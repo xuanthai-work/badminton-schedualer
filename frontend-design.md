@@ -250,7 +250,7 @@ Stitch should design **mobile portrait** as primary and provide a wider desktop 
   - Email input (placeholder `email@example.com`).
   - Primary button **"Mời"** (loading: **"Đang mời..."**).
   - Helper line under the form for status messages: **"Đã thêm thành viên." / "Người này đã có trong nhóm." / "Email chưa đăng ký tài khoản trên hệ thống."**
-  - Label is now **"Mời thêm thành viên (tên đăng nhập hoặc email)"** — the field accepts a **username or email** (resolved server-side). Status line also covers a generic not-found: **"Không tìm thấy người dùng với tên đăng nhập hoặc email này."**
+  - Label is now **"Mời thêm thành viên (tên đăng nhập hoặc email)"** — the field accepts a **username or email** (resolved server-side). **You can only invite accepted friends**; a non-friend returns the message **"Bạn chỉ có thể thêm bạn bè vào nhóm. Hãy kết bạn trước."** Status line also covers a generic not-found: **"Không tìm thấy người dùng với tên đăng nhập hoặc email này."**
 - **Mời từ bạn bè** card (admin-only, shipped): a glass panel with a `UserPlus` heading listing the admin's accepted friends **not already in the group**, each as `name @username#tag` + a small lime **"Mời"** button. Empty state when all friends are already members: **"Tất cả bạn bè đã ở trong nhóm."**
 - Member list (vertical, gap 12px). Each row is a glass panel:
   - Left: name (medium) with optional **"(bạn)"** badge after own name; email below in slate-400.

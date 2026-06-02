@@ -117,7 +117,13 @@ export default function MembersPanel({
         throw new Error(rpcError.message);
       }
       const result = data as
-        | { status: "added" | "already_member" | "user_not_found" }
+        | {
+            status:
+              | "added"
+              | "already_member"
+              | "not_friend"
+              | "user_not_found";
+          }
         | null;
 
       if (result?.status === "added") {
@@ -126,6 +132,8 @@ export default function MembersPanel({
         await load();
       } else if (result?.status === "already_member") {
         setInviteMsg(t("members.alreadyMember"));
+      } else if (result?.status === "not_friend") {
+        setInviteMsg(t("members.notFriend"));
       } else if (result?.status === "user_not_found") {
         setInviteMsg(t("members.notRegistered"));
       } else {
@@ -153,6 +161,8 @@ export default function MembersPanel({
         await load();
       } else if (result?.status === "already_member") {
         setInviteMsg(t("members.alreadyMember"));
+      } else if (result?.status === "not_friend") {
+        setInviteMsg(t("members.notFriend"));
       } else {
         setInviteMsg(t("members.cannotAdd"));
       }

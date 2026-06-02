@@ -54,7 +54,7 @@ type ProfileRow = {
 const USERNAME_REGEX = /^[a-zA-Z0-9._-]{3,20}$/;
 const TAG_REGEX = /^[0-9]{4}$/;
 // Where users are told to write to change a locked tag.
-const TAG_SUPPORT_EMAIL = "andrew.pham@techvify.com.vn";
+const TAG_SUPPORT_EMAIL = "xuanthaibui204@gmail.com";
 
 const randomTag = () =>
   String(Math.floor(Math.random() * 10000)).padStart(4, "0");

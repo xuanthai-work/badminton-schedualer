@@ -1,7 +1,9 @@
--- Invite by username OR email. Run in the Supabase SQL editor after phase2.sql.
--- Looks up by email when the identifier contains '@', otherwise by username
--- (case-insensitive). Lookup stays server-side so the inviter never sees the
--- invitee's email. Mirrors invite_user_by_email's return shape.
+-- Invite by username OR email. Run in the Supabase SQL editor after phase2.sql
+-- AND friends.sql (this references public.friendships). Looks up by email when
+-- the identifier contains '@', otherwise by username (case-insensitive). Lookup
+-- stays server-side so the inviter never sees the invitee's email. You can only
+-- invite someone who is an accepted friend of yours (returns 'not_friend'
+-- otherwise). Return shape: added | already_member | not_friend | user_not_found.
 
 create or replace function public.invite_user_by_identifier(
   target_group_id uuid,
@@ -52,6 +54,19 @@ begin
       and gm.user_id = invitee_id
   ) then
     return jsonb_build_object('status', 'already_member', 'user_id', invitee_id);
+  end if;
+
+  -- Can only invite an accepted friend of the caller.
+  if not exists (
+    select 1
+    from public.friendships f
+    where f.status = 'accepted'
+      and (
+        (f.requester = caller and f.addressee = invitee_id)
+        or (f.requester = invitee_id and f.addressee = caller)
+      )
+  ) then
+    return jsonb_build_object('status', 'not_friend');
   end if;
 
   insert into public.group_members (group_id, user_id, role)
