@@ -79,6 +79,7 @@ export default function HomePage() {
           email,
           password,
           options: {
+            emailRedirectTo: `${window.location.origin}/dashboard`,
             data: {
               name: trimmedUsername,
               username: trimmedUsername,
