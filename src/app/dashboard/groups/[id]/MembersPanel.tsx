@@ -29,7 +29,7 @@ export default function MembersPanel({
   const [members, setMembers] = useState<Member[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [inviteEmail, setInviteEmail] = useState("");
+  const [inviteValue, setInviteValue] = useState("");
   const [inviteBusy, setInviteBusy] = useState(false);
   const [inviteMsg, setInviteMsg] = useState("");
   const [actionBusy, setActionBusy] = useState<string | null>(null);
@@ -78,15 +78,15 @@ export default function MembersPanel({
 
   const handleInvite = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    const email = inviteEmail.trim().toLowerCase();
-    if (!email) return;
+    const identifier = inviteValue.trim();
+    if (!identifier) return;
 
     setInviteBusy(true);
     setInviteMsg("");
     try {
       const { data, error: rpcError } = await supabase.rpc(
-        "invite_user_by_email",
-        { target_group_id: groupId, target_email: email }
+        "invite_user_by_identifier",
+        { target_group_id: groupId, target_identifier: identifier }
       );
       if (rpcError) {
         throw new Error(rpcError.message);
@@ -97,7 +97,7 @@ export default function MembersPanel({
 
       if (result?.status === "added") {
         setInviteMsg(t("members.added"));
-        setInviteEmail("");
+        setInviteValue("");
         await load();
       } else if (result?.status === "already_member") {
         setInviteMsg(t("members.alreadyMember"));
@@ -176,11 +176,12 @@ export default function MembersPanel({
           <div className="min-w-[220px] flex-1 space-y-1 text-sm">
             <label className="text-slate-300">{t("members.inviteLabel")}</label>
             <input
-              type="email"
-              className="w-full rounded-xl border border-slate-800 bg-slate-950/60 px-3 py-2 text-slate-100 focus:outline-none focus:ring-2 focus:ring-lime-500/70"
-              placeholder="email@example.com"
-              value={inviteEmail}
-              onChange={(event) => setInviteEmail(event.target.value)}
+              type="text"
+              className="w-full rounded-xl border border-slate-800 bg-slate-950/60 px-3 py-2 text-slate-100 placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-lime-500/70"
+              placeholder={t("members.invitePlaceholder")}
+              value={inviteValue}
+              onChange={(event) => setInviteValue(event.target.value)}
+              autoComplete="off"
               required
             />
           </div>
