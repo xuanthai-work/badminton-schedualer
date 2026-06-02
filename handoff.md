@@ -5,7 +5,8 @@
 - **Phase 2:** Group detail with Matches & Members tabs; match detail with RSVP + expense entry + auto-split + reopen.
 - **Phase 2.5:** Stitch design port across all screens; bottom mobile nav; profile page (display name + bank + password + avatar + payment QR); group settings tab (rename + delete with type-to-confirm); Google Maps URL on matches; username-or-email sign-in.
 - **Phase 2.6:** Internationalization — Vietnamese (default) + English via a client Context + `localStorage`. Every screen and shared component reads from `t()`. Language switcher on the profile page. Committed `74d7af5`.
-- **Phase 2.7:** Invite by username or email; profile tag (`@username#0000`, set-once); friends system (add by `username#tag`, requests, accept/decline, friends list at `/dashboard/friends`, quick-invite friends into a group from the Members tab).
+- **Phase 2.7:** Invite by username or email; profile tag (`@username#0000`, set-once); friends system (add by `username#tag`, requests, accept/decline, friends list at `/dashboard/friends`, quick-invite friends into a group from the Members tab). Group invites restricted to accepted friends.
+- **Phase 2.8:** Realtime — the match detail page updates live (RSVPs, settle/reopen, expense) via Supabase Realtime. In-app notifications — new-match and added-to-group triggers write `notifications` rows; a header bell on the dashboard shows a live unread badge; `/dashboard/notifications` lists them and marks them read.
 
 ## Key files
 
@@ -20,6 +21,8 @@
 - `src/app/dashboard/groups/[id]/matches/[matchId]/page.tsx` — Hero info card, big RSVP buttons, expense receipt, admin settle/reopen.
 - `src/app/dashboard/groups/[id]/MembersPanel.tsx` — also has an admin-only "Mời từ bạn bè" quick-invite that lists accepted friends not yet in the group.
 - `src/app/dashboard/friends/page.tsx` — Friends: add by `username#tag`/email, incoming requests (accept/decline), outgoing (cancel), friends list (remove).
+- `src/app/dashboard/notifications/page.tsx` — Notifications list; renders text from `type`+`data` via i18n; marks all read on view. Bell entry point is `src/components/NotificationBell.tsx` (dashboard header, live unread badge via Realtime).
+- `src/app/dashboard/groups/[id]/matches/[matchId]/page.tsx` — also subscribes to Realtime (`rsvps`/`matches`/`expenses` for this match) and refetches on change.
 - `src/app/dashboard/profile/page.tsx` — `@username#tag` handle + set-once tag picker, avatar upload, display-name/login edit, bank info + QR upload, password, language switch, sign-out.
 
 ### Shared UI (src/components/)
@@ -51,6 +54,8 @@
 8. `supabase/profile-tag.sql` — `tag text` column on `public.users` + `users_tag_format` CHECK (`^[0-9]{4}$`, nullable). Decorative discriminator; no backfill (users pick once). Also folded into `schema.sql`.
 9. `supabase/friends.sql` — `friendships` table (requester/addressee/status, unique unordered-pair index) + RLS (SELECT own rows only; no client writes) + RPCs `send_friend_request`, `respond_friend_request`, `remove_friend`, `get_friends`.
 10. `supabase/invite-username.sql` — `invite_user_by_identifier(group_id, identifier)` RPC (matches email when `@` present, else `lower(username)`). **Run after `friends.sql`** — it references `public.friendships` to enforce that you can only invite accepted friends (`not_friend` otherwise). Re-run this file if you ran it before `friends.sql` existed.
+11. `supabase/realtime.sql` — adds `rsvps`/`matches`/`expenses` to the `supabase_realtime` publication + `replica identity full`. Enables live match-detail updates.
+12. `supabase/notifications.sql` — `notifications` table + RLS (own select/update/delete; no client insert) + triggers `notify_match_created` (after insert on `matches`) and `notify_added_to_group` (after insert on `group_members`, skips self) + adds `notifications` to the realtime publication.
 
 ## Setup requirements
 1. `.env.local` from `.env.example`:
@@ -68,6 +73,8 @@
 - **Profile tag:** decorative `#0000` discriminator (username stays globally unique). Set **once** via a direct `update` on `users.tag` (client-enforced single-write — there is no server lock yet, see Known issues). Shown as `@username#tag`. Changing later is meant to go through the admin (contact email shown on the profile).
 - **Friends:** `send_friend_request(identifier)` resolves `username#tag` / `username` / `email` to a user, inserting a `pending` friendship (or auto-accepting if the target already requested you). `respond_friend_request(id, accept)` (addressee only) accepts/declines; `remove_friend(id)` unfriends or cancels an outgoing request. `get_friends()` returns the enriched list (friend / incoming / outgoing) joined to each other user's profile — needed because the `users` SELECT policy only exposes self + group peers.
 - **Quick-invite friends to a group:** Members tab (admin) calls `get_friends()`, filters out current members, and invites a chosen friend via `invite_user_by_identifier` using their username.
+- **Live match detail:** on mount the match page opens a Supabase Realtime channel (`match-{id}`) listening to `postgres_changes` on `rsvps`/`matches`/`expenses` filtered to the match, and refetches on any event. RLS still gates delivery (only group members receive events). Channel is removed on unmount.
+- **Notifications:** DB triggers insert `notifications` rows (recipients = group members minus creator for new matches; the added user for group adds). `NotificationBell` (dashboard header) loads the unread count and subscribes to a Realtime channel `notifications-{uid}` (filter `user_id=eq.{uid}`) to keep the badge live. The notifications page renders each row from `type`+`data` (structured, not localized) and marks all unread read on view.
 - **RSVP:** any group member upserts into `rsvps` with `yes`/`no`. Disabled when match is `closed`.
 - **Settle match:** admin enters fees → `settle_match` RPC counts current `yes` RSVPs, computes per-person split, upserts `expenses`, flips match to `closed`. Returns `{attendees, total, fee_per_person}`.
 - **Reopen match:** admin can flip back to `open`. Saved expense is preserved.
@@ -86,6 +93,7 @@
 - Native `<input type=date|time>` / `<select>` dropdowns rendered in odd positions in Chrome DevTools mobile emulation — already replaced with custom popovers, but if you re-introduce a native one, add `style={{ colorScheme: 'dark' }}` and expect dev-tools-only positioning weirdness.
 - Profile QR/avatar uploads failing with "row-level security" — `supabase/storage.sql` not run, or bucket missing. Re-run.
 - Invite / friends / tag features throwing "function ... does not exist" or "column tag does not exist" → run the new migrations (`invite-username.sql`, `profile-tag.sql`, `friends.sql`).
+- Live updates / notifications not arriving → run `realtime.sql` + `notifications.sql`. Realtime only delivers rows the subscriber can SELECT under RLS, so a non-member won't see a match's events (by design). Notifications need the triggers installed — they fire on `matches` / `group_members` inserts.
 - **Tag lock is client-side only:** a user could still PATCH their own `users.tag` directly (RLS allows updating own row). If the set-once lock must be enforced, move tag-setting into a `set_tag` RPC that rejects a second write.
 
 ## Run / verify
@@ -95,8 +103,10 @@
 - Lint: `npm run lint`
 
 ## Next steps (Phase 3 candidates)
+- Payment surface on a closed match (admin QR / dynamic VietQR + per-attendee paid/confirm tracking) — closes the core bill-split loop. Then a "Công nợ của tôi" debt rollup on the dashboard.
+- Email notifications via a Supabase Edge Function + provider (Resend), reusing the `notifications` rows / triggers as the source.
+- More notification types (friend request received/accepted, match settled); fold friend requests into the bell.
 - Enforce the tag set-once lock server-side (`set_tag` RPC), and/or let users change it; show `@username#tag` in more places (dashboard greeting, member rows, RSVP rows).
-- Friends polish: realtime badge for incoming requests on the bottom nav; block/ignore; search-as-you-type.
 - i18n polish: persist language in `public.users` (per-account, not just per-device); add a 3rd language by dropping in a new dictionary + extending `LANGS`/`Lang`; localize match/expense memo strings if VietQR is wired.
 - Wire the avatar into the dashboard greeting + group cards + member list + RSVP list.
 - Show admin's bank QR + bank info on the match detail page when match is closed (the "MỞ GOOGLE MAPS" pill is already in place as a precedent for header link pills).

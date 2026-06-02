@@ -159,6 +159,32 @@ export default function MatchDetailPage() {
     void init();
   }, [router, load, t]);
 
+  // Live updates: refetch when this match's rsvps/status/expense change.
+  useEffect(() => {
+    if (!userId || !matchId) return;
+    const channel = supabase
+      .channel(`match-${matchId}-${Math.random().toString(36).slice(2)}`)
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "rsvps", filter: `match_id=eq.${matchId}` },
+        () => void load(userId)
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "matches", filter: `id=eq.${matchId}` },
+        () => void load(userId)
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "expenses", filter: `match_id=eq.${matchId}` },
+        () => void load(userId)
+      )
+      .subscribe();
+    return () => {
+      void supabase.removeChannel(channel);
+    };
+  }, [userId, matchId, load]);
+
   const myRsvp = userId ? rsvps.find((r) => r.userId === userId) : undefined;
   const yesList = rsvps.filter((r) => r.status === "yes");
   const noList = rsvps.filter((r) => r.status === "no");

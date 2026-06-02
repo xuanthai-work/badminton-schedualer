@@ -281,6 +281,13 @@ const vi = {
     errSend: "Lỗi gửi lời mời.",
     errAction: "Đã có lỗi xảy ra.",
   },
+  notifications: {
+    title: "Thông báo",
+    empty: "Chưa có thông báo.",
+    loadError: "Không thể tải thông báo.",
+    matchCreated: "Trận đấu mới tại {group}: {date} lúc {time}",
+    addedToGroup: "{actor} đã thêm bạn vào nhóm {group}",
+  },
   nav: {
     home: "Trang chủ",
     friends: "Bạn bè",
@@ -577,6 +584,13 @@ const en: typeof vi = {
     self: "You can't add yourself.",
     errSend: "Failed to send request.",
     errAction: "Something went wrong.",
+  },
+  notifications: {
+    title: "Notifications",
+    empty: "No notifications yet.",
+    loadError: "Could not load notifications.",
+    matchCreated: "New match in {group}: {date} at {time}",
+    addedToGroup: "{actor} added you to {group}",
   },
   nav: {
     home: "Home",

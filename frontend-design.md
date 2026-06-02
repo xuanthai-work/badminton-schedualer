@@ -133,6 +133,7 @@ Hover state (only on interactive cards): border becomes `border-lime-500/40`.
 /dashboard/groups/[id]                         Group detail (tabs: Matches, Members, Cài đặt)
 /dashboard/groups/[id]/matches/[matchId]       Match detail (RSVP + expense + Maps link)
 /dashboard/friends                             Friends (add by username#tag, requests, list)
+/dashboard/notifications                       Notifications list (new match, added to group)
 /dashboard/profile                             Handle/tag / avatar / login / bank / QR / password / language / sign-out
 ```
 
@@ -184,6 +185,7 @@ Stitch should design **mobile portrait** as primary and provide a wider desktop 
 **Header:**
 - Lime tracking label: **"DASHBOARD"**.
 - Page title (24px semibold, lime text): **"Nhóm của tôi"**.
+- **Notification bell** top-right (`Bell`, 40px rounded glass button) with a lime unread badge (count, "9+" cap) that updates live via Realtime; links to `/dashboard/notifications`.
 - No sign-out button (moved to the profile page; reachable from bottom nav).
 
 **Welcome section:**
@@ -277,7 +279,7 @@ Two glass cards stacked:
 
 ### 5.4 Match detail (`/dashboard/groups/[id]/matches/[matchId]`)
 
-The most important screen. Mobile-first, vertical scroll. Two visual states: **Open** and **Closed**.
+The most important screen. Mobile-first, vertical scroll. Two visual states: **Open** and **Closed**. **Live:** the attendee lists, status pill, and receipt update in real time (Supabase Realtime) when anyone RSVPs or the admin settles/reopens — no refresh.
 
 **Header (both states):**
 - Small lime back-link with `ChevronLeft`: **"← QUAY LẠI NHÓM"**.
@@ -422,6 +424,23 @@ For a member viewing their own row: show **"Tôi đã chuyển khoản"** button
 
 ---
 
+### 5.6c Notifications (`/dashboard/notifications`) — shipped
+
+**Purpose:** a simple feed of events that concern the user. Reached via the dashboard header bell (live unread badge).
+
+**Header:** lime back-link **"← DASHBOARD"** + title **"Thông báo"**.
+
+**List:** newest first, each row a glass panel (links to its target; hover lights the border):
+- Left: lime-tinted rounded icon box — `Calendar` for a new match, `UserPlus` for a group add.
+- Text rendered from structured data (i18n), e.g. **"Trận đấu mới tại {nhóm}: {ngày} lúc {giờ}"** → links to the match; **"{tên} đã thêm bạn vào nhóm {nhóm}"** → links to the group.
+- Small slate timestamp under the text; `ChevronRight` on the right.
+- Unread rows carry a faint lime border; opening the page marks everything read (the header badge clears live).
+- Empty state: **"Chưa có thông báo."**
+
+**Sources (DB triggers):** a new match notifies all group members except the creator; being added to a group notifies the added user. Designed to extend (friend requests, match settled, …).
+
+---
+
 ### 5.6 Empty/loading/error patterns (apply everywhere)
 
 - **Loading:** 1–3 glass-panel skeletons at 40–60% opacity with `animate-pulse`. Never a spinner.
@@ -482,4 +501,6 @@ When porting Stitch output back to code, override these recurring drifts:
 - **i18n shipped:** app is bilingual VI (default) + EN via `src/lib/i18n/`. Vietnamese stays the source-of-truth for design copy. Language switcher added to Profile §5.5 (Section 4); sign-out is now Section 5. Dates/currency and the `DateField` picker follow the active locale.
 - **Invite by username or email** (Members tab §5.3.2) — field no longer email-only.
 - **Profile tag** (§5.5 Section 1): `@username#0000` handle + set-once 4-digit tag picker.
-- **Friends** (§5.6b, route `/dashboard/friends`): add by `username#tag`, requests in/out, friends list; bottom nav is now **3 items** (Trang chủ / Bạn bè / Tài khoản). Members tab gained a **"Mời từ bạn bè"** quick-invite.
+- **Friends** (§5.6b, route `/dashboard/friends`): add by `username#tag`, requests in/out, friends list; bottom nav is now **3 items** (Trang chủ / Bạn bè / Tài khoản). Members tab gained a **"Mời từ bạn bè"** quick-invite, and group invites are now **friends-only**.
+- **Realtime** (§5.4): match detail updates live (RSVPs, settle/reopen, receipt).
+- **Notifications** (§5.6c, route `/dashboard/notifications`): in-app feed (new match, added to group) with a live unread **bell** badge in the dashboard header (§5.2).

@@ -8,6 +8,7 @@ import { supabase } from "@/lib/supabaseClient";
 import { ensureUserProfile } from "@/lib/userProfile";
 import { useI18n } from "@/lib/i18n";
 import BottomNav from "@/components/BottomNav";
+import NotificationBell from "@/components/NotificationBell";
 import CreateGroupPanel from "./CreateGroupPanel";
 
 type GroupCard = {
@@ -140,13 +141,16 @@ export default function DashboardPage() {
       />
 
       <div className="relative mx-auto flex w-full max-w-5xl flex-col gap-8 pb-16">
-        <header>
-          <p className="text-xs font-semibold uppercase tracking-[0.3em] text-lime-400">
-            {t("dashboard.eyebrow")}
-          </p>
-          <h1 className="mt-1 text-2xl font-semibold leading-tight text-lime-400">
-            {t("dashboard.myGroups")}
-          </h1>
+        <header className="flex items-start justify-between gap-4">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.3em] text-lime-400">
+              {t("dashboard.eyebrow")}
+            </p>
+            <h1 className="mt-1 text-2xl font-semibold leading-tight text-lime-400">
+              {t("dashboard.myGroups")}
+            </h1>
+          </div>
+          <NotificationBell />
         </header>
 
         <section className="space-y-1">
