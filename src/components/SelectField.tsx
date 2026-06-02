@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { Check, ChevronDown } from "lucide-react";
+import { useI18n } from "@/lib/i18n";
 
 export type SelectOption = {
   value: string;
@@ -21,12 +22,14 @@ export default function SelectField({
   value,
   onChange,
   options,
-  placeholder = "— Chọn —",
+  placeholder,
   required,
   disabled,
 }: Props) {
+  const { t } = useI18n();
   const [open, setOpen] = useState(false);
   const wrapperRef = useRef<HTMLDivElement>(null);
+  const placeholderText = placeholder ?? t("fields.select");
 
   useEffect(() => {
     if (!open) return;
@@ -55,7 +58,7 @@ export default function SelectField({
         }`}
       >
         <span className={selected ? "text-slate-100" : "text-slate-500"}>
-          {selected?.label ?? placeholder}
+          {selected?.label ?? placeholderText}
         </span>
         <ChevronDown
           size={16}

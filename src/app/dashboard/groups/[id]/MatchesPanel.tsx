@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { ChevronRight, MapPin, Plus, Users } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
+import { useI18n } from "@/lib/i18n";
 import DateField from "@/components/DateField";
 import TimeField from "@/components/TimeField";
 
@@ -22,6 +23,7 @@ type Props = {
 };
 
 export default function MatchesPanel({ groupId, isAdmin }: Props) {
+  const { t, lang } = useI18n();
   const [matches, setMatches] = useState<Match[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -63,9 +65,9 @@ export default function MatchesPanel({ groupId, isAdmin }: Props) {
       setMatches(mapped);
       setError("");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Lỗi tải lịch.");
+      setError(err instanceof Error ? err.message : t("matches.errLoad"));
     }
-  }, [groupId]);
+  }, [groupId, t]);
 
   useEffect(() => {
     const run = async () => {
@@ -91,13 +93,13 @@ export default function MatchesPanel({ groupId, isAdmin }: Props) {
     setFormError("");
 
     if (!date || !time || !location.trim()) {
-      setFormError("Vui lòng nhập đủ ngày, giờ và địa điểm.");
+      setFormError(t("matches.errRequired"));
       return;
     }
 
     const trimmedUrl = locationUrl.trim();
     if (trimmedUrl && !/^https?:\/\//i.test(trimmedUrl)) {
-      setFormError("Link Google Maps phải bắt đầu bằng http:// hoặc https://.");
+      setFormError(t("matches.errMapsUrl"));
       return;
     }
 
@@ -122,7 +124,7 @@ export default function MatchesPanel({ groupId, isAdmin }: Props) {
       reset();
       await load();
     } catch (err) {
-      setFormError(err instanceof Error ? err.message : "Tạo lịch thất bại.");
+      setFormError(err instanceof Error ? err.message : t("matches.errCreate"));
     } finally {
       setSubmitting(false);
     }
@@ -131,7 +133,7 @@ export default function MatchesPanel({ groupId, isAdmin }: Props) {
   const formatDate = (value: string) => {
     const parsed = new Date(`${value}T00:00:00`);
     if (Number.isNaN(parsed.getTime())) return value;
-    return parsed.toLocaleDateString("vi-VN", {
+    return parsed.toLocaleDateString(lang === "vi" ? "vi-VN" : "en-US", {
       weekday: "short",
       day: "2-digit",
       month: "2-digit",
@@ -142,7 +144,7 @@ export default function MatchesPanel({ groupId, isAdmin }: Props) {
   return (
     <section className="space-y-4">
       <div className="flex items-center justify-between">
-        <h2 className="text-lg font-semibold">Lịch đánh</h2>
+        <h2 className="text-lg font-semibold">{t("matches.title")}</h2>
         {isAdmin && (
           <button
             type="button"
@@ -150,7 +152,7 @@ export default function MatchesPanel({ groupId, isAdmin }: Props) {
             onClick={() => setOpen(true)}
           >
             <Plus size={16} strokeWidth={2.25} />
-            Tạo lịch
+            {t("matches.create")}
           </button>
         )}
       </div>
@@ -161,7 +163,7 @@ export default function MatchesPanel({ groupId, isAdmin }: Props) {
         <div className="glass-panel h-40 animate-pulse rounded-2xl" />
       ) : matches.length === 0 ? (
         <div className="glass-panel rounded-2xl p-6 text-sm text-slate-300">
-          Chưa có lịch nào. {isAdmin && "Bấm Tạo lịch để bắt đầu."}
+          {t("matches.empty")} {isAdmin && t("matches.emptyAdminHint")}
         </div>
       ) : (
         <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -193,7 +195,9 @@ export default function MatchesPanel({ groupId, isAdmin }: Props) {
                         : "border-white/10 bg-slate-800 text-slate-400"
                     }`}
                   >
-                    {match.status === "open" ? "Đang mở" : "Đã chốt"}
+                    {match.status === "open"
+                      ? t("matches.statusOpen")
+                      : t("matches.statusClosed")}
                   </span>
                 </div>
 
@@ -212,12 +216,12 @@ export default function MatchesPanel({ groupId, isAdmin }: Props) {
                       strokeWidth={1.75}
                       className="text-slate-400"
                     />
-                    <span>{match.yesCount} người tham gia</span>
+                    <span>{t("matches.attendees", { count: match.yesCount })}</span>
                   </div>
                 </div>
 
                 <div className="mt-auto flex items-center justify-end border-t border-white/10 pt-3 text-xs font-semibold uppercase tracking-[0.18em] text-lime-400">
-                  Chi tiết
+                  {t("matches.details")}
                   <ChevronRight
                     size={14}
                     strokeWidth={2}
@@ -242,7 +246,7 @@ export default function MatchesPanel({ groupId, isAdmin }: Props) {
         >
           <div className="glass-panel w-full max-w-lg rounded-2xl p-6 shadow-2xl">
             <div className="mb-4 flex items-center justify-between">
-              <h3 className="text-lg font-semibold">Tạo lịch đánh</h3>
+              <h3 className="text-lg font-semibold">{t("matches.modalTitle")}</h3>
               <button
                 type="button"
                 className="text-sm text-slate-400 hover:text-slate-200"
@@ -251,25 +255,25 @@ export default function MatchesPanel({ groupId, isAdmin }: Props) {
                   reset();
                 }}
               >
-                Đóng
+                {t("common.close")}
               </button>
             </div>
             <form onSubmit={handleCreate} className="space-y-4">
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1 text-sm">
-                  <label className="text-slate-300">Ngày</label>
+                  <label className="text-slate-300">{t("matches.date")}</label>
                   <DateField value={date} onChange={setDate} required />
                 </div>
                 <div className="space-y-1 text-sm">
-                  <label className="text-slate-300">Giờ</label>
+                  <label className="text-slate-300">{t("matches.time")}</label>
                   <TimeField value={time} onChange={setTime} required />
                 </div>
               </div>
               <div className="space-y-1 text-sm">
-                <label className="text-slate-300">Sân / Địa điểm</label>
+                <label className="text-slate-300">{t("matches.location")}</label>
                 <input
                   className="w-full rounded-xl border border-slate-800 bg-slate-950/60 px-3 py-2 text-slate-100 focus:outline-none focus:ring-2 focus:ring-lime-500/70"
-                  placeholder="Ví dụ: Sân Phú Mỹ Hưng - Sân 3"
+                  placeholder={t("matches.locationPlaceholder")}
                   value={location}
                   onChange={(event) => setLocation(event.target.value)}
                   required
@@ -277,8 +281,10 @@ export default function MatchesPanel({ groupId, isAdmin }: Props) {
               </div>
               <div className="space-y-1 text-sm">
                 <label className="text-slate-300">
-                  Link Google Maps{" "}
-                  <span className="text-xs text-slate-500">(tùy chọn)</span>
+                  {t("matches.mapsLink")}{" "}
+                  <span className="text-xs text-slate-500">
+                    {t("matches.optional")}
+                  </span>
                 </label>
                 <input
                   type="url"
@@ -301,13 +307,13 @@ export default function MatchesPanel({ groupId, isAdmin }: Props) {
                     reset();
                   }}
                 >
-                  Hủy
+                  {t("common.cancel")}
                 </button>
                 <button
                   className="rounded-xl bg-lime-500 px-4 py-2 text-sm font-semibold text-slate-950 disabled:opacity-60"
                   disabled={submitting}
                 >
-                  {submitting ? "Đang tạo..." : "Tạo lịch"}
+                  {submitting ? t("matches.creating") : t("matches.create")}
                 </button>
               </div>
             </form>

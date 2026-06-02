@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { AlertTriangle, Pencil, Save, Trash2 } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
+import { useI18n } from "@/lib/i18n";
 
 type Props = {
   groupId: string;
@@ -17,10 +18,13 @@ export default function GroupSettingsPanel({
   onRenamed,
 }: Props) {
   const router = useRouter();
+  const { t } = useI18n();
 
   const [name, setName] = useState(groupName);
   const [renameBusy, setRenameBusy] = useState(false);
-  const [renameMsg, setRenameMsg] = useState("");
+  const [renameMsg, setRenameMsg] = useState<{ text: string; ok: boolean } | null>(
+    null
+  );
 
   const [open, setOpen] = useState(false);
   const [confirmText, setConfirmText] = useState("");
@@ -40,20 +44,20 @@ export default function GroupSettingsPanel({
     event.preventDefault();
     const trimmed = name.trim();
     if (!trimmed) {
-      setRenameMsg("Tên nhóm không được để trống.");
+      setRenameMsg({ text: t("settings.errNameEmpty"), ok: false });
       return;
     }
     if (trimmed.length > 80) {
-      setRenameMsg("Tên nhóm tối đa 80 ký tự.");
+      setRenameMsg({ text: t("settings.errNameTooLong"), ok: false });
       return;
     }
     if (trimmed === groupName.trim()) {
-      setRenameMsg("Tên không thay đổi.");
+      setRenameMsg({ text: t("settings.nameUnchanged"), ok: false });
       return;
     }
 
     setRenameBusy(true);
-    setRenameMsg("");
+    setRenameMsg(null);
     try {
       const { error: updateError } = await supabase
         .from("groups")
@@ -62,9 +66,12 @@ export default function GroupSettingsPanel({
       if (updateError) throw new Error(updateError.message);
 
       onRenamed(trimmed);
-      setRenameMsg("Đã đổi tên nhóm.");
+      setRenameMsg({ text: t("settings.renamed"), ok: true });
     } catch (err) {
-      setRenameMsg(err instanceof Error ? err.message : "Lỗi đổi tên nhóm.");
+      setRenameMsg({
+        text: err instanceof Error ? err.message : t("settings.errRename"),
+        ok: false,
+      });
     } finally {
       setRenameBusy(false);
     }
@@ -82,7 +89,7 @@ export default function GroupSettingsPanel({
       if (deleteError) throw new Error(deleteError.message);
       router.push("/dashboard");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Lỗi xóa nhóm.");
+      setError(err instanceof Error ? err.message : t("settings.errDelete"));
       setBusy(false);
     }
   };
@@ -92,26 +99,24 @@ export default function GroupSettingsPanel({
       <div className="glass-panel rounded-2xl p-5">
         <div className="mb-4 flex items-center gap-2">
           <Pencil size={18} strokeWidth={1.75} className="text-lime-400" />
-          <h2 className="text-base font-semibold">Tên nhóm</h2>
+          <h2 className="text-base font-semibold">{t("settings.nameTitle")}</h2>
         </div>
         <form onSubmit={handleRename} className="space-y-3">
           <input
             className="w-full rounded-xl border border-slate-800 bg-slate-950/60 px-4 py-3 text-slate-100 placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-lime-500/70"
             value={name}
             onChange={(event) => setName(event.target.value)}
-            placeholder="Tên nhóm"
+            placeholder={t("settings.namePlaceholder")}
             maxLength={80}
             required
           />
           {renameMsg && (
             <p
               className={`text-xs ${
-                renameMsg.startsWith("Đã")
-                  ? "text-lime-300"
-                  : "text-rose-400"
+                renameMsg.ok ? "text-lime-300" : "text-rose-400"
               }`}
             >
-              {renameMsg}
+              {renameMsg.text}
             </p>
           )}
           <button
@@ -120,7 +125,7 @@ export default function GroupSettingsPanel({
             disabled={renameBusy || name.trim() === groupName.trim()}
           >
             <Save size={14} strokeWidth={2} />
-            {renameBusy ? "Đang lưu..." : "Lưu tên mới"}
+            {renameBusy ? t("settings.saving") : t("settings.saveName")}
           </button>
         </form>
       </div>
@@ -133,12 +138,15 @@ export default function GroupSettingsPanel({
             className="text-rose-300"
           />
           <h2 className="text-base font-semibold text-rose-300">
-            Vùng nguy hiểm
+            {t("settings.dangerZone")}
           </h2>
         </div>
         <p className="text-sm text-slate-300">
-          Xóa nhóm sẽ <strong>xóa vĩnh viễn</strong> tất cả lịch đánh, RSVP, và
-          chi phí đã ghi nhận. Hành động này <strong>không thể hoàn tác</strong>.
+          {t("settings.warnP1")}
+          <strong>{t("settings.warnStrong1")}</strong>
+          {t("settings.warnP2")}
+          <strong>{t("settings.warnStrong2")}</strong>
+          {t("settings.warnP3")}
         </p>
         <button
           type="button"
@@ -146,7 +154,7 @@ export default function GroupSettingsPanel({
           className="mt-4 inline-flex items-center gap-2 rounded-xl border border-rose-700/60 bg-rose-500/15 px-4 py-2 text-sm font-semibold text-rose-300 transition hover:bg-rose-500/25 active:scale-95"
         >
           <Trash2 size={16} strokeWidth={1.75} />
-          Xóa nhóm
+          {t("settings.deleteGroup")}
         </button>
       </div>
 
@@ -165,17 +173,17 @@ export default function GroupSettingsPanel({
                 className="text-rose-300"
               />
               <h3 className="text-lg font-semibold text-rose-300">
-                Xóa nhóm này?
+                {t("settings.modalTitle")}
               </h3>
             </div>
             <p className="text-sm text-slate-300">
-              Bạn sắp xóa nhóm{" "}
-              <span className="font-semibold text-slate-100">{groupName}</span>.
-              Toàn bộ lịch đánh, RSVP và chi phí sẽ bị xóa.
+              {t("settings.modalBodyPrefix")}
+              <span className="font-semibold text-slate-100">{groupName}</span>
+              {t("settings.modalBodySuffix")}
             </p>
             <div className="mt-4 space-y-1 text-sm">
               <label className="ml-1 text-[10px] font-semibold uppercase tracking-[0.2em] text-slate-400">
-                Gõ tên nhóm để xác nhận
+                {t("settings.typeToConfirm")}
               </label>
               <input
                 className="w-full rounded-xl border border-slate-800 bg-slate-950/60 px-4 py-3 text-slate-100 placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-rose-500/70"
@@ -195,7 +203,7 @@ export default function GroupSettingsPanel({
                 disabled={busy}
                 className="rounded-xl border border-slate-700 px-4 py-2 text-sm text-slate-200 transition hover:border-slate-500 disabled:opacity-60"
               >
-                Hủy
+                {t("common.cancel")}
               </button>
               <button
                 type="button"
@@ -204,7 +212,7 @@ export default function GroupSettingsPanel({
                 className="inline-flex items-center gap-2 rounded-xl bg-rose-500 px-4 py-2 text-sm font-semibold text-slate-950 transition hover:bg-rose-400 active:scale-95 disabled:opacity-40 disabled:hover:bg-rose-500"
               >
                 <Trash2 size={14} strokeWidth={2} />
-                {busy ? "Đang xóa..." : "Xóa vĩnh viễn"}
+                {busy ? t("settings.deleting") : t("settings.deletePermanent")}
               </button>
             </div>
           </div>

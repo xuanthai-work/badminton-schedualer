@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import { ensureUserProfile } from "@/lib/userProfile";
+import { useI18n } from "@/lib/i18n";
 
 type Mode = "login" | "register";
 
@@ -13,6 +14,7 @@ const isEmail = (value: string) => value.includes("@");
 
 export default function HomePage() {
   const router = useRouter();
+  const { t } = useI18n();
   const [mode, setMode] = useState<Mode>("login");
   const [username, setUsername] = useState("");
   const [identifier, setIdentifier] = useState("");
@@ -61,9 +63,7 @@ export default function HomePage() {
       if (mode === "register") {
         const trimmedUsername = username.trim();
         if (!USERNAME_REGEX.test(trimmedUsername)) {
-          throw new Error(
-            "Tên đăng nhập 3-20 ký tự, chỉ chữ/số và . _ -"
-          );
+          throw new Error(t("auth.errUsernameRule"));
         }
 
         const { data: availData, error: availError } = await supabase.rpc(
@@ -72,7 +72,7 @@ export default function HomePage() {
         );
         if (availError) throw new Error(availError.message);
         if (availData === false) {
-          throw new Error("Tên đăng nhập này đã có người dùng.");
+          throw new Error(t("auth.errUsernameTaken"));
         }
 
         const { data, error: signUpError } = await supabase.auth.signUp({
@@ -92,7 +92,7 @@ export default function HomePage() {
         }
 
         if (!data.session) {
-          setInfo("Vui lòng kiểm tra email để xác nhận tài khoản.");
+          setInfo(t("auth.checkEmail"));
           return;
         }
 
@@ -109,7 +109,7 @@ export default function HomePage() {
           );
           if (resolveError) throw new Error(resolveError.message);
           if (typeof resolved !== "string" || !resolved) {
-            throw new Error("Tên đăng nhập không tồn tại.");
+            throw new Error(t("auth.errUsernameNotFound"));
           }
           signInEmail = resolved;
         }
@@ -130,7 +130,7 @@ export default function HomePage() {
 
       router.push("/dashboard");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Xác thực thất bại.");
+      setError(err instanceof Error ? err.message : t("auth.errAuthFailed"));
     } finally {
       setLoading(false);
     }
@@ -153,13 +153,13 @@ export default function HomePage() {
 
       <section className="relative z-10 w-full max-w-[480px] text-center">
         <p className="mb-4 text-xs font-semibold uppercase tracking-[0.3em] text-lime-400">
-          Badminton Scheduler
+          {t("auth.brand")}
         </p>
         <h1 className="text-[32px] font-semibold leading-tight text-slate-50">
-          Chơi cầu lông không lo chia tiền.
+          {t("auth.heroTitle")}
         </h1>
         <p className="mt-3 text-base text-slate-300">
-          Lên lịch, điểm danh realtime và chia chi phí cho cả nhóm trong vài phút.
+          {t("auth.heroSubtitle")}
         </p>
       </section>
 
@@ -174,7 +174,7 @@ export default function HomePage() {
             }`}
             onClick={() => setMode("login")}
           >
-            Đăng nhập
+            {t("auth.login")}
           </button>
           <button
             type="button"
@@ -185,7 +185,7 @@ export default function HomePage() {
             }`}
             onClick={() => setMode("register")}
           >
-            Đăng ký
+            {t("auth.register")}
           </button>
         </div>
 
@@ -196,12 +196,12 @@ export default function HomePage() {
           disabled={loading}
         >
           <GoogleMark />
-          <span>Đăng nhập với Google</span>
+          <span>{t("auth.googleSignIn")}</span>
         </button>
 
         <div className="my-5 flex items-center gap-3 text-[10px] uppercase tracking-[0.25em] text-slate-500">
           <span className="h-px flex-1 bg-slate-800" />
-          {mode === "login" ? "Hoặc dùng tài khoản" : "Hoặc tạo tài khoản"}
+          {mode === "login" ? t("auth.orUseAccount") : t("auth.orCreateAccount")}
           <span className="h-px flex-1 bg-slate-800" />
         </div>
 
@@ -210,27 +210,28 @@ export default function HomePage() {
             <>
               <div className="space-y-1 text-sm">
                 <label className="ml-1 text-xs text-slate-400">
-                  Tên đăng nhập
+                  {t("auth.username")}
                 </label>
                 <input
                   className="w-full rounded-xl border border-slate-800 bg-slate-950/60 px-4 py-3 text-slate-100 placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-lime-500/70"
-                  placeholder="nguyenvana"
+                  placeholder={t("auth.usernamePlaceholder")}
                   value={username}
                   onChange={(event) => setUsername(event.target.value)}
                   autoComplete="username"
                   required
                 />
                 <p className="ml-1 text-[11px] text-slate-500">
-                  Dùng làm tên hiển thị và để đăng nhập. 3-20 ký tự, chỉ chữ/số
-                  và . _ -
+                  {t("auth.usernameHint")}
                 </p>
               </div>
               <div className="space-y-1 text-sm">
-                <label className="ml-1 text-xs text-slate-400">Email</label>
+                <label className="ml-1 text-xs text-slate-400">
+                  {t("auth.email")}
+                </label>
                 <input
                   type="email"
                   className="w-full rounded-xl border border-slate-800 bg-slate-950/60 px-4 py-3 text-slate-100 placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-lime-500/70"
-                  placeholder="email@vi-du.com"
+                  placeholder={t("auth.emailPlaceholder")}
                   value={email}
                   onChange={(event) => setEmail(event.target.value)}
                   autoComplete="email"
@@ -243,11 +244,11 @@ export default function HomePage() {
           {mode === "login" && (
             <div className="space-y-1 text-sm">
               <label className="ml-1 text-xs text-slate-400">
-                Tên đăng nhập hoặc email
+                {t("auth.identifier")}
               </label>
               <input
                 className="w-full rounded-xl border border-slate-800 bg-slate-950/60 px-4 py-3 text-slate-100 placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-lime-500/70"
-                placeholder="nguyenvana hoặc email@vi-du.com"
+                placeholder={t("auth.identifierPlaceholder")}
                 value={identifier}
                 onChange={(event) => setIdentifier(event.target.value)}
                 autoComplete="username"
@@ -257,7 +258,9 @@ export default function HomePage() {
           )}
 
           <div className="space-y-1 text-sm">
-            <label className="ml-1 text-xs text-slate-400">Mật khẩu</label>
+            <label className="ml-1 text-xs text-slate-400">
+              {t("auth.password")}
+            </label>
             <input
               type="password"
               className="w-full rounded-xl border border-slate-800 bg-slate-950/60 px-4 py-3 text-slate-100 placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-lime-500/70"
@@ -279,10 +282,10 @@ export default function HomePage() {
             disabled={loading}
           >
             {loading
-              ? "Đang xử lý..."
+              ? t("auth.processing")
               : mode === "login"
-                ? "Đăng nhập"
-                : "Tạo tài khoản"}
+                ? t("auth.login")
+                : t("auth.createAccount")}
           </button>
         </form>
       </section>

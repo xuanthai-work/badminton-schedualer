@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   ChevronLeft,
+  Globe,
   KeyRound,
   Landmark,
   LogOut,
@@ -12,6 +13,8 @@ import {
   UserCog,
 } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
+import { useI18n } from "@/lib/i18n";
+import { LANGS } from "@/lib/i18n/translations";
 import BottomNav from "@/components/BottomNav";
 import SelectField from "@/components/SelectField";
 import ImageUpload from "@/components/ImageUpload";
@@ -48,6 +51,7 @@ const USERNAME_REGEX = /^[a-zA-Z0-9._-]{3,20}$/;
 
 export default function ProfilePage() {
   const router = useRouter();
+  const { t, lang, setLang } = useI18n();
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -60,13 +64,17 @@ export default function ProfilePage() {
 
   const [name, setName] = useState("");
   const [nameBusy, setNameBusy] = useState(false);
-  const [nameMsg, setNameMsg] = useState("");
+  const [nameMsg, setNameMsg] = useState<{ text: string; ok: boolean } | null>(
+    null
+  );
 
   const [bankId, setBankId] = useState("");
   const [bankAccount, setBankAccount] = useState("");
   const [bankAccountName, setBankAccountName] = useState("");
   const [bankBusy, setBankBusy] = useState(false);
-  const [bankMsg, setBankMsg] = useState("");
+  const [bankMsg, setBankMsg] = useState<{ text: string; ok: boolean } | null>(
+    null
+  );
 
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -96,7 +104,7 @@ export default function ProfilePage() {
           .eq("id", u.id)
           .maybeSingle();
         if (queryError) throw queryError;
-        if (!row) throw new Error("Không tìm thấy hồ sơ.");
+        if (!row) throw new Error(t("profile.errProfileNotFound"));
 
         const profileRow: ProfileRow = {
           name: row.name,
@@ -114,13 +122,13 @@ export default function ProfilePage() {
         setBankAccount(profileRow.bankAccount ?? "");
         setBankAccountName(profileRow.bankAccountName ?? "");
       } catch (err) {
-        setError(err instanceof Error ? err.message : "Không thể tải hồ sơ.");
+        setError(err instanceof Error ? err.message : t("profile.errLoad"));
       } finally {
         setLoading(false);
       }
     };
     void init();
-  }, [router]);
+  }, [router, t]);
 
   const canChangePassword = providers.includes("email");
 
@@ -128,11 +136,11 @@ export default function ProfilePage() {
     event.preventDefault();
     const trimmed = name.trim();
     if (!USERNAME_REGEX.test(trimmed)) {
-      setNameMsg("Tên đăng nhập 3-20 ký tự, chỉ chữ/số và . _ -");
+      setNameMsg({ text: t("profile.errUsernameRule"), ok: false });
       return;
     }
     setNameBusy(true);
-    setNameMsg("");
+    setNameMsg(null);
     try {
       const current = profile?.username ?? "";
       if (trimmed.toLowerCase() !== current.toLowerCase()) {
@@ -142,7 +150,7 @@ export default function ProfilePage() {
         );
         if (availError) throw new Error(availError.message);
         if (avail === false) {
-          throw new Error("Tên đăng nhập này đã có người dùng.");
+          throw new Error(t("profile.errUsernameTaken"));
         }
       }
 
@@ -154,9 +162,12 @@ export default function ProfilePage() {
       setProfile((p) =>
         p ? { ...p, name: trimmed, username: trimmed } : p
       );
-      setNameMsg("Đã lưu tên đăng nhập.");
+      setNameMsg({ text: t("profile.nameSaved"), ok: true });
     } catch (err) {
-      setNameMsg(err instanceof Error ? err.message : "Lỗi cập nhật tên.");
+      setNameMsg({
+        text: err instanceof Error ? err.message : t("profile.errName"),
+        ok: false,
+      });
     } finally {
       setNameBusy(false);
     }
@@ -165,7 +176,7 @@ export default function ProfilePage() {
   const handleSaveBank = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setBankBusy(true);
-    setBankMsg("");
+    setBankMsg(null);
     try {
       const payload = {
         bank_id: bankId || null,
@@ -187,9 +198,12 @@ export default function ProfilePage() {
             }
           : p
       );
-      setBankMsg("Đã lưu thông tin ngân hàng.");
+      setBankMsg({ text: t("profile.bankSaved"), ok: true });
     } catch (err) {
-      setBankMsg(err instanceof Error ? err.message : "Lỗi cập nhật ngân hàng.");
+      setBankMsg({
+        text: err instanceof Error ? err.message : t("profile.errBank"),
+        ok: false,
+      });
     } finally {
       setBankBusy(false);
     }
@@ -200,11 +214,11 @@ export default function ProfilePage() {
     setPwError("");
     setPwMsg("");
     if (newPassword.length < 8) {
-      setPwError("Mật khẩu phải có ít nhất 8 ký tự.");
+      setPwError(t("profile.errPwShort"));
       return;
     }
     if (newPassword !== confirmPassword) {
-      setPwError("Mật khẩu xác nhận không khớp.");
+      setPwError(t("profile.errPwMismatch"));
       return;
     }
     setPwBusy(true);
@@ -213,11 +227,11 @@ export default function ProfilePage() {
         password: newPassword,
       });
       if (updateError) throw new Error(updateError.message);
-      setPwMsg("Đã đổi mật khẩu.");
+      setPwMsg(t("profile.pwChanged"));
       setNewPassword("");
       setConfirmPassword("");
     } catch (err) {
-      setPwError(err instanceof Error ? err.message : "Lỗi đổi mật khẩu.");
+      setPwError(err instanceof Error ? err.message : t("profile.errPw"));
     } finally {
       setPwBusy(false);
     }
@@ -258,14 +272,14 @@ export default function ProfilePage() {
             className="inline-flex items-center gap-1 text-xs font-semibold uppercase tracking-[0.3em] text-lime-400 transition hover:text-lime-300"
           >
             <ChevronLeft size={14} strokeWidth={2} />
-            Dashboard
+            {t("dashboard.eyebrow")}
           </Link>
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.3em] text-lime-400">
-              Tài khoản
+              {t("profile.account")}
             </p>
             <h1 className="mt-1 text-[28px] font-semibold leading-tight">
-              Hồ sơ & cài đặt
+              {t("profile.title")}
             </h1>
           </div>
         </header>
@@ -283,7 +297,9 @@ export default function ProfilePage() {
                   strokeWidth={1.75}
                   className="text-lime-400"
                 />
-                <h2 className="text-base font-semibold">Thông tin cá nhân</h2>
+                <h2 className="text-base font-semibold">
+                  {t("profile.personalInfo")}
+                </h2>
               </div>
 
               <div className="mb-4 flex items-center gap-4">
@@ -294,36 +310,35 @@ export default function ProfilePage() {
                   currentUrl={profile.avatarUrl}
                   shape="circle"
                   size={80}
-                  emptyLabel="Ảnh"
+                  emptyLabel={t("profile.avatarEmpty")}
                   onUploaded={(url) => persistImageUrl("avatar_url", url)}
                   onRemoved={() => persistImageUrl("avatar_url", null)}
                 />
                 <p className="text-xs text-slate-400">
-                  Ảnh đại diện hiển thị bên cạnh tên của bạn trong các nhóm. JPG/PNG, &lt;5MB.
+                  {t("profile.avatarHint")}
                 </p>
               </div>
 
               <form onSubmit={handleSaveName} className="space-y-4">
                 <div className="space-y-1">
                   <label className="ml-1 text-[10px] font-semibold uppercase tracking-[0.2em] text-slate-400">
-                    Tên đăng nhập
+                    {t("profile.username")}
                   </label>
                   <input
                     className="w-full rounded-xl border border-slate-800 bg-slate-950/60 px-4 py-3 text-slate-100 placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-lime-500/70"
                     value={name}
                     onChange={(event) => setName(event.target.value)}
-                    placeholder="nguyenvana"
+                    placeholder={t("profile.usernamePlaceholder")}
                     autoComplete="username"
                     required
                   />
                   <p className="ml-1 text-[11px] text-slate-500">
-                    Dùng làm tên hiển thị và để đăng nhập. 3-20 ký tự, chỉ
-                    chữ/số và . _ -
+                    {t("profile.usernameHint")}
                   </p>
                 </div>
                 <div className="space-y-1">
                   <label className="ml-1 text-[10px] font-semibold uppercase tracking-[0.2em] text-slate-400">
-                    Email
+                    {t("profile.email")}
                   </label>
                   <input
                     className="w-full cursor-not-allowed rounded-xl border border-slate-800 bg-slate-900/40 px-4 py-3 text-slate-400"
@@ -331,18 +346,16 @@ export default function ProfilePage() {
                     readOnly
                   />
                   <p className="ml-1 text-[11px] text-slate-500">
-                    Email gắn với tài khoản đăng nhập, không thể đổi tại đây.
+                    {t("profile.emailHint")}
                   </p>
                 </div>
                 {nameMsg && (
                   <p
                     className={`text-xs ${
-                      nameMsg.startsWith("Đã")
-                        ? "text-lime-300"
-                        : "text-rose-400"
+                      nameMsg.ok ? "text-lime-300" : "text-rose-400"
                     }`}
                   >
-                    {nameMsg}
+                    {nameMsg.text}
                   </p>
                 )}
                 <button
@@ -353,7 +366,7 @@ export default function ProfilePage() {
                   }
                 >
                   <Save size={14} strokeWidth={2} />
-                  {nameBusy ? "Đang lưu..." : "Lưu tên"}
+                  {nameBusy ? t("profile.savingName") : t("profile.saveName")}
                 </button>
               </form>
             </section>
@@ -365,21 +378,22 @@ export default function ProfilePage() {
                   strokeWidth={1.75}
                   className="text-lime-400"
                 />
-                <h2 className="text-base font-semibold">Tài khoản ngân hàng</h2>
+                <h2 className="text-base font-semibold">
+                  {t("profile.bankTitle")}
+                </h2>
               </div>
               <p className="mb-4 text-xs text-slate-400">
-                Dùng để sinh mã VietQR khi nhóm của bạn chốt chi phí. Thành viên
-                trong nhóm sẽ thấy thông tin này.
+                {t("profile.bankHint")}
               </p>
               <form onSubmit={handleSaveBank} className="space-y-4">
                 <div className="space-y-1">
                   <label className="ml-1 text-[10px] font-semibold uppercase tracking-[0.2em] text-slate-400">
-                    Ngân hàng
+                    {t("profile.bank")}
                   </label>
                   <SelectField
                     value={bankId}
                     onChange={setBankId}
-                    placeholder="— Chọn ngân hàng —"
+                    placeholder={t("profile.selectBank")}
                     options={BANK_OPTIONS.map((bank) => ({
                       value: bank.code,
                       label: bank.label,
@@ -388,7 +402,7 @@ export default function ProfilePage() {
                 </div>
                 <div className="space-y-1">
                   <label className="ml-1 text-[10px] font-semibold uppercase tracking-[0.2em] text-slate-400">
-                    Số tài khoản
+                    {t("profile.accountNumber")}
                   </label>
                   <input
                     className="w-full rounded-xl border border-slate-800 bg-slate-950/60 px-4 py-3 text-slate-100 placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-lime-500/70"
@@ -400,7 +414,7 @@ export default function ProfilePage() {
                 </div>
                 <div className="space-y-1">
                   <label className="ml-1 text-[10px] font-semibold uppercase tracking-[0.2em] text-slate-400">
-                    Tên chủ tài khoản
+                    {t("profile.accountName")}
                   </label>
                   <input
                     className="w-full rounded-xl border border-slate-800 bg-slate-950/60 px-4 py-3 text-slate-100 placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-lime-500/70"
@@ -412,12 +426,10 @@ export default function ProfilePage() {
                 {bankMsg && (
                   <p
                     className={`text-xs ${
-                      bankMsg.startsWith("Đã")
-                        ? "text-lime-300"
-                        : "text-rose-400"
+                      bankMsg.ok ? "text-lime-300" : "text-rose-400"
                     }`}
                   >
-                    {bankMsg}
+                    {bankMsg.text}
                   </p>
                 )}
                 <button
@@ -425,16 +437,16 @@ export default function ProfilePage() {
                   disabled={bankBusy}
                 >
                   <Save size={14} strokeWidth={2} />
-                  {bankBusy ? "Đang lưu..." : "Lưu thông tin ngân hàng"}
+                  {bankBusy ? t("profile.savingBank") : t("profile.saveBank")}
                 </button>
               </form>
 
               <div className="mt-6 space-y-3 border-t border-white/10 pt-5">
                 <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-slate-400">
-                  Mã QR thanh toán
+                  {t("profile.qrTitle")}
                 </p>
                 <p className="text-xs text-slate-400">
-                  Thay vì nhập số tài khoản, bạn có thể tải lên mã QR riêng để các thành viên quét và chuyển khoản trực tiếp.
+                  {t("profile.qrHint")}
                 </p>
                 <ImageUpload
                   userId={userId}
@@ -443,7 +455,7 @@ export default function ProfilePage() {
                   currentUrl={profile.bankQrUrl}
                   shape="square"
                   size={192}
-                  emptyLabel="Tải mã QR"
+                  emptyLabel={t("profile.qrEmpty")}
                   onUploaded={(url) => persistImageUrl("bank_qr_url", url)}
                   onRemoved={() => persistImageUrl("bank_qr_url", null)}
                 />
@@ -457,40 +469,42 @@ export default function ProfilePage() {
                   strokeWidth={1.75}
                   className="text-lime-400"
                 />
-                <h2 className="text-base font-semibold">Đổi mật khẩu</h2>
+                <h2 className="text-base font-semibold">
+                  {t("profile.passwordTitle")}
+                </h2>
               </div>
 
               {!canChangePassword ? (
                 <p className="text-sm text-slate-400">
-                  Tài khoản đăng nhập bằng{" "}
-                  {providers[0] === "google" ? "Google" : "OAuth"}. Không thể đổi
-                  mật khẩu tại đây.
+                  {t("profile.oauthNoPasswordPrefix")}
+                  {providers[0] === "google" ? "Google" : "OAuth"}
+                  {t("profile.oauthNoPasswordSuffix")}
                 </p>
               ) : (
                 <form onSubmit={handleChangePassword} className="space-y-4">
                   <div className="space-y-1">
                     <label className="ml-1 text-[10px] font-semibold uppercase tracking-[0.2em] text-slate-400">
-                      Mật khẩu mới
+                      {t("profile.newPassword")}
                     </label>
                     <input
                       type="password"
                       className="w-full rounded-xl border border-slate-800 bg-slate-950/60 px-4 py-3 text-slate-100 placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-lime-500/70"
                       value={newPassword}
                       onChange={(event) => setNewPassword(event.target.value)}
-                      placeholder="Tối thiểu 8 ký tự"
+                      placeholder={t("profile.newPasswordPlaceholder")}
                       autoComplete="new-password"
                     />
                   </div>
                   <div className="space-y-1">
                     <label className="ml-1 text-[10px] font-semibold uppercase tracking-[0.2em] text-slate-400">
-                      Xác nhận mật khẩu
+                      {t("profile.confirmPassword")}
                     </label>
                     <input
                       type="password"
                       className="w-full rounded-xl border border-slate-800 bg-slate-950/60 px-4 py-3 text-slate-100 placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-lime-500/70"
                       value={confirmPassword}
                       onChange={(event) => setConfirmPassword(event.target.value)}
-                      placeholder="Nhập lại mật khẩu mới"
+                      placeholder={t("profile.confirmPasswordPlaceholder")}
                       autoComplete="new-password"
                     />
                   </div>
@@ -501,10 +515,29 @@ export default function ProfilePage() {
                     disabled={pwBusy || !newPassword || !confirmPassword}
                   >
                     <KeyRound size={14} strokeWidth={2} />
-                    {pwBusy ? "Đang cập nhật..." : "Cập nhật mật khẩu"}
+                    {pwBusy
+                      ? t("profile.updatingPassword")
+                      : t("profile.updatePassword")}
                   </button>
                 </form>
               )}
+            </section>
+
+            <section className="glass-panel rounded-2xl p-5">
+              <div className="mb-4 flex items-center gap-2">
+                <Globe size={18} strokeWidth={1.75} className="text-lime-400" />
+                <h2 className="text-base font-semibold">
+                  {t("profile.languageTitle")}
+                </h2>
+              </div>
+              <p className="mb-3 text-xs text-slate-400">
+                {t("profile.languageHint")}
+              </p>
+              <SelectField
+                value={lang}
+                onChange={(next) => setLang(next as typeof lang)}
+                options={LANGS.map((l) => ({ value: l.value, label: l.label }))}
+              />
             </section>
 
             <button
@@ -513,7 +546,7 @@ export default function ProfilePage() {
               className="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-rose-700/40 bg-rose-500/10 px-4 py-3 text-sm font-semibold text-rose-300 transition hover:bg-rose-500/15 active:scale-[0.99]"
             >
               <LogOut size={16} strokeWidth={1.75} />
-              Đăng xuất
+              {t("profile.signOut")}
             </button>
           </>
         ) : null}

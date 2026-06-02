@@ -4,6 +4,7 @@ import { useRef, useState } from "react";
 import Image from "next/image";
 import { Camera, ImagePlus, Trash2 } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
+import { useI18n } from "@/lib/i18n";
 
 type Props = {
   userId: string;
@@ -28,11 +29,13 @@ export default function ImageUpload({
   onRemoved,
   shape = "square",
   size = 192,
-  emptyLabel = "Tải ảnh lên",
+  emptyLabel,
 }: Props) {
+  const { t } = useI18n();
   const fileRef = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const emptyText = emptyLabel ?? t("upload.change");
 
   const triggerPick = () => {
     if (busy) return;
@@ -45,11 +48,11 @@ export default function ImageUpload({
     if (!file) return;
 
     if (!file.type.startsWith("image/")) {
-      setError("Chỉ cho phép tệp ảnh.");
+      setError(t("upload.errOnlyImages"));
       return;
     }
     if (file.size > MAX_BYTES) {
-      setError("Ảnh vượt quá 5MB.");
+      setError(t("upload.errTooLarge"));
       return;
     }
 
@@ -69,11 +72,11 @@ export default function ImageUpload({
       if (uploadError) throw new Error(uploadError.message);
 
       const { data } = supabase.storage.from(bucket).getPublicUrl(path);
-      if (!data.publicUrl) throw new Error("Không lấy được link ảnh.");
+      if (!data.publicUrl) throw new Error(t("upload.errNoUrl"));
 
       await onUploaded(data.publicUrl);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Tải ảnh thất bại.");
+      setError(err instanceof Error ? err.message : t("upload.errUpload"));
     } finally {
       setBusy(false);
     }
@@ -86,7 +89,7 @@ export default function ImageUpload({
     try {
       await onRemoved();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Lỗi xoá ảnh.");
+      setError(err instanceof Error ? err.message : t("upload.errRemove"));
     } finally {
       setBusy(false);
     }
@@ -104,7 +107,7 @@ export default function ImageUpload({
           isCircle ? "rounded-full" : "rounded-2xl"
         }`}
         style={{ width: size, height: size }}
-        aria-label={currentUrl ? "Đổi ảnh" : emptyLabel}
+        aria-label={currentUrl ? t("upload.change") : emptyText}
       >
         {currentUrl ? (
           <Image
@@ -122,7 +125,7 @@ export default function ImageUpload({
             ) : (
               <ImagePlus size={32} strokeWidth={1.5} />
             )}
-            <span className="text-xs">{emptyLabel}</span>
+            <span className="text-xs">{emptyText}</span>
           </div>
         )}
 
@@ -130,14 +133,14 @@ export default function ImageUpload({
           <div className="absolute inset-0 flex items-center justify-center bg-slate-950/0 text-slate-100 opacity-0 transition group-hover:bg-slate-950/60 group-hover:opacity-100">
             <div className="flex items-center gap-1 text-xs font-semibold">
               <Camera size={14} strokeWidth={1.75} />
-              Đổi ảnh
+              {t("upload.change")}
             </div>
           </div>
         )}
 
         {busy && (
           <div className="absolute inset-0 flex items-center justify-center bg-slate-950/70 text-xs text-slate-200">
-            Đang tải...
+            {t("upload.uploading")}
           </div>
         )}
       </button>
@@ -158,7 +161,7 @@ export default function ImageUpload({
           className="inline-flex items-center gap-1 rounded-lg border border-rose-700/40 bg-rose-500/10 px-2.5 py-1 text-[11px] font-semibold text-rose-300 transition hover:bg-rose-500/15 active:scale-95 disabled:opacity-60"
         >
           <Trash2 size={12} strokeWidth={1.75} />
-          Xoá ảnh
+          {t("upload.remove")}
         </button>
       )}
 

@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
+import { useI18n } from "@/lib/i18n";
 
 type Member = {
   userId: string;
@@ -24,6 +25,7 @@ export default function MembersPanel({
   currentUserId,
   createdBy,
 }: Props) {
+  const { t } = useI18n();
   const [members, setMembers] = useState<Member[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -49,7 +51,7 @@ export default function MembersPanel({
           const user = Array.isArray(row.users) ? row.users[0] : row.users;
           return {
             userId: row.user_id,
-            name: user?.name ?? "(không rõ)",
+            name: user?.name ?? t("members.unknownUser"),
             email: user?.email ?? "",
             role: row.role === "admin" ? "admin" : "member",
             joinedAt: row.joined_at,
@@ -59,9 +61,9 @@ export default function MembersPanel({
       setMembers(mapped);
       setError("");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Lỗi tải thành viên.");
+      setError(err instanceof Error ? err.message : t("members.errLoad"));
     }
-  }, [groupId]);
+  }, [groupId, t]);
 
   useEffect(() => {
     const run = async () => {
@@ -94,18 +96,18 @@ export default function MembersPanel({
         | null;
 
       if (result?.status === "added") {
-        setInviteMsg("Đã thêm thành viên.");
+        setInviteMsg(t("members.added"));
         setInviteEmail("");
         await load();
       } else if (result?.status === "already_member") {
-        setInviteMsg("Người này đã có trong nhóm.");
+        setInviteMsg(t("members.alreadyMember"));
       } else if (result?.status === "user_not_found") {
-        setInviteMsg("Email chưa đăng ký tài khoản trên hệ thống.");
+        setInviteMsg(t("members.notRegistered"));
       } else {
-        setInviteMsg("Không thể thêm thành viên.");
+        setInviteMsg(t("members.cannotAdd"));
       }
     } catch (err) {
-      setInviteMsg(err instanceof Error ? err.message : "Lỗi mời thành viên.");
+      setInviteMsg(err instanceof Error ? err.message : t("members.errInvite"));
     } finally {
       setInviteBusy(false);
     }
@@ -113,7 +115,7 @@ export default function MembersPanel({
 
   const handleToggleRole = async (member: Member) => {
     if (member.userId === createdBy) {
-      setError("Không thể đổi vai trò của người tạo nhóm.");
+      setError(t("members.errCreatorRole"));
       return;
     }
     setActionBusy(member.userId);
@@ -131,7 +133,7 @@ export default function MembersPanel({
       }
       await load();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Lỗi đổi vai trò.");
+      setError(err instanceof Error ? err.message : t("members.errRole"));
     } finally {
       setActionBusy(null);
     }
@@ -139,10 +141,10 @@ export default function MembersPanel({
 
   const handleRemove = async (member: Member) => {
     if (member.userId === createdBy) {
-      setError("Không thể xóa người tạo nhóm.");
+      setError(t("members.errRemoveCreator"));
       return;
     }
-    if (!confirm(`Xóa ${member.name} khỏi nhóm?`)) return;
+    if (!confirm(t("members.confirmRemove", { name: member.name }))) return;
 
     setActionBusy(member.userId);
     setError("");
@@ -158,7 +160,7 @@ export default function MembersPanel({
       }
       await load();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Lỗi xóa thành viên.");
+      setError(err instanceof Error ? err.message : t("members.errRemove"));
     } finally {
       setActionBusy(null);
     }
@@ -172,7 +174,7 @@ export default function MembersPanel({
           className="glass-panel flex flex-wrap items-end gap-3 rounded-2xl p-4"
         >
           <div className="min-w-[220px] flex-1 space-y-1 text-sm">
-            <label className="text-slate-300">Mời thêm thành viên (email)</label>
+            <label className="text-slate-300">{t("members.inviteLabel")}</label>
             <input
               type="email"
               className="w-full rounded-xl border border-slate-800 bg-slate-950/60 px-3 py-2 text-slate-100 focus:outline-none focus:ring-2 focus:ring-lime-500/70"
@@ -186,7 +188,7 @@ export default function MembersPanel({
             className="rounded-xl bg-lime-500 px-4 py-2 text-sm font-semibold text-slate-950 disabled:opacity-60"
             disabled={inviteBusy}
           >
-            {inviteBusy ? "Đang mời..." : "Mời"}
+            {inviteBusy ? t("members.inviting") : t("members.invite")}
           </button>
           {inviteMsg && (
             <p className="basis-full text-xs text-slate-300">{inviteMsg}</p>
@@ -200,7 +202,7 @@ export default function MembersPanel({
         <div className="glass-panel h-24 animate-pulse rounded-2xl" />
       ) : members.length === 0 ? (
         <div className="glass-panel rounded-2xl p-6 text-sm text-slate-300">
-          Chưa có thành viên.
+          {t("members.empty")}
         </div>
       ) : (
         <ul className="space-y-3">
@@ -216,7 +218,9 @@ export default function MembersPanel({
                   <p className="font-medium">
                     {member.name}
                     {isSelf && (
-                      <span className="ml-2 text-xs text-slate-400">(bạn)</span>
+                      <span className="ml-2 text-xs text-slate-400">
+                        {t("members.you")}
+                      </span>
                     )}
                   </p>
                   <p className="text-xs text-slate-400">{member.email}</p>
@@ -229,8 +233,10 @@ export default function MembersPanel({
                         : "bg-slate-800 text-slate-300"
                     }`}
                   >
-                    {member.role === "admin" ? "Admin" : "Member"}
-                    {isCreator && " · Tạo nhóm"}
+                    {member.role === "admin"
+                      ? t("common.admin")
+                      : t("common.member")}
+                    {isCreator && ` · ${t("members.creatorTag")}`}
                   </span>
                   {isAdmin && !isCreator && (
                     <>
@@ -240,7 +246,9 @@ export default function MembersPanel({
                         disabled={actionBusy === member.userId}
                         onClick={() => handleToggleRole(member)}
                       >
-                        {member.role === "admin" ? "Hạ quyền" : "Phong admin"}
+                        {member.role === "admin"
+                          ? t("members.demote")
+                          : t("members.promote")}
                       </button>
                       <button
                         type="button"
@@ -248,7 +256,7 @@ export default function MembersPanel({
                         disabled={actionBusy === member.userId}
                         onClick={() => handleRemove(member)}
                       >
-                        Xóa
+                        {t("members.remove")}
                       </button>
                     </>
                   )}

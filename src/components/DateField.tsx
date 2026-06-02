@@ -3,8 +3,8 @@
 import { useEffect, useRef, useState } from "react";
 import { DayPicker } from "react-day-picker";
 import { format, parse } from "date-fns";
-import { vi } from "date-fns/locale";
 import { Calendar } from "lucide-react";
+import { useI18n } from "@/lib/i18n";
 
 type Props = {
   value: string;
@@ -17,8 +17,9 @@ export default function DateField({
   value,
   onChange,
   required,
-  placeholder = "Chọn ngày",
+  placeholder,
 }: Props) {
+  const { t, dateLocale } = useI18n();
   const [open, setOpen] = useState(false);
   const wrapperRef = useRef<HTMLDivElement>(null);
 
@@ -26,8 +27,9 @@ export default function DateField({
     ? parse(value, "yyyy-MM-dd", new Date())
     : undefined;
   const display = selected
-    ? format(selected, "EEE, dd/MM/yyyy", { locale: vi })
+    ? format(selected, "EEE, dd/MM/yyyy", { locale: dateLocale })
     : "";
+  const placeholderText = placeholder ?? t("fields.selectDate");
 
   useEffect(() => {
     if (!open) return;
@@ -53,7 +55,7 @@ export default function DateField({
         }`}
       >
         <span className={display ? "text-slate-100" : "text-slate-500"}>
-          {display || placeholder}
+          {display || placeholderText}
         </span>
         <Calendar size={16} strokeWidth={1.75} className="text-slate-400" />
       </button>
@@ -77,7 +79,7 @@ export default function DateField({
                 setOpen(false);
               }
             }}
-            locale={vi}
+            locale={dateLocale}
             weekStartsOn={1}
             showOutsideDays
           />

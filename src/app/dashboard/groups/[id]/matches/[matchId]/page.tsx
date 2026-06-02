@@ -13,6 +13,7 @@ import {
   XCircle,
 } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
+import { useI18n } from "@/lib/i18n";
 import BottomNav from "@/components/BottomNav";
 
 type Rsvp = {
@@ -41,6 +42,7 @@ type Expense = {
 
 export default function MatchDetailPage() {
   const router = useRouter();
+  const { t, formatVnd, formatDate } = useI18n();
   const params = useParams<{ id: string; matchId: string }>();
   const groupId = params?.id;
   const matchId = params?.matchId;
@@ -72,9 +74,9 @@ export default function MatchDetailPage() {
         .maybeSingle();
 
       if (matchError) throw matchError;
-      if (!matchRow) throw new Error("Không tìm thấy lịch.");
+      if (!matchRow) throw new Error(t("match.errNotFound"));
       if (matchRow.group_id !== groupId) {
-        throw new Error("Lịch không thuộc nhóm này.");
+        throw new Error(t("match.errWrongGroup"));
       }
 
       setMatch({
@@ -108,7 +110,7 @@ export default function MatchDetailPage() {
           return {
             userId: row.user_id,
             status: row.status === "yes" ? "yes" : "no",
-            name: user?.name ?? "(không rõ)",
+            name: user?.name ?? t("match.unknownUser"),
           };
         }) ?? [];
       setRsvps(mapped);
@@ -135,7 +137,7 @@ export default function MatchDetailPage() {
         setExpense(null);
       }
     },
-    [groupId, matchId]
+    [groupId, matchId, t]
   );
 
   useEffect(() => {
@@ -149,13 +151,13 @@ export default function MatchDetailPage() {
         setUserId(data.session.user.id);
         await load(data.session.user.id);
       } catch (err) {
-        setError(err instanceof Error ? err.message : "Không thể tải dữ liệu.");
+        setError(err instanceof Error ? err.message : t("match.errLoad"));
       } finally {
         setLoading(false);
       }
     };
     void init();
-  }, [router, load]);
+  }, [router, load, t]);
 
   const myRsvp = userId ? rsvps.find((r) => r.userId === userId) : undefined;
   const yesList = rsvps.filter((r) => r.status === "yes");
@@ -177,7 +179,7 @@ export default function MatchDetailPage() {
       if (upsertError) throw new Error(upsertError.message);
       await load(userId);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Lỗi cập nhật RSVP.");
+      setError(err instanceof Error ? err.message : t("match.errRsvp"));
     } finally {
       setRsvpBusy(false);
     }
@@ -195,7 +197,7 @@ export default function MatchDetailPage() {
       const shuttle = Number(shuttleFee) || 0;
       const water = Number(waterFee) || 0;
       if (court < 0 || shuttle < 0 || water < 0) {
-        throw new Error("Chi phí không được âm.");
+        throw new Error(t("match.errNegativeFee"));
       }
 
       const { data, error: rpcError } = await supabase.rpc("settle_match", {
@@ -212,14 +214,17 @@ export default function MatchDetailPage() {
       } | null;
       if (result) {
         setSettleMsg(
-          `Đã chốt: ${result.attendees ?? 0} người · ${formatVnd(result.fee_per_person ?? 0)} / người`
+          t("match.settledMsg", {
+            count: result.attendees ?? 0,
+            amount: formatVnd(result.fee_per_person ?? 0),
+          })
         );
       } else {
-        setSettleMsg("Đã chốt.");
+        setSettleMsg(t("match.settledMsgSimple"));
       }
       await load(userId);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Lỗi chốt chi phí.");
+      setError(err instanceof Error ? err.message : t("match.errSettle"));
     } finally {
       setSettleBusy(false);
     }
@@ -227,7 +232,7 @@ export default function MatchDetailPage() {
 
   const handleReopen = async () => {
     if (!matchId || !userId) return;
-    if (!confirm("Mở lại lịch này? Chi phí đã lưu sẽ giữ nguyên.")) return;
+    if (!confirm(t("match.confirmReopen"))) return;
     setSettleBusy(true);
     try {
       const { error: updateError } = await supabase
@@ -237,7 +242,7 @@ export default function MatchDetailPage() {
       if (updateError) throw new Error(updateError.message);
       await load(userId);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Lỗi mở lại lịch.");
+      setError(err instanceof Error ? err.message : t("match.errReopen"));
     } finally {
       setSettleBusy(false);
     }
@@ -257,14 +262,14 @@ export default function MatchDetailPage() {
             className="inline-flex items-center gap-1 text-xs font-semibold uppercase tracking-[0.3em] text-lime-400 transition hover:text-lime-300"
           >
             <ChevronLeft size={14} strokeWidth={2} />
-            Quay lại nhóm
+            {t("match.backToGroup")}
           </Link>
 
           {match && (
             <div className="flex flex-wrap items-end justify-between gap-3">
               <div className="space-y-1">
                 <h1 className="text-[28px] font-semibold leading-tight">
-                  Chi tiết trận đấu
+                  {t("match.title")}
                 </h1>
                 <div className="flex flex-wrap items-center gap-2 text-sm text-slate-300">
                   <MapPin
@@ -281,7 +286,7 @@ export default function MatchDetailPage() {
                       className="inline-flex items-center gap-1 rounded-lg border border-lime-500/30 bg-lime-500/10 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-[0.15em] text-lime-300 transition hover:bg-lime-500/20"
                     >
                       <ExternalLink size={12} strokeWidth={2} />
-                      Mở Google Maps
+                      {t("match.openMaps")}
                     </a>
                   )}
                 </div>
@@ -293,7 +298,9 @@ export default function MatchDetailPage() {
                     : "border-white/10 bg-slate-800 text-slate-400"
                 }`}
               >
-                {match.status === "open" ? "Đang mở" : "Đã chốt"}
+                {match.status === "open"
+                  ? t("match.statusOpen")
+                  : t("match.statusClosed")}
               </span>
             </div>
           )}
@@ -314,10 +321,16 @@ export default function MatchDetailPage() {
                 </div>
                 <div>
                   <p className="text-[10px] font-semibold uppercase tracking-[0.25em] text-slate-400">
-                    Thời gian
+                    {t("match.time")}
                   </p>
                   <p className="mt-0.5 text-lg font-semibold leading-tight">
-                    {formatDate(match.date)} · {match.time.slice(0, 5)}
+                    {formatDate(match.date, {
+                      weekday: "long",
+                      day: "2-digit",
+                      month: "2-digit",
+                      year: "numeric",
+                    })}{" "}
+                    · {match.time.slice(0, 5)}
                   </p>
                 </div>
               </div>
@@ -325,16 +338,16 @@ export default function MatchDetailPage() {
 
             <section className="glass-panel rounded-2xl p-5">
               <h2 className="text-center text-lg font-semibold">
-                Bạn có tham gia không?
+                {t("match.rsvpQuestion")}
               </h2>
               {match.status === "closed" ? (
                 <p className="mt-3 text-center text-sm text-slate-400">
-                  Lịch đã đóng. Không thể đổi RSVP.
+                  {t("match.closedNoRsvp")}
                 </p>
               ) : (
                 <div className="mt-4 grid grid-cols-2 gap-3">
                   <RsvpButton
-                    label="Tham gia"
+                    label={t("match.join")}
                     icon={<CheckCircle2 size={28} strokeWidth={1.75} />}
                     active={myRsvp?.status === "yes"}
                     tone="lime"
@@ -342,7 +355,7 @@ export default function MatchDetailPage() {
                     onClick={() => handleRsvp("yes")}
                   />
                   <RsvpButton
-                    label="Nghỉ"
+                    label={t("match.skip")}
                     icon={<XCircle size={28} strokeWidth={1.75} />}
                     active={myRsvp?.status === "no"}
                     tone="rose"
@@ -355,14 +368,16 @@ export default function MatchDetailPage() {
 
             <section className="grid gap-4 sm:grid-cols-2">
               <RsvpList
-                title={`Tham gia (${yesList.length})`}
+                title={t("match.joinList", { count: yesList.length })}
                 list={yesList}
                 tone="lime"
+                emptyLabel={t("match.nobody")}
               />
               <RsvpList
-                title={`Nghỉ (${noList.length})`}
+                title={t("match.skipList", { count: noList.length })}
                 list={noList}
                 tone="rose"
+                emptyLabel={t("match.nobody")}
               />
             </section>
 
@@ -374,24 +389,28 @@ export default function MatchDetailPage() {
                     strokeWidth={1.75}
                     className="text-lime-400"
                   />
-                  <h2 className="text-base font-semibold">Chi phí</h2>
+                  <h2 className="text-base font-semibold">
+                    {t("match.expenses")}
+                  </h2>
                 </div>
                 <dl className="grid grid-cols-2 gap-y-1 text-sm text-slate-300">
-                  <dt>Tiền sân</dt>
+                  <dt>{t("match.courtFee")}</dt>
                   <dd className="text-right">{formatVnd(expense.courtFee)}</dd>
-                  <dt>Tiền cầu</dt>
+                  <dt>{t("match.shuttleFee")}</dt>
                   <dd className="text-right">{formatVnd(expense.shuttleFee)}</dd>
-                  <dt>Tiền nước</dt>
+                  <dt>{t("match.waterFee")}</dt>
                   <dd className="text-right">{formatVnd(expense.waterFee)}</dd>
                   <dt className="mt-1 border-t border-white/10 pt-2 font-semibold text-slate-200">
-                    Tổng
+                    {t("match.total")}
                   </dt>
                   <dd className="mt-1 border-t border-white/10 pt-2 text-right font-semibold text-slate-100">
                     {formatVnd(expense.totalAmount)}
                   </dd>
                 </dl>
                 <p className="mt-3 rounded-xl bg-lime-500/10 px-3 py-2 text-center text-sm font-medium text-lime-200">
-                  Mỗi người trả {formatVnd(expense.feePerPerson)}
+                  {t("match.perPerson", {
+                    amount: formatVnd(expense.feePerPerson),
+                  })}
                 </p>
               </section>
             )}
@@ -407,8 +426,8 @@ export default function MatchDetailPage() {
                     />
                     <h2 className="text-base font-semibold">
                       {match.status === "open"
-                        ? "Chốt chi phí"
-                        : "Cập nhật chi phí"}
+                        ? t("match.settleTitle")
+                        : t("match.updateTitle")}
                     </h2>
                   </div>
                   {match.status === "closed" && (
@@ -418,33 +437,33 @@ export default function MatchDetailPage() {
                       disabled={settleBusy}
                       className="rounded-lg border border-slate-700 px-3 py-1 text-xs text-slate-200 transition hover:border-slate-500 disabled:opacity-60"
                     >
-                      Mở lại lịch
+                      {t("match.reopen")}
                     </button>
                   )}
                 </div>
                 <form onSubmit={handleSettle} className="space-y-3">
                   <FeeInput
-                    label="Tiền sân (VND)"
+                    label={t("match.courtFeeLabel")}
                     value={courtFee}
                     onChange={setCourtFee}
-                    placeholder="Ví dụ: 400.000"
+                    placeholder="400.000"
                   />
                   <div className="grid grid-cols-2 gap-3">
                     <FeeInput
-                      label="Tiền cầu"
+                      label={t("match.shuttleFee")}
                       value={shuttleFee}
                       onChange={setShuttleFee}
                       placeholder="150.000"
                     />
                     <FeeInput
-                      label="Tiền nước"
+                      label={t("match.waterFee")}
                       value={waterFee}
                       onChange={setWaterFee}
                       placeholder="50.000"
                     />
                   </div>
                   <p className="text-xs text-slate-400">
-                    Hệ thống sẽ chia cho {yesList.length} người tham gia.
+                    {t("match.splitNote", { count: yesList.length })}
                   </p>
                   {settleMsg && <p className="text-xs text-lime-300">{settleMsg}</p>}
                   <button
@@ -452,10 +471,10 @@ export default function MatchDetailPage() {
                     disabled={settleBusy}
                   >
                     {settleBusy
-                      ? "Đang lưu..."
+                      ? t("match.saving")
                       : match.status === "open"
-                        ? "Chốt và chia tiền"
-                        : "Cập nhật chi phí"}
+                        ? t("match.settleAndSplit")
+                        : t("match.updateCosts")}
                   </button>
                 </form>
               </section>
@@ -510,10 +529,12 @@ function RsvpList({
   title,
   list,
   tone,
+  emptyLabel,
 }: {
   title: string;
   list: Rsvp[];
   tone: "lime" | "rose";
+  emptyLabel: string;
 }) {
   const toneClass = tone === "lime" ? "text-lime-300" : "text-rose-300";
   return (
@@ -524,7 +545,7 @@ function RsvpList({
         {title}
       </p>
       {list.length === 0 ? (
-        <p className="mt-3 text-sm text-slate-500">Chưa có ai.</p>
+        <p className="mt-3 text-sm text-slate-500">{emptyLabel}</p>
       ) : (
         <ul className="mt-3 space-y-2">
           {list.map((r) => (
@@ -585,24 +606,4 @@ function FeeInput({
       />
     </div>
   );
-}
-
-function formatDate(value: string) {
-  const parsed = new Date(`${value}T00:00:00`);
-  if (Number.isNaN(parsed.getTime())) return value;
-  return parsed.toLocaleDateString("vi-VN", {
-    weekday: "long",
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-  });
-}
-
-function formatVnd(value: number) {
-  if (Number.isNaN(value)) return "0 ₫";
-  return new Intl.NumberFormat("vi-VN", {
-    style: "currency",
-    currency: "VND",
-    maximumFractionDigits: 0,
-  }).format(value);
 }

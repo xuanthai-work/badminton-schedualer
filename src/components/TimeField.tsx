@@ -2,6 +2,7 @@
 
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Clock } from "lucide-react";
+import { useI18n } from "@/lib/i18n";
 
 type Props = {
   value: string;
@@ -17,6 +18,7 @@ const MINUTES = Array.from({ length: 12 }, (_, i) =>
 );
 
 export default function TimeField({ value, onChange, required }: Props) {
+  const { t } = useI18n();
   const [open, setOpen] = useState(false);
   const wrapperRef = useRef<HTMLDivElement>(null);
   const hourListRef = useRef<HTMLDivElement>(null);
@@ -78,7 +80,7 @@ export default function TimeField({ value, onChange, required }: Props) {
         }`}
       >
         <span className={display ? "text-slate-100" : "text-slate-500"}>
-          {display || "Chọn giờ"}
+          {display || t("fields.selectTime")}
         </span>
         <Clock size={16} strokeWidth={1.75} className="text-slate-400" />
       </button>
@@ -95,14 +97,14 @@ export default function TimeField({ value, onChange, required }: Props) {
         <div className="glass-panel absolute left-0 top-full z-50 mt-2 grid grid-cols-2 gap-2 rounded-2xl p-2 shadow-2xl">
           <Column
             innerRef={hourListRef}
-            label="Giờ"
+            label={t("fields.hour")}
             items={HOURS}
             value={hour}
             onSelect={setHour}
           />
           <Column
             innerRef={minuteListRef}
-            label="Phút"
+            label={t("fields.minute")}
             items={MINUTES}
             value={minute}
             onSelect={setMinute}

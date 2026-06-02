@@ -83,7 +83,14 @@ export const ensureUserProfile = async (user: User) => {
     }
   }
 
+  // Non-React module: read the stored language directly (the hook isn't available here).
+  const stored =
+    typeof window !== "undefined"
+      ? window.localStorage.getItem("bs.lang")
+      : null;
   throw new Error(
-    "Không thể tạo tên đăng nhập tự động. Vui lòng chọn lại."
+    stored === "en"
+      ? "Couldn't auto-generate a username. Please pick one."
+      : "Không thể tạo tên đăng nhập tự động. Vui lòng chọn lại."
   );
 };

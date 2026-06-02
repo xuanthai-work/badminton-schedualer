@@ -1,11 +1,12 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ChevronRight, Users } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { ensureUserProfile } from "@/lib/userProfile";
+import { useI18n } from "@/lib/i18n";
 import BottomNav from "@/components/BottomNav";
 import CreateGroupPanel from "./CreateGroupPanel";
 
@@ -19,13 +20,14 @@ type GroupCard = {
 
 export default function DashboardPage() {
   const router = useRouter();
+  const { t } = useI18n();
   const [userId, setUserId] = useState<string | null>(null);
   const [displayName, setDisplayName] = useState<string>("");
   const [groups, setGroups] = useState<GroupCard[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
-  const loadGroups = async (uid: string) => {
+  const loadGroups = useCallback(async (uid: string) => {
     setError("");
     const { data: memberships, error: membershipError } = await supabase
       .from("group_members")
@@ -88,11 +90,11 @@ export default function DashboardPage() {
           name: group.name,
           role: group.role,
           memberCount: stats?.count ?? 0,
-          adminName: stats?.adminName ?? "Chưa rõ",
+          adminName: stats?.adminName ?? t("dashboard.unknownAdmin"),
         };
       })
     );
-  };
+  }, [t]);
 
   useEffect(() => {
     const init = async () => {
@@ -117,14 +119,14 @@ export default function DashboardPage() {
 
         await loadGroups(data.session.user.id);
       } catch (err) {
-        setError(err instanceof Error ? err.message : "Không thể tải dữ liệu.");
+        setError(err instanceof Error ? err.message : t("dashboard.loadError"));
       } finally {
         setLoading(false);
       }
     };
 
     void init();
-  }, [router]);
+  }, [router, loadGroups, t]);
 
   return (
     <main className="relative min-h-screen overflow-hidden bg-slate-950 px-6 py-10 pb-28 text-slate-50">
@@ -140,31 +142,31 @@ export default function DashboardPage() {
       <div className="relative mx-auto flex w-full max-w-5xl flex-col gap-8 pb-16">
         <header>
           <p className="text-xs font-semibold uppercase tracking-[0.3em] text-lime-400">
-            Dashboard
+            {t("dashboard.eyebrow")}
           </p>
           <h1 className="mt-1 text-2xl font-semibold leading-tight text-lime-400">
-            Nhóm của tôi
+            {t("dashboard.myGroups")}
           </h1>
         </header>
 
         <section className="space-y-1">
           <h2 className="text-[28px] font-semibold leading-tight">
-            Chào bạn,{" "}
+            {t("dashboard.greeting")}{" "}
             <span className="text-lime-400">
-              {displayName || "lông thủ"}
+              {displayName || t("dashboard.defaultName")}
             </span>
           </h2>
           <p className="text-sm text-slate-300">
-            Sẵn sàng cho các trận đấu hôm nay?
+            {t("dashboard.readyToday")}
           </p>
         </section>
 
         <section className="space-y-4">
           <div className="flex items-baseline justify-between">
-            <h3 className="text-lg font-semibold">Danh sách nhóm</h3>
+            <h3 className="text-lg font-semibold">{t("dashboard.groupList")}</h3>
             {userId && (
               <span className="text-xs text-slate-400">
-                {groups.length} nhóm
+                {t("dashboard.groupCount", { count: groups.length })}
               </span>
             )}
           </div>
@@ -182,7 +184,7 @@ export default function DashboardPage() {
             <p className="text-sm text-rose-400">{error}</p>
           ) : groups.length === 0 ? (
             <div className="glass-panel rounded-2xl p-6 text-sm text-slate-300">
-              Bạn chưa tham gia nhóm nào. Hãy tạo nhóm mới để bắt đầu.
+              {t("dashboard.emptyGroups")}
             </div>
           ) : (
             <div className="grid gap-4 sm:grid-cols-2">
@@ -201,6 +203,7 @@ export default function DashboardPage() {
 }
 
 function GroupCardItem({ group }: { group: GroupCard }) {
+  const { t } = useI18n();
   const isAdmin = group.role === "admin";
   return (
     <Link
@@ -223,7 +226,7 @@ function GroupCardItem({ group }: { group: GroupCard }) {
               : "border-white/10 bg-slate-800/80 text-slate-300"
           }`}
         >
-          {isAdmin ? "Admin" : "Member"}
+          {isAdmin ? t("common.admin") : t("common.member")}
         </span>
       </div>
 
@@ -232,7 +235,7 @@ function GroupCardItem({ group }: { group: GroupCard }) {
       </h4>
       <div className="relative mt-1 flex items-center gap-2 text-sm text-slate-400">
         <Users size={14} strokeWidth={1.75} />
-        <span>{group.memberCount} thành viên</span>
+        <span>{t("dashboard.memberCount", { count: group.memberCount })}</span>
       </div>
 
       <div className="relative mt-5 flex items-center justify-between border-t border-white/10 pt-4">
@@ -240,7 +243,7 @@ function GroupCardItem({ group }: { group: GroupCard }) {
           <InitialAvatar name={group.adminName} size={32} />
           <div>
             <p className="text-[10px] uppercase tracking-wider text-slate-400">
-              Admin
+              {t("common.admin")}
             </p>
             <p className="text-sm text-slate-100">{group.adminName}</p>
           </div>

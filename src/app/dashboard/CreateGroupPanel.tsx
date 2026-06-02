@@ -2,12 +2,14 @@
 
 import { useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
+import { useI18n } from "@/lib/i18n";
 
 type Props = {
   onCreated: () => void;
 };
 
 export default function CreateGroupPanel({ onCreated }: Props) {
+  const { t } = useI18n();
   const [open, setOpen] = useState(false);
   const [name, setName] = useState("");
   const [loading, setLoading] = useState(false);
@@ -23,7 +25,7 @@ export default function CreateGroupPanel({ onCreated }: Props) {
         return message;
       }
     }
-    return "Tạo nhóm thất bại.";
+    return t("createGroup.errFailed");
   };
 
   const handleCreate = async (event: React.FormEvent<HTMLFormElement>) => {
@@ -32,7 +34,7 @@ export default function CreateGroupPanel({ onCreated }: Props) {
 
     const trimmed = name.trim();
     if (!trimmed) {
-      setError("Tên nhóm không được để trống.");
+      setError(t("createGroup.errEmpty"));
       return;
     }
 
@@ -44,7 +46,7 @@ export default function CreateGroupPanel({ onCreated }: Props) {
         throw new Error(userError.message);
       }
       if (!userData.user) {
-        throw new Error("Phiên đăng nhập đã hết. Vui lòng đăng nhập lại.");
+        throw new Error(t("createGroup.errSessionExpired"));
       }
 
       const currentUserId = userData.user.id;
@@ -59,7 +61,7 @@ export default function CreateGroupPanel({ onCreated }: Props) {
         throw new Error(groupError.message);
       }
       if (!group) {
-        throw new Error("Không thể tạo nhóm. Vui lòng thử lại.");
+        throw new Error(t("createGroup.errCannotCreate"));
       }
 
       const { error: memberError } = await supabase.from("group_members").insert({
@@ -89,7 +91,7 @@ export default function CreateGroupPanel({ onCreated }: Props) {
         className="fixed bottom-24 right-6 z-40 rounded-full bg-lime-500 px-5 py-3 text-sm font-semibold text-slate-950 shadow-lg shadow-lime-500/20 transition hover:shadow-[0_0_24px_rgba(163,230,53,0.45)]"
         onClick={() => setOpen(true)}
       >
-        + Tạo nhóm mới
+        {t("createGroup.fab")}
       </button>
 
       {open && (
@@ -103,22 +105,24 @@ export default function CreateGroupPanel({ onCreated }: Props) {
         >
           <div className="glass-panel w-full max-w-lg rounded-2xl p-6 shadow-2xl">
             <div className="mb-4 flex items-center justify-between">
-              <h2 className="text-lg font-semibold">Tạo nhóm mới</h2>
+              <h2 className="text-lg font-semibold">{t("createGroup.title")}</h2>
               <button
                 type="button"
                 className="text-sm text-slate-400 hover:text-slate-200"
                 onClick={() => setOpen(false)}
               >
-                Đóng
+                {t("common.close")}
               </button>
             </div>
 
             <form onSubmit={handleCreate} className="space-y-4">
               <div className="space-y-1 text-sm">
-                <label className="text-slate-300">Tên nhóm</label>
+                <label className="text-slate-300">
+                  {t("createGroup.nameLabel")}
+                </label>
                 <input
                   className="w-full rounded-xl border border-slate-800 bg-slate-950/60 px-3 py-2 text-slate-100 focus:outline-none focus:ring-2 focus:ring-lime-500/70"
-                  placeholder="Ví dụ: Thứ 3 vui vẻ"
+                  placeholder={t("createGroup.namePlaceholder")}
                   value={name}
                   onChange={(event) => setName(event.target.value)}
                   required
@@ -133,13 +137,13 @@ export default function CreateGroupPanel({ onCreated }: Props) {
                   className="rounded-xl border border-slate-700 px-4 py-2 text-sm text-slate-200"
                   onClick={() => setOpen(false)}
                 >
-                  Hủy
+                  {t("common.cancel")}
                 </button>
                 <button
                   className="rounded-xl bg-lime-500 px-4 py-2 text-sm font-semibold text-slate-950 disabled:opacity-60"
                   disabled={loading}
                 >
-                  {loading ? "Đang tạo..." : "Tạo nhóm"}
+                  {loading ? t("createGroup.creating") : t("createGroup.create")}
                 </button>
               </div>
             </form>

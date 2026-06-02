@@ -3,10 +3,11 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Home, User } from "lucide-react";
+import { useI18n } from "@/lib/i18n";
 
 type Item = {
   href: string;
-  label: string;
+  labelKey: string;
   icon: React.ComponentType<{ size?: number; strokeWidth?: number }>;
   matches: (pathname: string) => boolean;
 };
@@ -14,14 +15,14 @@ type Item = {
 const items: Item[] = [
   {
     href: "/dashboard",
-    label: "Trang chủ",
+    labelKey: "nav.home",
     icon: Home,
     matches: (path) =>
       path === "/dashboard" || path.startsWith("/dashboard/groups"),
   },
   {
     href: "/dashboard/profile",
-    label: "Tài khoản",
+    labelKey: "nav.account",
     icon: User,
     matches: (path) => path.startsWith("/dashboard/profile"),
   },
@@ -29,6 +30,7 @@ const items: Item[] = [
 
 export default function BottomNav() {
   const pathname = usePathname() ?? "";
+  const { t } = useI18n();
 
   return (
     <nav className="fixed bottom-0 left-0 z-40 flex h-16 w-full items-center justify-around border-t border-white/10 bg-slate-950/80 px-4 backdrop-blur-xl shadow-[0_-4px_20px_rgba(163,230,53,0.06)]">
@@ -51,7 +53,7 @@ export default function BottomNav() {
                 active ? "font-semibold" : "font-medium"
               }`}
             >
-              {item.label}
+              {t(item.labelKey)}
             </span>
           </Link>
         );

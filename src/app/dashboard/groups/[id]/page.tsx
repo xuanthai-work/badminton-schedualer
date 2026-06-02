@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { ChevronLeft } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
+import { useI18n } from "@/lib/i18n";
 import BottomNav from "@/components/BottomNav";
 import MembersPanel from "./MembersPanel";
 import MatchesPanel from "./MatchesPanel";
@@ -19,6 +20,7 @@ type GroupInfo = {
 
 export default function GroupDetailPage() {
   const router = useRouter();
+  const { t } = useI18n();
   const params = useParams<{ id: string }>();
   const groupId = params?.id;
 
@@ -44,7 +46,7 @@ export default function GroupDetailPage() {
         throw groupError;
       }
       if (!groupRow) {
-        throw new Error("Không tìm thấy nhóm hoặc bạn không có quyền xem.");
+        throw new Error(t("group.errNotFound"));
       }
 
       const { data: membership, error: memberError } = await supabase
@@ -58,7 +60,7 @@ export default function GroupDetailPage() {
         throw memberError;
       }
       if (!membership) {
-        throw new Error("Bạn không phải thành viên của nhóm này.");
+        throw new Error(t("group.errNotMember"));
       }
 
       setGroup({
@@ -68,7 +70,7 @@ export default function GroupDetailPage() {
       });
       setRole(membership.role === "admin" ? "admin" : "member");
     },
-    [groupId]
+    [groupId, t]
   );
 
   useEffect(() => {
@@ -82,14 +84,14 @@ export default function GroupDetailPage() {
         setUserId(data.session.user.id);
         await load(data.session.user.id);
       } catch (err) {
-        setError(err instanceof Error ? err.message : "Không thể tải dữ liệu.");
+        setError(err instanceof Error ? err.message : t("group.errLoad"));
       } finally {
         setLoading(false);
       }
     };
 
     void init();
-  }, [router, load]);
+  }, [router, load, t]);
 
   const isAdmin = role === "admin";
 
@@ -107,11 +109,11 @@ export default function GroupDetailPage() {
             className="inline-flex items-center gap-1 text-xs font-semibold uppercase tracking-[0.3em] text-lime-400 transition hover:text-lime-300"
           >
             <ChevronLeft size={14} strokeWidth={2} />
-            Dashboard
+            {t("dashboard.eyebrow")}
           </Link>
           <div className="flex flex-wrap items-center gap-3">
             <h1 className="text-[28px] font-semibold leading-tight">
-              {group?.name ?? "Đang tải nhóm..."}
+              {group?.name ?? t("group.loading")}
             </h1>
             {role && (
               <span
@@ -121,7 +123,7 @@ export default function GroupDetailPage() {
                     : "border-white/10 bg-slate-800/80 text-slate-300"
                 }`}
               >
-                {isAdmin ? "Admin" : "Member"}
+                {isAdmin ? t("common.admin") : t("common.member")}
               </span>
             )}
           </div>
@@ -137,7 +139,7 @@ export default function GroupDetailPage() {
             }`}
             onClick={() => setTab("matches")}
           >
-            Lịch đánh
+            {t("group.tabMatches")}
           </button>
           <button
             type="button"
@@ -148,7 +150,7 @@ export default function GroupDetailPage() {
             }`}
             onClick={() => setTab("members")}
           >
-            Thành viên
+            {t("group.tabMembers")}
           </button>
           {isAdmin && (
             <button
@@ -160,7 +162,7 @@ export default function GroupDetailPage() {
               }`}
               onClick={() => setTab("settings")}
             >
-              Cài đặt
+              {t("group.tabSettings")}
             </button>
           )}
         </nav>
