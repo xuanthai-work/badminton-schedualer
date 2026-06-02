@@ -5,9 +5,12 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   ChevronLeft,
+  Dices,
   Globe,
+  Hash,
   KeyRound,
   Landmark,
+  Lock,
   LogOut,
   Save,
   UserCog,
@@ -40,6 +43,7 @@ type ProfileRow = {
   name: string;
   username: string;
   email: string;
+  tag: string | null;
   bankId: string | null;
   bankAccount: string | null;
   bankAccountName: string | null;
@@ -48,6 +52,12 @@ type ProfileRow = {
 };
 
 const USERNAME_REGEX = /^[a-zA-Z0-9._-]{3,20}$/;
+const TAG_REGEX = /^[0-9]{4}$/;
+// Where users are told to write to change a locked tag.
+const TAG_SUPPORT_EMAIL = "andrew.pham@techvify.com.vn";
+
+const randomTag = () =>
+  String(Math.floor(Math.random() * 10000)).padStart(4, "0");
 
 export default function ProfilePage() {
   const router = useRouter();
@@ -65,6 +75,12 @@ export default function ProfilePage() {
   const [name, setName] = useState("");
   const [nameBusy, setNameBusy] = useState(false);
   const [nameMsg, setNameMsg] = useState<{ text: string; ok: boolean } | null>(
+    null
+  );
+
+  const [tagInput, setTagInput] = useState("");
+  const [tagBusy, setTagBusy] = useState(false);
+  const [tagMsg, setTagMsg] = useState<{ text: string; ok: boolean } | null>(
     null
   );
 
@@ -99,7 +115,7 @@ export default function ProfilePage() {
         const { data: row, error: queryError } = await supabase
           .from("users")
           .select(
-            "name, username, email, bank_id, bank_account, bank_account_name, avatar_url, bank_qr_url"
+            "name, username, email, tag, bank_id, bank_account, bank_account_name, avatar_url, bank_qr_url"
           )
           .eq("id", u.id)
           .maybeSingle();
@@ -110,6 +126,7 @@ export default function ProfilePage() {
           name: row.name,
           username: row.username ?? "",
           email: row.email,
+          tag: row.tag ?? null,
           bankId: row.bank_id ?? null,
           bankAccount: row.bank_account ?? null,
           bankAccountName: row.bank_account_name ?? null,
@@ -118,6 +135,8 @@ export default function ProfilePage() {
         };
         setProfile(profileRow);
         setName(profileRow.username || profileRow.name);
+        // Pre-fill the tag picker with a random suggestion when unset.
+        setTagInput(profileRow.tag ?? randomTag());
         setBankId(profileRow.bankId ?? "");
         setBankAccount(profileRow.bankAccount ?? "");
         setBankAccountName(profileRow.bankAccountName ?? "");
@@ -170,6 +189,35 @@ export default function ProfilePage() {
       });
     } finally {
       setNameBusy(false);
+    }
+  };
+
+  const handleSaveTag = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    // Tag is set once, then locked (changes go through the admin).
+    if (profile?.tag) return;
+    const value = tagInput.trim();
+    if (!TAG_REGEX.test(value)) {
+      setTagMsg({ text: t("profile.errTagFormat"), ok: false });
+      return;
+    }
+    setTagBusy(true);
+    setTagMsg(null);
+    try {
+      const { error: updateError } = await supabase
+        .from("users")
+        .update({ tag: value })
+        .eq("id", userId);
+      if (updateError) throw new Error(updateError.message);
+      setProfile((p) => (p ? { ...p, tag: value } : p));
+      setTagMsg({ text: t("profile.tagSaved"), ok: true });
+    } catch (err) {
+      setTagMsg({
+        text: err instanceof Error ? err.message : t("profile.errTag"),
+        ok: false,
+      });
+    } finally {
+      setTagBusy(false);
     }
   };
 
@@ -314,9 +362,19 @@ export default function ProfilePage() {
                   onUploaded={(url) => persistImageUrl("avatar_url", url)}
                   onRemoved={() => persistImageUrl("avatar_url", null)}
                 />
-                <p className="text-xs text-slate-400">
-                  {t("profile.avatarHint")}
-                </p>
+                <div className="min-w-0">
+                  <p className="truncate text-lg font-semibold leading-tight">
+                    <span className="text-slate-100">
+                      @{profile.username || profile.name}
+                    </span>
+                    <span className="text-lime-400">
+                      #{profile.tag ?? "----"}
+                    </span>
+                  </p>
+                  <p className="mt-0.5 text-xs text-slate-400">
+                    {t("profile.avatarHint")}
+                  </p>
+                </div>
               </div>
 
               <form onSubmit={handleSaveName} className="space-y-4">
@@ -369,6 +427,79 @@ export default function ProfilePage() {
                   {nameBusy ? t("profile.savingName") : t("profile.saveName")}
                 </button>
               </form>
+
+              <div className="mt-5 space-y-2 border-t border-white/10 pt-5">
+                <label className="ml-1 text-[10px] font-semibold uppercase tracking-[0.2em] text-slate-400">
+                  {t("profile.tag")}
+                </label>
+                {profile.tag ? (
+                  <>
+                    <div className="flex items-center gap-2">
+                      <span className="inline-flex items-center gap-1 rounded-xl border border-slate-800 bg-slate-900/40 px-4 py-3 text-slate-100">
+                        <Hash size={14} strokeWidth={2} className="text-lime-400" />
+                        <span className="font-semibold tracking-wider">
+                          {profile.tag}
+                        </span>
+                      </span>
+                      <Lock size={14} strokeWidth={1.75} className="text-slate-500" />
+                    </div>
+                    <p className="ml-1 text-[11px] text-slate-500">
+                      {t("profile.tagLockedHint", { email: TAG_SUPPORT_EMAIL })}
+                    </p>
+                  </>
+                ) : (
+                  <form onSubmit={handleSaveTag} className="space-y-2">
+                    <div className="flex items-center gap-2">
+                      <div className="relative">
+                        <Hash
+                          size={16}
+                          strokeWidth={2}
+                          className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-lime-400"
+                        />
+                        <input
+                          className="w-32 rounded-xl border border-slate-800 bg-slate-950/60 py-3 pl-9 pr-4 font-semibold tracking-wider text-slate-100 placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-lime-500/70"
+                          value={tagInput}
+                          onChange={(event) =>
+                            setTagInput(
+                              event.target.value.replace(/\D/g, "").slice(0, 4)
+                            )
+                          }
+                          placeholder="0000"
+                          inputMode="numeric"
+                          maxLength={4}
+                        />
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setTagInput(randomTag())}
+                        className="inline-flex items-center gap-1 rounded-xl border border-slate-700 px-3 py-3 text-xs text-slate-200 transition hover:border-slate-500 active:scale-95"
+                      >
+                        <Dices size={14} strokeWidth={1.75} />
+                        {t("profile.randomize")}
+                      </button>
+                      <button
+                        className="inline-flex items-center gap-2 rounded-xl bg-lime-500 px-4 py-3 text-sm font-semibold text-slate-950 shadow-[0_0_20px_rgba(163,230,53,0.25)] transition hover:scale-[1.02] active:scale-95 disabled:opacity-60 disabled:hover:scale-100"
+                        disabled={tagBusy || !TAG_REGEX.test(tagInput)}
+                      >
+                        <Save size={14} strokeWidth={2} />
+                        {tagBusy ? t("profile.savingTag") : t("profile.saveTag")}
+                      </button>
+                    </div>
+                    <p className="ml-1 text-[11px] text-slate-500">
+                      {t("profile.tagHint")}
+                    </p>
+                  </form>
+                )}
+                {tagMsg && (
+                  <p
+                    className={`ml-1 text-xs ${
+                      tagMsg.ok ? "text-lime-300" : "text-rose-400"
+                    }`}
+                  >
+                    {tagMsg.text}
+                  </p>
+                )}
+              </div>
             </section>
 
             <section className="glass-panel rounded-2xl p-5">

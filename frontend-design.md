@@ -112,7 +112,7 @@ Hover state (only on interactive cards): border becomes `border-lime-500/40`.
 
 ### 3.9 Bottom mobile nav (shipped)
 - Fixed glass bar, `h-16`, `bg-slate-950/80 backdrop-blur-xl` with a top border `border-white/10` and a faint top-glow shadow.
-- Two items currently: **Trang chủ** (`Home` Lucide → `/dashboard`) and **Tài khoản** (`User` Lucide → `/dashboard/profile`).
+- Three items: **Trang chủ** (`Home` → `/dashboard`), **Bạn bè** (`Users` → `/dashboard/friends`), **Tài khoản** (`User` → `/dashboard/profile`).
 - Active item: lime icon + lime label on a `bg-lime-500/10` rounded pill. Inactive: `text-slate-400`.
 - Active-route detection via `usePathname`. `/dashboard/groups/*` is treated as "Trang chủ".
 
@@ -132,7 +132,8 @@ Hover state (only on interactive cards): border becomes `border-lime-500/40`.
 /dashboard                                     List of my groups + personalized greeting
 /dashboard/groups/[id]                         Group detail (tabs: Matches, Members, Cài đặt)
 /dashboard/groups/[id]/matches/[matchId]       Match detail (RSVP + expense + Maps link)
-/dashboard/profile                             Avatar / login / bank / QR / password / sign-out
+/dashboard/friends                             Friends (add by username#tag, requests, list)
+/dashboard/profile                             Handle/tag / avatar / login / bank / QR / password / language / sign-out
 ```
 
 Stitch should design **mobile portrait** as primary and provide a wider desktop layout as a secondary deliverable per screen.
@@ -249,6 +250,8 @@ Stitch should design **mobile portrait** as primary and provide a wider desktop 
   - Email input (placeholder `email@example.com`).
   - Primary button **"Mời"** (loading: **"Đang mời..."**).
   - Helper line under the form for status messages: **"Đã thêm thành viên." / "Người này đã có trong nhóm." / "Email chưa đăng ký tài khoản trên hệ thống."**
+  - Label is now **"Mời thêm thành viên (tên đăng nhập hoặc email)"** — the field accepts a **username or email** (resolved server-side). Status line also covers a generic not-found: **"Không tìm thấy người dùng với tên đăng nhập hoặc email này."**
+- **Mời từ bạn bè** card (admin-only, shipped): a glass panel with a `UserPlus` heading listing the admin's accepted friends **not already in the group**, each as `name @username#tag` + a small lime **"Mời"** button. Empty state when all friends are already members: **"Tất cả bạn bè đã ở trong nhóm."**
 - Member list (vertical, gap 12px). Each row is a glass panel:
   - Left: name (medium) with optional **"(bạn)"** badge after own name; email below in slate-400.
   - Right: role pill (Admin / Member). If user is the group creator, append **"· Tạo nhóm"** to the pill.
@@ -362,8 +365,11 @@ For a member viewing their own row: show **"Tôi đã chuyển khoản"** button
 
 **Section 1 — Thông tin cá nhân** (glass card):
 - Heading: `UserCog` icon + **"Thông tin cá nhân"**.
-- Top row: 80px round `ImageUpload` (bucket `avatars`, prefix `avatar`) on the left, helper text on the right: **"Ảnh đại diện hiển thị bên cạnh tên của bạn trong các nhóm. JPG/PNG, <5MB."**
+- Top row: 80px round `ImageUpload` (bucket `avatars`, prefix `avatar`) on the left; on the right, a prominent **handle line** — `@username` (slate-100) + `#tag` (lime), e.g. **`@phuonganh#0421`** (shows `#----` until the tag is set) — with helper text below: **"Ảnh đại diện hiển thị bên cạnh tên của bạn trong các nhóm. JPG/PNG, <5MB."**
 - **"Tên đăng nhập"** input (regex `^[a-zA-Z0-9._-]{3,20}$`) with helper text **"Dùng làm tên hiển thị và để đăng nhập. 3-20 ký tự, chỉ chữ/số và . _ -"**.
+- **Tag** sub-block (divider above): a 4-digit discriminator (`#0000`), decorative — username stays globally unique.
+  - **Unset:** a `Hash`-prefixed 4-digit numeric input + a **"Ngẫu nhiên"** dice button (pre-filled with a random suggestion) + lime **"Lưu tag"**. Helper: **"Chọn tag 4 chữ số. Chỉ đặt được một lần — sau đó cần liên hệ quản trị viên để đổi."**
+  - **Set:** read-only `#1234` chip with a `Lock` icon + note **"Để đổi tag, vui lòng liên hệ {email}."** Set-once.
 - **"Email"** input (read-only, disabled styling). Helper text: **"Email gắn với tài khoản đăng nhập, không thể đổi tại đây."**
 - Primary CTA with `Save` icon: **"Lưu tên"** (disabled when unchanged). Inline lime success or rose error message.
 
@@ -392,6 +398,27 @@ For a member viewing their own row: show **"Tôi đã chuyển khoản"** button
 
 **Section 5 — Sign out:**
 - Full-width rose-tinted button **"Đăng xuất"** with `LogOut` icon.
+
+---
+
+### 5.6b Friends (`/dashboard/friends`) — shipped
+
+**Purpose:** add people by their `username#tag` (Riot-style), manage requests, and reuse the list to quick-invite into groups.
+
+**Header:**
+- Lime back-link **"← DASHBOARD"**.
+- Title **"Bạn bè"** (28px semibold) + subtitle **"Kết bạn để mời vào nhóm nhanh hơn."**
+
+**Add card (glass panel):**
+- Label **"Thêm bạn (tên đăng nhập#tag hoặc email)"**, input (placeholder `nguyenvana#0421`) + lime **"Gửi lời mời"** button with `UserPlus` icon (loading: **"Đang gửi..."**).
+- Inline status messages (lime if ok, rose otherwise): **"Đã gửi lời mời kết bạn." / "Đã là bạn bè!" / "Các bạn đã là bạn bè." / "Đã gửi lời mời trước đó." / "Không tìm thấy người dùng." / "Bạn không thể tự kết bạn với chính mình."**
+
+**Sections (each a list of rows; a row shows avatar/initial + name + `@username#tag`):**
+1. **Lời mời kết bạn ({n})** — incoming pending. Each row: lime **"Chấp nhận"** (`Check`) + outline **"Từ chối"** (`X`). Sorted to the top.
+2. **Đang chờ phản hồi ({n})** — outgoing pending. Each row: `Clock` glyph + outline **"Huỷ lời mời"**.
+3. **Bạn bè ({n})** — accepted. Each row: rose-outline **"Xoá bạn"** (confirm dialog **"Xoá {name} khỏi danh sách bạn bè?"**). Empty state: **"Chưa có bạn bè. Thêm bạn bằng tên đăng nhập#tag."**
+
+**Notes:** all reads/writes go through security-definer RPCs (`get_friends`, `send_friend_request`, `respond_friend_request`, `remove_friend`). A friend's email is never exposed to the other party.
 
 ---
 
@@ -453,3 +480,6 @@ When porting Stitch output back to code, override these recurring drifts:
 - Payment section (§5.4.3) now branches between an admin-uploaded QR image and the dynamic VietQR API.
 - Sign-out moved off the dashboard header into the profile page.
 - **i18n shipped:** app is bilingual VI (default) + EN via `src/lib/i18n/`. Vietnamese stays the source-of-truth for design copy. Language switcher added to Profile §5.5 (Section 4); sign-out is now Section 5. Dates/currency and the `DateField` picker follow the active locale.
+- **Invite by username or email** (Members tab §5.3.2) — field no longer email-only.
+- **Profile tag** (§5.5 Section 1): `@username#0000` handle + set-once 4-digit tag picker.
+- **Friends** (§5.6b, route `/dashboard/friends`): add by `username#tag`, requests in/out, friends list; bottom nav is now **3 items** (Trang chủ / Bạn bè / Tài khoản). Members tab gained a **"Mời từ bạn bè"** quick-invite.

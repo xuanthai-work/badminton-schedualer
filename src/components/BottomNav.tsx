@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, User } from "lucide-react";
+import { Home, Users, User } from "lucide-react";
 import { useI18n } from "@/lib/i18n";
 
 type Item = {
@@ -19,6 +19,12 @@ const items: Item[] = [
     icon: Home,
     matches: (path) =>
       path === "/dashboard" || path.startsWith("/dashboard/groups"),
+  },
+  {
+    href: "/dashboard/friends",
+    labelKey: "nav.friends",
+    icon: Users,
+    matches: (path) => path.startsWith("/dashboard/friends"),
   },
   {
     href: "/dashboard/profile",

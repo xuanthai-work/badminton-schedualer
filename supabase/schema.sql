@@ -15,6 +15,17 @@ create unique index if not exists users_username_lower_uidx
   on public.users (lower(username));
 alter table public.users add column if not exists avatar_url text;
 alter table public.users add column if not exists bank_qr_url text;
+alter table public.users add column if not exists tag text;
+do $$
+begin
+  if not exists (
+    select 1 from pg_constraint where conname = 'users_tag_format'
+  ) then
+    alter table public.users
+      add constraint users_tag_format
+      check (tag is null or tag ~ '^[0-9]{4}$');
+  end if;
+end $$;
 
 create table if not exists public.groups (
   id uuid primary key default gen_random_uuid(),

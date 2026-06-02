@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { UserPlus } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { useI18n } from "@/lib/i18n";
 
@@ -10,6 +11,13 @@ type Member = {
   email: string;
   role: "admin" | "member";
   joinedAt: string;
+};
+
+type FriendLite = {
+  userId: string;
+  name: string;
+  username: string;
+  tag: string | null;
 };
 
 type Props = {
@@ -33,6 +41,7 @@ export default function MembersPanel({
   const [inviteBusy, setInviteBusy] = useState(false);
   const [inviteMsg, setInviteMsg] = useState("");
   const [actionBusy, setActionBusy] = useState<string | null>(null);
+  const [friends, setFriends] = useState<FriendLite[]>([]);
 
   const load = useCallback(async () => {
     try {
@@ -65,16 +74,32 @@ export default function MembersPanel({
     }
   }, [groupId, t]);
 
+  const loadFriends = useCallback(async () => {
+    if (!isAdmin) return;
+    const { data } = await supabase.rpc("get_friends");
+    const rows = (data as Array<Record<string, unknown>> | null) ?? [];
+    setFriends(
+      rows
+        .filter((r) => r.relation === "friend")
+        .map((r) => ({
+          userId: r.user_id as string,
+          name: (r.name as string) ?? "",
+          username: (r.username as string) ?? "",
+          tag: (r.tag as string | null) ?? null,
+        }))
+    );
+  }, [isAdmin]);
+
   useEffect(() => {
     const run = async () => {
       try {
-        await load();
+        await Promise.all([load(), loadFriends()]);
       } finally {
         setLoading(false);
       }
     };
     void run();
-  }, [load]);
+  }, [load, loadFriends]);
 
   const handleInvite = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -112,6 +137,35 @@ export default function MembersPanel({
       setInviteBusy(false);
     }
   };
+
+  const inviteFriend = async (friend: FriendLite) => {
+    setActionBusy(friend.userId);
+    setInviteMsg("");
+    try {
+      const { data, error: rpcError } = await supabase.rpc(
+        "invite_user_by_identifier",
+        { target_group_id: groupId, target_identifier: friend.username }
+      );
+      if (rpcError) throw new Error(rpcError.message);
+      const result = data as { status?: string } | null;
+      if (result?.status === "added") {
+        setInviteMsg(t("members.added"));
+        await load();
+      } else if (result?.status === "already_member") {
+        setInviteMsg(t("members.alreadyMember"));
+      } else {
+        setInviteMsg(t("members.cannotAdd"));
+      }
+    } catch (err) {
+      setInviteMsg(err instanceof Error ? err.message : t("members.errInvite"));
+    } finally {
+      setActionBusy(null);
+    }
+  };
+
+  const invitableFriends = friends.filter(
+    (f) => !members.some((m) => m.userId === f.userId)
+  );
 
   const handleToggleRole = async (member: Member) => {
     if (member.userId === createdBy) {
@@ -195,6 +249,47 @@ export default function MembersPanel({
             <p className="basis-full text-xs text-slate-300">{inviteMsg}</p>
           )}
         </form>
+      )}
+
+      {isAdmin && friends.length > 0 && (
+        <div className="glass-panel space-y-3 rounded-2xl p-4">
+          <div className="flex items-center gap-2">
+            <UserPlus size={16} strokeWidth={1.75} className="text-lime-400" />
+            <h3 className="text-sm font-semibold">{t("members.inviteFriends")}</h3>
+          </div>
+          {invitableFriends.length === 0 ? (
+            <p className="text-xs text-slate-400">
+              {t("members.inviteFriendsEmpty")}
+            </p>
+          ) : (
+            <ul className="space-y-2">
+              {invitableFriends.map((friend) => (
+                <li
+                  key={friend.userId}
+                  className="flex items-center justify-between gap-3 rounded-xl bg-slate-900/50 px-3 py-2"
+                >
+                  <span className="min-w-0 truncate text-sm text-slate-100">
+                    {friend.name}{" "}
+                    <span className="text-xs text-slate-400">
+                      @{friend.username}
+                      {friend.tag && (
+                        <span className="text-lime-400">#{friend.tag}</span>
+                      )}
+                    </span>
+                  </span>
+                  <button
+                    type="button"
+                    disabled={actionBusy === friend.userId}
+                    onClick={() => inviteFriend(friend)}
+                    className="shrink-0 rounded-lg bg-lime-500 px-3 py-1.5 text-xs font-semibold text-slate-950 transition hover:scale-[1.03] active:scale-95 disabled:opacity-60"
+                  >
+                    {t("members.invite")}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
       )}
 
       {error && <p className="text-sm text-rose-400">{error}</p>}
