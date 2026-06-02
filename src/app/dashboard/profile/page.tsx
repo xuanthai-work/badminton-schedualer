@@ -19,6 +19,7 @@ import { supabase } from "@/lib/supabaseClient";
 import { useI18n } from "@/lib/i18n";
 import { LANGS } from "@/lib/i18n/translations";
 import BottomNav from "@/components/BottomNav";
+import NotificationBell from "@/components/NotificationBell";
 import SelectField from "@/components/SelectField";
 import ImageUpload from "@/components/ImageUpload";
 import { BANKS } from "@/lib/banks";
@@ -306,13 +307,16 @@ export default function ProfilePage() {
             <ChevronLeft size={14} strokeWidth={2} />
             {t("dashboard.eyebrow")}
           </Link>
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.3em] text-lime-400">
-              {t("profile.account")}
-            </p>
-            <h1 className="mt-1 text-[28px] font-semibold leading-tight">
-              {t("profile.title")}
-            </h1>
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.3em] text-lime-400">
+                {t("profile.account")}
+              </p>
+              <h1 className="mt-1 text-[28px] font-semibold leading-tight">
+                {t("profile.title")}
+              </h1>
+            </div>
+            <NotificationBell />
           </div>
         </header>
 

@@ -46,6 +46,7 @@ declare
   utag text;
   target uuid;
   existing record;
+  me_name text;
 begin
   if me is null then
     raise exception 'not_authenticated';
@@ -53,6 +54,8 @@ begin
   if needle is null or needle = '' then
     return jsonb_build_object('status', 'user_not_found');
   end if;
+
+  select name into me_name from public.users where id = me;
 
   if position('@' in needle) > 0 then
     select id into target from public.users where lower(email) = lower(needle) limit 1;
@@ -83,15 +86,20 @@ begin
     elsif existing.requester = me then
       return jsonb_build_object('status', 'already_sent');
     else
+      -- Target had already requested me → accept and tell them.
       update public.friendships
         set status = 'accepted', responded_at = now()
         where id = existing.id;
+      insert into public.notifications (user_id, type, data)
+      values (target, 'friend_accepted', jsonb_build_object('name', me_name));
       return jsonb_build_object('status', 'accepted');
     end if;
   end if;
 
   insert into public.friendships (requester, addressee, status)
   values (me, target, 'pending');
+  insert into public.notifications (user_id, type, data)
+  values (target, 'friend_request', jsonb_build_object('name', me_name));
   return jsonb_build_object('status', 'sent');
 end;
 $$;
@@ -106,6 +114,7 @@ as $$
 declare
   me uuid := auth.uid();
   fr record;
+  me_name text;
 begin
   if me is null then
     raise exception 'not_authenticated';
@@ -121,6 +130,9 @@ begin
   if accept then
     update public.friendships set status = 'accepted', responded_at = now()
       where id = request_id;
+    select name into me_name from public.users where id = me;
+    insert into public.notifications (user_id, type, data)
+    values (fr.requester, 'friend_accepted', jsonb_build_object('name', me_name));
     return jsonb_build_object('status', 'accepted');
   else
     delete from public.friendships where id = request_id;

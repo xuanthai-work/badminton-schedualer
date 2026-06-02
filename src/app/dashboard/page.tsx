@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ChevronRight, Users } from "lucide-react";
+import { ChevronRight, Users, Wallet } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { ensureUserProfile } from "@/lib/userProfile";
 import { useI18n } from "@/lib/i18n";
@@ -28,26 +28,39 @@ type GroupInvite = {
 
 export default function DashboardPage() {
   const router = useRouter();
-  const { t } = useI18n();
+  const { t, formatVnd } = useI18n();
   const [userId, setUserId] = useState<string | null>(null);
   const [displayName, setDisplayName] = useState<string>("");
   const [groups, setGroups] = useState<GroupCard[]>([]);
   const [invites, setInvites] = useState<GroupInvite[]>([]);
   const [inviteBusy, setInviteBusy] = useState<string | null>(null);
+  const [debt, setDebt] = useState<{ unpaid: number; submitted: number }>({
+    unpaid: 0,
+    submitted: 0,
+  });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
   const loadInvites = useCallback(async () => {
     const { data } = await supabase.rpc("get_group_invites");
     const rows = (data as Array<Record<string, unknown>> | null) ?? [];
-    setInvites(
-      rows.map((r) => ({
-        inviteId: r.invite_id as string,
-        groupId: r.group_id as string,
-        groupName: (r.group_name as string) ?? "",
-        inviterName: (r.inviter_name as string) ?? "",
-      }))
-    );
+    const mapped: GroupInvite[] = rows.map((r) => ({
+      inviteId: r.invite_id as string,
+      groupId: r.group_id as string,
+      groupName: (r.group_name as string) ?? "",
+      inviterName: (r.inviter_name as string) ?? "",
+    }));
+    setInvites(mapped);
+    return mapped;
+  }, []);
+
+  const loadDebt = useCallback(async () => {
+    const { data } = await supabase.rpc("get_payment_summary");
+    const row = (data as Array<Record<string, unknown>> | null)?.[0];
+    setDebt({
+      unpaid: Number(row?.owe_unpaid ?? 0),
+      submitted: Number(row?.owe_submitted ?? 0),
+    });
   }, []);
 
   const loadGroups = useCallback(async (uid: string) => {
@@ -140,7 +153,11 @@ export default function DashboardPage() {
           setDisplayName(profile.name);
         }
 
-        await Promise.all([loadGroups(data.session.user.id), loadInvites()]);
+        await Promise.all([
+          loadGroups(data.session.user.id),
+          loadInvites(),
+          loadDebt(),
+        ]);
       } catch (err) {
         setError(err instanceof Error ? err.message : t("dashboard.loadError"));
       } finally {
@@ -149,7 +166,7 @@ export default function DashboardPage() {
     };
 
     void init();
-  }, [router, loadGroups, loadInvites, t]);
+  }, [router, loadGroups, loadInvites, loadDebt, t]);
 
   const respondInvite = async (invite: GroupInvite, accept: boolean) => {
     setInviteBusy(invite.inviteId);
@@ -204,6 +221,24 @@ export default function DashboardPage() {
             {t("dashboard.readyToday")}
           </p>
         </section>
+
+        {debt.unpaid + debt.submitted > 0 && (
+          <div className="glass-panel flex items-center justify-between gap-4 rounded-2xl border-amber-500/20 p-5">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-amber-300">
+                {t("dashboard.debtTitle")}
+              </p>
+              <p className="mt-1 text-2xl font-semibold leading-tight">
+                {formatVnd(debt.unpaid + debt.submitted)}
+              </p>
+              <p className="mt-1 text-xs text-slate-400">
+                {t("dashboard.debtToPay")} {formatVnd(debt.unpaid)} ·{" "}
+                {t("dashboard.debtPending")} {formatVnd(debt.submitted)}
+              </p>
+            </div>
+            <Wallet size={28} strokeWidth={1.5} className="text-amber-300" />
+          </div>
+        )}
 
         {invites.length > 0 && (
           <section className="space-y-3">

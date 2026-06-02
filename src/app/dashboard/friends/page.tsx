@@ -8,6 +8,7 @@ import { Check, ChevronLeft, Clock, UserPlus, X } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { useI18n } from "@/lib/i18n";
 import BottomNav from "@/components/BottomNav";
+import NotificationBell from "@/components/NotificationBell";
 
 type Relation = "friend" | "incoming" | "outgoing";
 
@@ -173,13 +174,16 @@ export default function FriendsPage() {
             <ChevronLeft size={14} strokeWidth={2} />
             {t("dashboard.eyebrow")}
           </Link>
-          <div>
-            <h1 className="text-[28px] font-semibold leading-tight">
-              {t("friends.title")}
-            </h1>
-            <p className="mt-1 text-sm text-slate-300">
-              {t("friends.subtitle")}
-            </p>
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <h1 className="text-[28px] font-semibold leading-tight">
+                {t("friends.title")}
+              </h1>
+              <p className="mt-1 text-sm text-slate-300">
+                {t("friends.subtitle")}
+              </p>
+            </div>
+            <NotificationBell />
           </div>
         </header>
 

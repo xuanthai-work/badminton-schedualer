@@ -3,7 +3,13 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Calendar, ChevronLeft, ChevronRight, UserPlus } from "lucide-react";
+import {
+  Calendar,
+  ChevronLeft,
+  ChevronRight,
+  ReceiptText,
+  UserPlus,
+} from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { useI18n } from "@/lib/i18n";
 import BottomNav from "@/components/BottomNav";
@@ -20,7 +26,7 @@ type NotificationRow = {
 
 export default function NotificationsPage() {
   const router = useRouter();
-  const { t, lang, formatDate } = useI18n();
+  const { t, lang, formatDate, formatVnd } = useI18n();
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -103,6 +109,22 @@ export default function NotificationsPage() {
         group: String(n.data.group_name ?? ""),
       });
     }
+    if (n.type === "friend_request") {
+      return t("notifications.friendRequest", {
+        name: String(n.data.name ?? ""),
+      });
+    }
+    if (n.type === "friend_accepted") {
+      return t("notifications.friendAccepted", {
+        name: String(n.data.name ?? ""),
+      });
+    }
+    if (n.type === "payment_confirmed") {
+      return t("notifications.paymentConfirmed", {
+        amount: formatVnd(Number(n.data.amount ?? 0)),
+        group: String(n.data.group_name ?? ""),
+      });
+    }
     return n.type;
   };
 
@@ -113,6 +135,12 @@ export default function NotificationsPage() {
     // A pending invite goes to the dashboard (accept/decline card) — the
     // invitee isn't a group member yet, so the group page would reject them.
     if (n.type === "group_invite") return "/dashboard";
+    if (n.type === "friend_request" || n.type === "friend_accepted") {
+      return "/dashboard/friends";
+    }
+    if (n.type === "payment_confirmed" && n.groupId && n.matchId) {
+      return `/dashboard/groups/${n.groupId}/matches/${n.matchId}`;
+    }
     if (n.groupId) return `/dashboard/groups/${n.groupId}`;
     return "/dashboard";
   };
@@ -160,7 +188,12 @@ export default function NotificationsPage() {
         ) : (
           <ul className="space-y-3">
             {items.map((n) => {
-              const Icon = n.type === "match_created" ? Calendar : UserPlus;
+              const Icon =
+                n.type === "match_created"
+                  ? Calendar
+                  : n.type === "payment_confirmed"
+                    ? ReceiptText
+                    : UserPlus;
               return (
                 <li key={n.id}>
                   <Link

@@ -53,6 +53,16 @@ type Payee = {
   bankQrUrl: string | null;
 };
 
+type PaymentStatus = "unpaid" | "submitted" | "confirmed";
+
+type Payment = {
+  userId: string;
+  name: string;
+  tag: string | null;
+  amount: number;
+  status: PaymentStatus;
+};
+
 export default function MatchDetailPage() {
   const router = useRouter();
   const { t, formatVnd, formatDate } = useI18n();
@@ -66,6 +76,8 @@ export default function MatchDetailPage() {
   const [rsvps, setRsvps] = useState<Rsvp[]>([]);
   const [expense, setExpense] = useState<Expense | null>(null);
   const [payee, setPayee] = useState<Payee | null>(null);
+  const [payments, setPayments] = useState<Payment[]>([]);
+  const [payBusy, setPayBusy] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [rsvpBusy, setRsvpBusy] = useState(false);
@@ -176,6 +188,23 @@ export default function MatchDetailPage() {
             : null
         );
       }
+
+      const { data: paymentRows } = await supabase
+        .from("payments")
+        .select("user_id, amount, status, users ( name, tag )")
+        .eq("match_id", matchId);
+      setPayments(
+        (paymentRows ?? []).map((row) => {
+          const user = Array.isArray(row.users) ? row.users[0] : row.users;
+          return {
+            userId: row.user_id as string,
+            name: user?.name ?? t("match.unknownUser"),
+            tag: (user?.tag as string | null) ?? null,
+            amount: Number(row.amount),
+            status: row.status as PaymentStatus,
+          };
+        })
+      );
     },
     [groupId, matchId, t]
   );
@@ -217,6 +246,11 @@ export default function MatchDetailPage() {
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "expenses", filter: `match_id=eq.${matchId}` },
+        () => void load(userId)
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "payments", filter: `match_id=eq.${matchId}` },
         () => void load(userId)
       )
       .subscribe();
@@ -311,6 +345,42 @@ export default function MatchDetailPage() {
       setError(err instanceof Error ? err.message : t("match.errReopen"));
     } finally {
       setSettleBusy(false);
+    }
+  };
+
+  const handleSubmitPayment = async () => {
+    if (!matchId || !userId) return;
+    setPayBusy(userId);
+    setError("");
+    try {
+      const { error: rpcError } = await supabase.rpc("submit_payment", {
+        target_match_id: matchId,
+      });
+      if (rpcError) throw new Error(rpcError.message);
+      await load(userId);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t("match.errPay"));
+    } finally {
+      setPayBusy(null);
+    }
+  };
+
+  const handleConfirmPayment = async (targetUserId: string, confirmed: boolean) => {
+    if (!matchId || !userId) return;
+    setPayBusy(targetUserId);
+    setError("");
+    try {
+      const { error: rpcError } = await supabase.rpc("confirm_payment", {
+        target_match_id: matchId,
+        target_user_id: targetUserId,
+        confirmed,
+      });
+      if (rpcError) throw new Error(rpcError.message);
+      await load(userId);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t("match.errPay"));
+    } finally {
+      setPayBusy(null);
     }
   };
 
@@ -489,6 +559,17 @@ export default function MatchDetailPage() {
               />
             )}
 
+            {match.status === "closed" && payments.length > 0 && (
+              <PaymentStatusList
+                payments={payments}
+                currentUserId={userId}
+                isAdmin={isAdmin}
+                busyId={payBusy}
+                onSubmit={handleSubmitPayment}
+                onConfirm={handleConfirmPayment}
+              />
+            )}
+
             {isAdmin && (
               <section className="glass-panel rounded-2xl border-lime-500/20 bg-lime-500/5 p-5">
                 <div className="mb-4 flex items-center justify-between">
@@ -558,6 +639,107 @@ export default function MatchDetailPage() {
       </div>
       <BottomNav />
     </main>
+  );
+}
+
+function PaymentStatusList({
+  payments,
+  currentUserId,
+  isAdmin,
+  busyId,
+  onSubmit,
+  onConfirm,
+}: {
+  payments: Payment[];
+  currentUserId: string | null;
+  isAdmin: boolean;
+  busyId: string | null;
+  onSubmit: () => void;
+  onConfirm: (userId: string, confirmed: boolean) => void;
+}) {
+  const { t, formatVnd } = useI18n();
+
+  const pill: Record<PaymentStatus, { label: string; cls: string }> = {
+    unpaid: { label: t("match.payUnpaid"), cls: "bg-slate-800 text-slate-400" },
+    submitted: {
+      label: t("match.paySubmitted"),
+      cls: "bg-amber-500/20 text-amber-300",
+    },
+    confirmed: {
+      label: t("match.payConfirmed"),
+      cls: "bg-emerald-500/20 text-emerald-300",
+    },
+  };
+
+  return (
+    <section className="glass-panel rounded-2xl p-5">
+      <div className="mb-3 flex items-center gap-2">
+        <ReceiptText size={18} strokeWidth={1.75} className="text-lime-400" />
+        <h2 className="text-base font-semibold">{t("match.payStatusTitle")}</h2>
+      </div>
+      <ul className="space-y-2">
+        {payments.map((p) => {
+          const isSelf = p.userId === currentUserId;
+          const busy = busyId === p.userId;
+          return (
+            <li
+              key={p.userId}
+              className="flex items-center justify-between gap-3 rounded-xl bg-slate-900/50 px-3 py-2"
+            >
+              <div className="min-w-0">
+                <p className="truncate text-sm text-slate-100">
+                  {p.name}
+                  {p.tag && <span className="text-lime-400">#{p.tag}</span>}
+                  {isSelf && (
+                    <span className="ml-1 text-xs text-slate-500">
+                      {t("members.you")}
+                    </span>
+                  )}
+                </p>
+                <p className="text-xs text-slate-500">{formatVnd(p.amount)}</p>
+              </div>
+              <div className="flex shrink-0 items-center gap-2">
+                <span
+                  className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${pill[p.status].cls}`}
+                >
+                  {pill[p.status].label}
+                </span>
+                {isSelf && p.status === "unpaid" && (
+                  <button
+                    type="button"
+                    disabled={busy}
+                    onClick={onSubmit}
+                    className="rounded-lg bg-lime-500 px-3 py-1.5 text-xs font-semibold text-slate-950 transition hover:scale-[1.03] active:scale-95 disabled:opacity-60"
+                  >
+                    {t("match.payIPaid")}
+                  </button>
+                )}
+                {isAdmin && p.status === "submitted" && (
+                  <button
+                    type="button"
+                    disabled={busy}
+                    onClick={() => onConfirm(p.userId, true)}
+                    className="rounded-lg bg-emerald-500 px-3 py-1.5 text-xs font-semibold text-slate-950 transition hover:scale-[1.03] active:scale-95 disabled:opacity-60"
+                  >
+                    {t("match.payConfirm")}
+                  </button>
+                )}
+                {isAdmin && p.status === "confirmed" && (
+                  <button
+                    type="button"
+                    disabled={busy}
+                    onClick={() => onConfirm(p.userId, false)}
+                    className="rounded-lg border border-slate-700 px-3 py-1.5 text-xs text-slate-300 transition hover:border-slate-500 active:scale-95 disabled:opacity-60"
+                  >
+                    {t("match.payUnconfirm")}
+                  </button>
+                )}
+              </div>
+            </li>
+          );
+        })}
+      </ul>
+    </section>
   );
 }
 

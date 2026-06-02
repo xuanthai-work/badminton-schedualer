@@ -185,12 +185,15 @@ Stitch should design **mobile portrait** as primary and provide a wider desktop 
 **Header:**
 - Lime tracking label: **"DASHBOARD"**.
 - Page title (24px semibold, lime text): **"Nhóm của tôi"**.
-- **Notification bell** top-right (`Bell`, 40px rounded glass button) with a lime unread badge (count, "9+" cap) that updates live via Realtime; links to `/dashboard/notifications`.
+- **Notification bell** top-right (`Bell`, 40px rounded glass button) with a lime unread badge (count, "9+" cap) that updates live via Realtime; links to `/dashboard/notifications`. The same bell sits top-right on the **Friends** and **Tài khoản** headers too, so it's reachable from every nav page. (No forced popup — the badge is the nudge.)
 - No sign-out button (moved to the profile page; reachable from bottom nav).
 
 **Welcome section:**
 - Big greeting (28px semibold): **"Chào bạn, {username}"** with the username highlighted lime. Fallback **"Chào bạn, lông thủ"** while loading.
 - Subhead (slate-300): **"Sẵn sàng cho các trận đấu hôm nay?"**
+
+**Công nợ của tôi (shipped, shown only when you owe something):**
+- An amber-tinted glass card with a `Wallet` icon: the total you owe (28px), with a breakdown line **"Cần đóng {x} · Chờ duyệt {y}"**. Sourced from `get_payment_summary` (unpaid + submitted across all closed matches).
 
 **Pending group invites (shipped, shown only when you have any):**
 - Section **"Lời mời vào nhóm"**; each invite is a lime-tinted glass row: **"{inviter} mời bạn vào nhóm {group}"** + **"Tham gia"** (accept → joins + the row disappears) and **"Từ chối"** (decline). Group membership now requires this acceptance — admins can't force-add.
@@ -337,7 +340,9 @@ All elements above remain visible (for transparency), but:
 
 #### 5.4.3 Payment section (shipped)
 
-When the match is closed, **below the receipt card**, a **"Thanh toán"** card renders the **group creator's** payment info: the uploaded QR if set, otherwise a dynamic VietQR (per-person amount + memo), plus bank name / account number / holder with **copy** buttons (account + transfer memo) and the per-person amount. Empty state if no bank info: **"Quản trị viên chưa thiết lập thông tin thanh toán."** Per-attendee paid/confirm tracking is still the next step. Source detail:
+When the match is closed, **below the receipt card**, a **"Thanh toán"** card renders the **group creator's** payment info: the uploaded QR if set, otherwise a dynamic VietQR (per-person amount + memo), plus bank name / account number / holder with **copy** buttons (account + transfer memo) and the per-person amount. Empty state if no bank info: **"Quản trị viên chưa thiết lập thông tin thanh toán."**
+
+Below it, a **"Trạng thái thanh toán"** list (shipped) shows each attendee with a status pill — **Chưa đóng** (slate) / **Chờ duyệt** (amber) / **Đã thanh toán** (emerald) — and the amount. The viewer's own unpaid row has a lime **"Tôi đã CK"** button; an admin sees **"Xác nhận"** on pending rows (and **"Hủy"** to undo). Updates live via Realtime. Source detail:
 
 **A) Admin's pre-uploaded payment QR** (already implemented as upload — see §5.5 Profile, "Mã QR thanh toán"). If `users.bank_qr_url` is set on the match's group admin, render that image inline (256×256 mobile, 320×320 desktop) inside a glass panel:
 - Section heading **"Thanh toán"**.
@@ -435,7 +440,7 @@ For a member viewing their own row: show **"Tôi đã chuyển khoản"** button
 
 **List:** newest first, each row a glass panel (links to its target; hover lights the border):
 - Left: lime-tinted rounded icon box — `Calendar` for a new match, `UserPlus` for a group add.
-- Text rendered from structured data (i18n), e.g. **"Trận đấu mới tại {nhóm}: {ngày} lúc {giờ}"** → links to the match; **"{tên} đã thêm bạn vào nhóm {nhóm}"** → links to the group.
+- Text rendered from structured data (i18n): **"Trận đấu mới tại {nhóm}: {ngày} lúc {giờ}"** → match; **"{tên} đã thêm bạn vào nhóm {nhóm}"** / **"{tên} mời bạn vào nhóm {nhóm}"** → group / dashboard; **"{tên} đã gửi lời mời kết bạn"** / **"{tên} đã chấp nhận lời mời kết bạn"** → `/dashboard/friends`.
 - Small slate timestamp under the text; `ChevronRight` on the right.
 - Unread rows carry a faint lime border; opening the page marks everything read (the header badge clears live).
 - Empty state: **"Chưa có thông báo."**
@@ -509,3 +514,4 @@ When porting Stitch output back to code, override these recurring drifts:
 - **Notifications** (§5.6c, route `/dashboard/notifications`): in-app feed (new match, added to group, group invite) with a live unread **bell** badge in the dashboard header (§5.2).
 - **Group invites require acceptance** (§5.2): admin invite → pending invite + notification → invitee accepts/declines on the dashboard. No force-add.
 - **Payment surface shipped** (§5.4.3): closed match shows the group creator's QR/VietQR + copyable bank details + per-person amount.
+- **Payment tracking shipped** (§5.4.3): per-attendee status (Tôi đã CK → admin Xác nhận), live; plus a **"Công nợ của tôi"** widget on the dashboard (§5.2).
