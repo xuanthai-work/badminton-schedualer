@@ -3,6 +3,8 @@
 > **Use this document as the prompt for Google Stitch (stitch.withgoogle.com).**
 > Paste the relevant section into Stitch screen-by-screen, or paste the whole doc and ask Stitch to produce the full set.
 > Design instructions are written in English. **Product copy in Vietnamese must be preserved verbatim** — Stitch should render the Vietnamese strings exactly as written so they match the shipped UI.
+>
+> **Localization (shipped):** the app is bilingual — **Vietnamese (default) + English** — via a client i18n layer (`src/lib/i18n/`, Context + `localStorage["bs.lang"]`). Vietnamese remains the **source of truth** for design copy; every VI string below has an EN counterpart in `translations.ts`. When designing, keep using the Vietnamese strings verbatim; the English just mirrors them. A language switcher lives on the profile page (§5.5).
 
 ---
 
@@ -83,7 +85,7 @@ Hover state (only on interactive cards): border becomes `border-lime-500/40`.
 - `rounded-xl border border-slate-800 bg-slate-950/60 text-slate-100 px-3 py-2`.
 - Focus: `ring-2 ring-lime-500/70`, no border color change.
 - Date/time inputs and select dropdowns use **custom popover components** (`DateField`, `TimeField`, `SelectField` in `src/components/`), not native HTML pickers. Native pickers escape the viewport inside DevTools mobile emulation and break the modal experience.
-  - `DateField` wraps `react-day-picker` v10 with Vietnamese locale, week starts Monday, lime selection.
+  - `DateField` wraps `react-day-picker` v10 with the active i18n locale (vi/enUS), week starts Monday, lime selection.
   - `TimeField` is a two-column popover (hours 00–23, minutes 00–55 in 5-min steps), auto-scrolls active item.
   - `SelectField` is a themed dropdown popover with optional scrolling and a Check icon next to the active option.
   - All three close on outside-click and preserve `required` form validation via a hidden input.
@@ -383,7 +385,12 @@ For a member viewing their own row: show **"Tôi đã chuyển khoản"** button
 - If the user signed up with email/password (i.e. `email` provider): two password inputs (`Mật khẩu mới`, `Xác nhận mật khẩu`) with min 8 chars + match validation. Primary CTA **"Cập nhật mật khẩu"**.
 - If OAuth-only: replace the form with the line **"Tài khoản đăng nhập bằng Google. Không thể đổi mật khẩu tại đây."**
 
-**Section 4 — Sign out:**
+**Section 4 — Ngôn ngữ / Language** (glass card, shipped):
+- Heading: `Globe` icon + **"Ngôn ngữ"**.
+- Body: **"Chọn ngôn ngữ hiển thị của ứng dụng."**
+- A themed `SelectField` with two options: **"Tiếng Việt"** and **"English"**. Selecting one switches the entire UI instantly and persists to `localStorage` (`bs.lang`). Default is Tiếng Việt.
+
+**Section 5 — Sign out:**
 - Full-width rose-tinted button **"Đăng xuất"** with `LogOut` icon.
 
 ---
@@ -445,3 +452,4 @@ When porting Stitch output back to code, override these recurring drifts:
 - Avatar uploader added to profile §5.5. Bank QR uploader added in the bank section.
 - Payment section (§5.4.3) now branches between an admin-uploaded QR image and the dynamic VietQR API.
 - Sign-out moved off the dashboard header into the profile page.
+- **i18n shipped:** app is bilingual VI (default) + EN via `src/lib/i18n/`. Vietnamese stays the source-of-truth for design copy. Language switcher added to Profile §5.5 (Section 4); sign-out is now Section 5. Dates/currency and the `DateField` picker follow the active locale.

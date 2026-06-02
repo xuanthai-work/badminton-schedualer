@@ -4,6 +4,7 @@
 - **Phase 1:** Auth (email/password + Google OAuth) and group creation/listing on the dashboard.
 - **Phase 2:** Group detail with Matches & Members tabs; match detail with RSVP + expense entry + auto-split + reopen.
 - **Phase 2.5:** Stitch design port across all screens; bottom mobile nav; profile page (display name + bank + password + avatar + payment QR); group settings tab (rename + delete with type-to-confirm); Google Maps URL on matches; username-or-email sign-in.
+- **Phase 2.6:** Internationalization — Vietnamese (default) + English via a client Context + `localStorage`. Every screen and shared component reads from `t()`. Language switcher on the profile page. Committed `74d7af5`.
 
 ## Key files
 
@@ -20,14 +21,21 @@
 
 ### Shared UI (src/components/)
 - `BottomNav.tsx` — Fixed glass nav (Trang chủ → /dashboard, Tài khoản → /dashboard/profile). Active route via usePathname. Mounted on all logged-in pages.
-- `DateField.tsx` — Themed button → in-DOM popover with `react-day-picker` (vi locale, Monday start). Returns `yyyy-MM-dd`.
-- `TimeField.tsx` — Two-column hour/minute popover (00-23, 00-55 in 5-min steps). Returns `HH:mm`. Auto-scrolls active item.
+- `DateField.tsx` — Themed button → in-DOM popover with `react-day-picker` (locale follows `useI18n().dateLocale`, Monday start). Returns `yyyy-MM-dd`.
+- `TimeField.tsx` — Two-column hour/minute popover (00-23, 00-55 in 5-min steps; column labels via `t()`). Returns `HH:mm`. Auto-scrolls active item.
 - `SelectField.tsx` — Themed dropdown popover, replaces native `<select>` (used for bank selector).
 - `ImageUpload.tsx` — Reusable circle/square uploader with hover overlay, 5MB cap, Remove button. Uploads to `{userId}/{prefix}-{ts}.{ext}` in a Supabase Storage bucket and returns the public URL.
 
 ### Libs
 - `src/lib/supabaseClient.ts` — Browser Supabase client (singleton on `globalThis.__supabase`).
-- `src/lib/userProfile.ts` — `ensureUserProfile`: insert `public.users` on first sign-in, deriving `username` from metadata or email; retries with random suffix on `23505` unique-violation.
+- `src/lib/userProfile.ts` — `ensureUserProfile`: insert `public.users` on first sign-in, deriving `username` from metadata or email; retries with random suffix on `23505` unique-violation. (Its one rare fallback error reads `localStorage["bs.lang"]` directly to pick VI/EN, since it can't use the React hook.)
+
+### i18n (src/lib/i18n/)
+- `translations.ts` — `vi` (source of truth) + `en` dictionaries, ~180 keys in 13 namespaces (`common`, `auth`, `dashboard`, `createGroup`, `group`, `matches`, `members`, `settings`, `match`, `profile`, `nav`, `upload`, `fields`). `en` is typed `typeof vi`, so a missing/renamed key is a **compile error**. Also exports `Lang`, `LANGS`, `DEFAULT_LANG` (`vi`).
+- `index.tsx` — `I18nProvider` (mounted in `app/layout.tsx`) + `useI18n()` hook returning:
+  - `t(key, vars?)` — dot-path lookup with `{token}` interpolation, e.g. `t("matches.attendees", { count })`. Missing keys return the key string so they're obvious in dev.
+  - `lang`, `setLang` — persisted to `localStorage["bs.lang"]`; also sets `document.documentElement.lang`.
+  - `formatVnd(n)`, `formatDate(yyyyMmDd, opts?)`, `dateLocale` — all bound to the active locale (`vi-VN`/`en-US`; date-fns `vi`/`enUS` for `react-day-picker`).
 
 ### Database (run in order)
 1. `supabase/schema.sql` — Tables + RLS + helper functions. Idempotent `ADD COLUMN IF NOT EXISTS` keeps it safe to re-run for the new bank/username/avatar/qr columns.
@@ -58,6 +66,8 @@
 - **Delete group:** admin clicks "Xóa nhóm" → modal asks to type the exact group name → `delete` cascades through `matches`/`rsvps`/`expenses` via FK on delete cascade.
 - **Avatar upload:** profile page round area → file picker → uploads to `avatars/{userId}/avatar-{ts}.{ext}` → public URL saved to `users.avatar_url`. Path-with-timestamp avoids browser cache surprises.
 - **Bank QR upload:** profile page square area in the bank card → uploads to `bank-qr/{userId}/qr-{ts}.{ext}` → public URL saved to `users.bank_qr_url`.
+- **Language switch:** the profile page has a "Ngôn ngữ / Language" `SelectField` wired to `setLang`. Changing it persists to `localStorage["bs.lang"]` and re-renders the whole tree instantly (no reload). SSR renders the default `vi`; the stored preference applies right after mount via an effect, so an EN user sees a brief VI flash on a hard reload (accepted tradeoff for the no-URL approach).
+- **Adding a string:** add the key to **both** `vi` and `en` in `translations.ts` (TS enforces this), then call `t("namespace.key")` in the component. New screens that are client components can call `useI18n()` directly; plain modules can't (read `localStorage["bs.lang"]` if absolutely needed).
 
 ## Known issues / troubleshooting
 - **"new row violates row-level security policy for table 'groups'"** (42501) at group creation usually means the `Group creators can view their groups` SELECT policy is missing. PostgreSQL applies the SELECT policy to RETURNING rows on INSERT; the creator isn't in `group_members` yet at that instant. Re-run `supabase/reset-rls.sql`.
@@ -74,6 +84,7 @@
 - Lint: `npm run lint`
 
 ## Next steps (Phase 3 candidates)
+- i18n polish: persist language in `public.users` (per-account, not just per-device); add a 3rd language by dropping in a new dictionary + extending `LANGS`/`Lang`; localize match/expense memo strings if VietQR is wired.
 - Wire the avatar into the dashboard greeting + group cards + member list + RSVP list.
 - Show admin's bank QR + bank info on the match detail page when match is closed (the "MỞ GOOGLE MAPS" pill is already in place as a precedent for header link pills).
 - VietQR per-attendee dynamic generator (`img.vietqr.io`) using admin's stored bank info + per-person amount.
