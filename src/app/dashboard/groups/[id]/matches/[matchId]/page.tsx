@@ -3,7 +3,17 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
+import {
+  Calendar,
+  CheckCircle2,
+  ChevronLeft,
+  ExternalLink,
+  MapPin,
+  ReceiptText,
+  XCircle,
+} from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
+import BottomNav from "@/components/BottomNav";
 
 type Rsvp = {
   userId: string;
@@ -17,6 +27,7 @@ type Match = {
   date: string;
   time: string;
   location: string;
+  locationUrl: string | null;
   status: "open" | "closed";
 };
 
@@ -56,7 +67,7 @@ export default function MatchDetailPage() {
 
       const { data: matchRow, error: matchError } = await supabase
         .from("matches")
-        .select("id, group_id, match_date, match_time, location, status")
+        .select("id, group_id, match_date, match_time, location, location_url, status")
         .eq("id", matchId)
         .maybeSingle();
 
@@ -72,6 +83,7 @@ export default function MatchDetailPage() {
         date: matchRow.match_date,
         time: matchRow.match_time,
         location: matchRow.location,
+        locationUrl: matchRow.location_url ?? null,
         status: matchRow.status === "closed" ? "closed" : "open",
       });
 
@@ -232,28 +244,53 @@ export default function MatchDetailPage() {
   };
 
   return (
-    <main className="min-h-screen bg-slate-950 px-6 py-10 text-slate-50">
-      <div className="mx-auto flex w-full max-w-3xl flex-col gap-6">
-        <header>
+    <main className="relative min-h-screen overflow-hidden bg-slate-950 px-6 py-10 pb-28 text-slate-50">
+      <div
+        aria-hidden
+        className="pointer-events-none fixed -top-32 right-[-80px] h-80 w-80 rounded-full bg-lime-500/10 blur-3xl"
+      />
+
+      <div className="relative mx-auto flex w-full max-w-3xl flex-col gap-6">
+        <header className="space-y-3">
           <Link
             href={`/dashboard/groups/${groupId ?? ""}`}
-            className="text-xs uppercase tracking-[0.3em] text-lime-400 hover:text-lime-300"
+            className="inline-flex items-center gap-1 text-xs font-semibold uppercase tracking-[0.3em] text-lime-400 transition hover:text-lime-300"
           >
-            ← Quay lại nhóm
+            <ChevronLeft size={14} strokeWidth={2} />
+            Quay lại nhóm
           </Link>
+
           {match && (
-            <div className="mt-2 flex flex-wrap items-baseline justify-between gap-3">
-              <div>
-                <h1 className="text-2xl font-semibold">{match.location}</h1>
-                <p className="mt-1 text-sm text-slate-400">
-                  {formatDate(match.date)} · {match.time.slice(0, 5)}
-                </p>
+            <div className="flex flex-wrap items-end justify-between gap-3">
+              <div className="space-y-1">
+                <h1 className="text-[28px] font-semibold leading-tight">
+                  Chi tiết trận đấu
+                </h1>
+                <div className="flex flex-wrap items-center gap-2 text-sm text-slate-300">
+                  <MapPin
+                    size={16}
+                    strokeWidth={1.75}
+                    className="text-slate-400"
+                  />
+                  <span>{match.location}</span>
+                  {match.locationUrl && (
+                    <a
+                      href={match.locationUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1 rounded-lg border border-lime-500/30 bg-lime-500/10 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-[0.15em] text-lime-300 transition hover:bg-lime-500/20"
+                    >
+                      <ExternalLink size={12} strokeWidth={2} />
+                      Mở Google Maps
+                    </a>
+                  )}
+                </div>
               </div>
               <span
-                className={`rounded-full px-3 py-1 text-xs ${
+                className={`rounded-full border px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] ${
                   match.status === "open"
-                    ? "bg-lime-500/20 text-lime-300"
-                    : "bg-slate-800 text-slate-400"
+                    ? "border-emerald-500/30 bg-emerald-500/20 text-emerald-300"
+                    : "border-white/10 bg-slate-800 text-slate-400"
                 }`}
               >
                 {match.status === "open" ? "Đang mở" : "Đã chốt"}
@@ -270,50 +307,75 @@ export default function MatchDetailPage() {
           <>
             {error && <p className="text-sm text-rose-400">{error}</p>}
 
-            <section className="glass-panel space-y-3 rounded-2xl p-5">
-              <h2 className="text-base font-semibold">RSVP của bạn</h2>
+            <section className="glass-panel rounded-2xl p-5">
+              <div className="flex items-center gap-4">
+                <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-lime-500/10 text-lime-400">
+                  <Calendar size={24} strokeWidth={1.75} />
+                </div>
+                <div>
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.25em] text-slate-400">
+                    Thời gian
+                  </p>
+                  <p className="mt-0.5 text-lg font-semibold leading-tight">
+                    {formatDate(match.date)} · {match.time.slice(0, 5)}
+                  </p>
+                </div>
+              </div>
+            </section>
+
+            <section className="glass-panel rounded-2xl p-5">
+              <h2 className="text-center text-lg font-semibold">
+                Bạn có tham gia không?
+              </h2>
               {match.status === "closed" ? (
-                <p className="text-sm text-slate-400">
+                <p className="mt-3 text-center text-sm text-slate-400">
                   Lịch đã đóng. Không thể đổi RSVP.
                 </p>
               ) : (
-                <div className="flex gap-2">
-                  <button
-                    type="button"
-                    className={`flex-1 rounded-xl px-4 py-2 text-sm font-semibold transition ${
-                      myRsvp?.status === "yes"
-                        ? "bg-lime-500 text-slate-950"
-                        : "border border-slate-700 text-slate-200 hover:border-lime-500/60"
-                    } disabled:opacity-60`}
+                <div className="mt-4 grid grid-cols-2 gap-3">
+                  <RsvpButton
+                    label="Tham gia"
+                    icon={<CheckCircle2 size={28} strokeWidth={1.75} />}
+                    active={myRsvp?.status === "yes"}
+                    tone="lime"
+                    disabled={rsvpBusy}
                     onClick={() => handleRsvp("yes")}
+                  />
+                  <RsvpButton
+                    label="Nghỉ"
+                    icon={<XCircle size={28} strokeWidth={1.75} />}
+                    active={myRsvp?.status === "no"}
+                    tone="rose"
                     disabled={rsvpBusy}
-                  >
-                    Tham gia
-                  </button>
-                  <button
-                    type="button"
-                    className={`flex-1 rounded-xl px-4 py-2 text-sm font-semibold transition ${
-                      myRsvp?.status === "no"
-                        ? "bg-rose-500 text-slate-950"
-                        : "border border-slate-700 text-slate-200 hover:border-rose-500/60"
-                    } disabled:opacity-60`}
                     onClick={() => handleRsvp("no")}
-                    disabled={rsvpBusy}
-                  >
-                    Nghỉ
-                  </button>
+                  />
                 </div>
               )}
             </section>
 
             <section className="grid gap-4 sm:grid-cols-2">
-              <RsvpList title={`Tham gia (${yesList.length})`} list={yesList} tone="lime" />
-              <RsvpList title={`Nghỉ (${noList.length})`} list={noList} tone="rose" />
+              <RsvpList
+                title={`Tham gia (${yesList.length})`}
+                list={yesList}
+                tone="lime"
+              />
+              <RsvpList
+                title={`Nghỉ (${noList.length})`}
+                list={noList}
+                tone="rose"
+              />
             </section>
 
             {expense && (
-              <section className="glass-panel space-y-2 rounded-2xl p-5">
-                <h2 className="text-base font-semibold">Chi phí</h2>
+              <section className="glass-panel rounded-2xl p-5">
+                <div className="mb-3 flex items-center gap-2">
+                  <ReceiptText
+                    size={18}
+                    strokeWidth={1.75}
+                    className="text-lime-400"
+                  />
+                  <h2 className="text-base font-semibold">Chi phí</h2>
+                </div>
                 <dl className="grid grid-cols-2 gap-y-1 text-sm text-slate-300">
                   <dt>Tiền sân</dt>
                   <dd className="text-right">{formatVnd(expense.courtFee)}</dd>
@@ -321,52 +383,64 @@ export default function MatchDetailPage() {
                   <dd className="text-right">{formatVnd(expense.shuttleFee)}</dd>
                   <dt>Tiền nước</dt>
                   <dd className="text-right">{formatVnd(expense.waterFee)}</dd>
-                  <dt className="border-t border-slate-800 pt-1 font-semibold text-slate-200">
+                  <dt className="mt-1 border-t border-white/10 pt-2 font-semibold text-slate-200">
                     Tổng
                   </dt>
-                  <dd className="border-t border-slate-800 pt-1 text-right font-semibold text-slate-100">
+                  <dd className="mt-1 border-t border-white/10 pt-2 text-right font-semibold text-slate-100">
                     {formatVnd(expense.totalAmount)}
                   </dd>
                 </dl>
-                <p className="rounded-xl bg-lime-500/10 px-3 py-2 text-center text-sm text-lime-200">
+                <p className="mt-3 rounded-xl bg-lime-500/10 px-3 py-2 text-center text-sm font-medium text-lime-200">
                   Mỗi người trả {formatVnd(expense.feePerPerson)}
                 </p>
               </section>
             )}
 
             {isAdmin && (
-              <section className="glass-panel space-y-3 rounded-2xl p-5">
-                <div className="flex items-center justify-between">
-                  <h2 className="text-base font-semibold">
-                    {match.status === "open" ? "Chốt chi phí" : "Cập nhật chi phí"}
-                  </h2>
+              <section className="glass-panel rounded-2xl border-lime-500/20 bg-lime-500/5 p-5">
+                <div className="mb-4 flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <ReceiptText
+                      size={18}
+                      strokeWidth={1.75}
+                      className="text-lime-400"
+                    />
+                    <h2 className="text-base font-semibold">
+                      {match.status === "open"
+                        ? "Chốt chi phí"
+                        : "Cập nhật chi phí"}
+                    </h2>
+                  </div>
                   {match.status === "closed" && (
                     <button
                       type="button"
                       onClick={handleReopen}
                       disabled={settleBusy}
-                      className="rounded-lg border border-slate-700 px-3 py-1 text-xs text-slate-200 hover:border-slate-500 disabled:opacity-60"
+                      className="rounded-lg border border-slate-700 px-3 py-1 text-xs text-slate-200 transition hover:border-slate-500 disabled:opacity-60"
                     >
                       Mở lại lịch
                     </button>
                   )}
                 </div>
                 <form onSubmit={handleSettle} className="space-y-3">
-                  <div className="grid grid-cols-3 gap-3">
-                    <FeeInput
-                      label="Tiền sân"
-                      value={courtFee}
-                      onChange={setCourtFee}
-                    />
+                  <FeeInput
+                    label="Tiền sân (VND)"
+                    value={courtFee}
+                    onChange={setCourtFee}
+                    placeholder="Ví dụ: 400.000"
+                  />
+                  <div className="grid grid-cols-2 gap-3">
                     <FeeInput
                       label="Tiền cầu"
                       value={shuttleFee}
                       onChange={setShuttleFee}
+                      placeholder="150.000"
                     />
                     <FeeInput
                       label="Tiền nước"
                       value={waterFee}
                       onChange={setWaterFee}
+                      placeholder="50.000"
                     />
                   </div>
                   <p className="text-xs text-slate-400">
@@ -374,7 +448,7 @@ export default function MatchDetailPage() {
                   </p>
                   {settleMsg && <p className="text-xs text-lime-300">{settleMsg}</p>}
                   <button
-                    className="w-full rounded-xl bg-lime-500 py-2 text-sm font-semibold text-slate-950 disabled:opacity-60"
+                    className="w-full rounded-xl bg-lime-500 py-3 text-sm font-semibold text-slate-950 shadow-[0_0_20px_rgba(163,230,53,0.4)] transition hover:scale-[1.01] active:scale-[0.98] disabled:opacity-60 disabled:hover:scale-100"
                     disabled={settleBusy}
                   >
                     {settleBusy
@@ -389,7 +463,46 @@ export default function MatchDetailPage() {
           </>
         ) : null}
       </div>
+      <BottomNav />
     </main>
+  );
+}
+
+function RsvpButton({
+  label,
+  icon,
+  active,
+  tone,
+  disabled,
+  onClick,
+}: {
+  label: string;
+  icon: React.ReactNode;
+  active: boolean;
+  tone: "lime" | "rose";
+  disabled: boolean;
+  onClick: () => void;
+}) {
+  const activeStyles =
+    tone === "lime"
+      ? "border-lime-500/50 bg-lime-500 text-slate-950 shadow-[0_0_30px_rgba(163,230,53,0.4)]"
+      : "border-rose-500/50 bg-rose-500 text-slate-950 shadow-[0_0_30px_rgba(251,113,133,0.35)]";
+  const inactiveHover =
+    tone === "lime" ? "hover:border-lime-500/60" : "hover:border-rose-500/60";
+  return (
+    <button
+      type="button"
+      disabled={disabled}
+      onClick={onClick}
+      className={`flex flex-col items-center justify-center gap-2 rounded-xl border py-5 text-sm font-semibold transition active:scale-95 disabled:opacity-60 ${
+        active
+          ? activeStyles
+          : `border-white/10 bg-slate-900/60 text-slate-200 ${inactiveHover}`
+      }`}
+    >
+      {icon}
+      <span>{label}</span>
+    </button>
   );
 }
 
@@ -405,16 +518,42 @@ function RsvpList({
   const toneClass = tone === "lime" ? "text-lime-300" : "text-rose-300";
   return (
     <div className="glass-panel rounded-2xl p-4">
-      <p className={`text-xs uppercase tracking-wider ${toneClass}`}>{title}</p>
+      <p
+        className={`text-[11px] font-semibold uppercase tracking-[0.2em] ${toneClass}`}
+      >
+        {title}
+      </p>
       {list.length === 0 ? (
-        <p className="mt-2 text-sm text-slate-500">Chưa có ai.</p>
+        <p className="mt-3 text-sm text-slate-500">Chưa có ai.</p>
       ) : (
-        <ul className="mt-2 space-y-1 text-sm text-slate-200">
+        <ul className="mt-3 space-y-2">
           {list.map((r) => (
-            <li key={r.userId}>{r.name}</li>
+            <li
+              key={r.userId}
+              className="flex items-center gap-3 rounded-xl bg-slate-900/50 px-3 py-2"
+            >
+              <InitialAvatar name={r.name} size={32} />
+              <span className="text-sm text-slate-100">{r.name}</span>
+            </li>
           ))}
         </ul>
       )}
+    </div>
+  );
+}
+
+function InitialAvatar({ name, size = 32 }: { name: string; size?: number }) {
+  const initial = (name || "?").trim().charAt(0).toUpperCase() || "?";
+  return (
+    <div
+      className="flex items-center justify-center rounded-full border border-white/10 bg-slate-800/80 font-semibold text-lime-300"
+      style={{
+        width: size,
+        height: size,
+        fontSize: Math.round(size * 0.42),
+      }}
+    >
+      {initial}
     </div>
   );
 }
@@ -423,22 +562,26 @@ function FeeInput({
   label,
   value,
   onChange,
+  placeholder,
 }: {
   label: string;
   value: string;
   onChange: (next: string) => void;
+  placeholder?: string;
 }) {
   return (
     <div className="space-y-1 text-sm">
-      <label className="text-slate-300">{label}</label>
+      <label className="ml-1 text-[10px] font-semibold uppercase tracking-[0.2em] text-slate-400">
+        {label}
+      </label>
       <input
         type="number"
         min={0}
         step="1000"
-        className="w-full rounded-xl border border-slate-800 bg-slate-950/60 px-3 py-2 text-slate-100 focus:outline-none focus:ring-2 focus:ring-lime-500/70"
+        className="w-full rounded-xl border border-slate-800 bg-slate-950/60 px-4 py-3 text-slate-100 placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-lime-500/70"
         value={value}
         onChange={(event) => onChange(event.target.value)}
-        placeholder="0"
+        placeholder={placeholder ?? "0"}
       />
     </div>
   );

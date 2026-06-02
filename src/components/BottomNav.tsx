@@ -1,0 +1,61 @@
+"use client";
+
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+import { Home, User } from "lucide-react";
+
+type Item = {
+  href: string;
+  label: string;
+  icon: React.ComponentType<{ size?: number; strokeWidth?: number }>;
+  matches: (pathname: string) => boolean;
+};
+
+const items: Item[] = [
+  {
+    href: "/dashboard",
+    label: "Trang chủ",
+    icon: Home,
+    matches: (path) =>
+      path === "/dashboard" || path.startsWith("/dashboard/groups"),
+  },
+  {
+    href: "/dashboard/profile",
+    label: "Tài khoản",
+    icon: User,
+    matches: (path) => path.startsWith("/dashboard/profile"),
+  },
+];
+
+export default function BottomNav() {
+  const pathname = usePathname() ?? "";
+
+  return (
+    <nav className="fixed bottom-0 left-0 z-40 flex h-16 w-full items-center justify-around border-t border-white/10 bg-slate-950/80 px-4 backdrop-blur-xl shadow-[0_-4px_20px_rgba(163,230,53,0.06)]">
+      {items.map((item) => {
+        const active = item.matches(pathname);
+        const Icon = item.icon;
+        return (
+          <Link
+            key={item.href}
+            href={item.href}
+            className={`flex flex-col items-center justify-center gap-0.5 rounded-xl px-4 py-1 transition active:scale-90 ${
+              active
+                ? "bg-lime-500/10 text-lime-400"
+                : "text-slate-400 hover:text-slate-200"
+            }`}
+          >
+            <Icon size={22} strokeWidth={active ? 2 : 1.75} />
+            <span
+              className={`text-[10px] ${
+                active ? "font-semibold" : "font-medium"
+              }`}
+            >
+              {item.label}
+            </span>
+          </Link>
+        );
+      })}
+    </nav>
+  );
+}

@@ -7,6 +7,10 @@ create table if not exists public.users (
   created_at timestamptz not null default now()
 );
 
+alter table public.users add column if not exists bank_id text;
+alter table public.users add column if not exists bank_account text;
+alter table public.users add column if not exists bank_account_name text;
+
 create table if not exists public.groups (
   id uuid primary key default gen_random_uuid(),
   name text not null,
@@ -32,6 +36,8 @@ create table if not exists public.matches (
   created_by uuid references public.users(id) on delete set null,
   created_at timestamptz not null default now()
 );
+
+alter table public.matches add column if not exists location_url text;
 
 create table if not exists public.rsvps (
   match_id uuid not null references public.matches(id) on delete cascade,

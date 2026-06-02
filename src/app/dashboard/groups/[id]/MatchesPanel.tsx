@@ -2,7 +2,10 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
+import { ChevronRight, MapPin, Plus, Users } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
+import DateField from "@/components/DateField";
+import TimeField from "@/components/TimeField";
 
 type Match = {
   id: string;
@@ -26,6 +29,7 @@ export default function MatchesPanel({ groupId, isAdmin }: Props) {
   const [date, setDate] = useState("");
   const [time, setTime] = useState("");
   const [location, setLocation] = useState("");
+  const [locationUrl, setLocationUrl] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState("");
 
@@ -78,6 +82,7 @@ export default function MatchesPanel({ groupId, isAdmin }: Props) {
     setDate("");
     setTime("");
     setLocation("");
+    setLocationUrl("");
     setFormError("");
   };
 
@@ -90,6 +95,12 @@ export default function MatchesPanel({ groupId, isAdmin }: Props) {
       return;
     }
 
+    const trimmedUrl = locationUrl.trim();
+    if (trimmedUrl && !/^https?:\/\//i.test(trimmedUrl)) {
+      setFormError("Link Google Maps phải bắt đầu bằng http:// hoặc https://.");
+      return;
+    }
+
     setSubmitting(true);
     try {
       const { data: userData } = await supabase.auth.getUser();
@@ -99,6 +110,7 @@ export default function MatchesPanel({ groupId, isAdmin }: Props) {
         match_date: date,
         match_time: time,
         location: location.trim(),
+        location_url: trimmedUrl || null,
         created_by: uid,
       });
 
@@ -134,10 +146,11 @@ export default function MatchesPanel({ groupId, isAdmin }: Props) {
         {isAdmin && (
           <button
             type="button"
-            className="rounded-xl bg-lime-500 px-4 py-2 text-sm font-semibold text-slate-950"
+            className="inline-flex items-center gap-2 rounded-xl bg-lime-500 px-4 py-2 text-sm font-semibold text-slate-950 shadow-[0_0_20px_rgba(163,230,53,0.25)] transition hover:scale-[1.02] active:scale-95"
             onClick={() => setOpen(true)}
           >
-            + Tạo lịch
+            <Plus size={16} strokeWidth={2.25} />
+            Tạo lịch
           </button>
         )}
       </div>
@@ -145,39 +158,72 @@ export default function MatchesPanel({ groupId, isAdmin }: Props) {
       {error && <p className="text-sm text-rose-400">{error}</p>}
 
       {loading ? (
-        <div className="glass-panel h-24 animate-pulse rounded-2xl" />
+        <div className="glass-panel h-40 animate-pulse rounded-2xl" />
       ) : matches.length === 0 ? (
         <div className="glass-panel rounded-2xl p-6 text-sm text-slate-300">
           Chưa có lịch nào. {isAdmin && "Bấm Tạo lịch để bắt đầu."}
         </div>
       ) : (
-        <ul className="grid gap-3 sm:grid-cols-2">
+        <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {matches.map((match) => (
             <li key={match.id}>
               <Link
                 href={`/dashboard/groups/${groupId}/matches/${match.id}`}
-                className="glass-panel block rounded-2xl p-4 transition hover:border-lime-500/40"
+                className="glass-panel group flex h-full flex-col gap-4 rounded-2xl p-5 transition hover:border-lime-500/40"
               >
                 <div className="flex items-start justify-between gap-3">
                   <div>
-                    <p className="text-sm text-slate-400">
-                      {formatDate(match.date)} · {match.time.slice(0, 5)}
+                    <p
+                      className={`mb-1 text-[11px] font-semibold uppercase tracking-[0.2em] ${
+                        match.status === "open"
+                          ? "text-lime-400"
+                          : "text-slate-400"
+                      }`}
+                    >
+                      {formatDate(match.date)}
                     </p>
-                    <p className="mt-1 text-base font-medium">{match.location}</p>
+                    <p className="text-xl font-semibold leading-tight">
+                      {match.time.slice(0, 5)}
+                    </p>
                   </div>
                   <span
-                    className={`rounded-full px-3 py-1 text-xs ${
+                    className={`rounded-lg border px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.18em] ${
                       match.status === "open"
-                        ? "bg-lime-500/20 text-lime-300"
-                        : "bg-slate-800 text-slate-400"
+                        ? "border-emerald-500/30 bg-emerald-500/20 text-emerald-300"
+                        : "border-white/10 bg-slate-800 text-slate-400"
                     }`}
                   >
-                    {match.status === "open" ? "Mở" : "Đã chốt"}
+                    {match.status === "open" ? "Đang mở" : "Đã chốt"}
                   </span>
                 </div>
-                <p className="mt-3 text-xs text-slate-400">
-                  {match.yesCount} người tham gia
-                </p>
+
+                <div className="space-y-2 text-sm text-slate-300">
+                  <div className="flex items-center gap-2">
+                    <MapPin
+                      size={16}
+                      strokeWidth={1.75}
+                      className="text-slate-400"
+                    />
+                    <span className="line-clamp-1">{match.location}</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Users
+                      size={16}
+                      strokeWidth={1.75}
+                      className="text-slate-400"
+                    />
+                    <span>{match.yesCount} người tham gia</span>
+                  </div>
+                </div>
+
+                <div className="mt-auto flex items-center justify-end border-t border-white/10 pt-3 text-xs font-semibold uppercase tracking-[0.18em] text-lime-400">
+                  Chi tiết
+                  <ChevronRight
+                    size={14}
+                    strokeWidth={2}
+                    className="ml-1 transition-transform group-hover:translate-x-1"
+                  />
+                </div>
               </Link>
             </li>
           ))}
@@ -212,23 +258,11 @@ export default function MatchesPanel({ groupId, isAdmin }: Props) {
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1 text-sm">
                   <label className="text-slate-300">Ngày</label>
-                  <input
-                    type="date"
-                    className="w-full rounded-xl border border-slate-800 bg-slate-950/60 px-3 py-2 text-slate-100 focus:outline-none focus:ring-2 focus:ring-lime-500/70"
-                    value={date}
-                    onChange={(event) => setDate(event.target.value)}
-                    required
-                  />
+                  <DateField value={date} onChange={setDate} required />
                 </div>
                 <div className="space-y-1 text-sm">
                   <label className="text-slate-300">Giờ</label>
-                  <input
-                    type="time"
-                    className="w-full rounded-xl border border-slate-800 bg-slate-950/60 px-3 py-2 text-slate-100 focus:outline-none focus:ring-2 focus:ring-lime-500/70"
-                    value={time}
-                    onChange={(event) => setTime(event.target.value)}
-                    required
-                  />
+                  <TimeField value={time} onChange={setTime} required />
                 </div>
               </div>
               <div className="space-y-1 text-sm">
@@ -239,6 +273,20 @@ export default function MatchesPanel({ groupId, isAdmin }: Props) {
                   value={location}
                   onChange={(event) => setLocation(event.target.value)}
                   required
+                />
+              </div>
+              <div className="space-y-1 text-sm">
+                <label className="text-slate-300">
+                  Link Google Maps{" "}
+                  <span className="text-xs text-slate-500">(tùy chọn)</span>
+                </label>
+                <input
+                  type="url"
+                  inputMode="url"
+                  className="w-full rounded-xl border border-slate-800 bg-slate-950/60 px-3 py-2 text-slate-100 placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-lime-500/70"
+                  placeholder="https://maps.app.goo.gl/..."
+                  value={locationUrl}
+                  onChange={(event) => setLocationUrl(event.target.value)}
                 />
               </div>
 
