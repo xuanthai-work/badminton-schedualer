@@ -248,7 +248,7 @@ const vi = {
     errTag: "Lỗi lưu tag.",
     bankTitle: "Tài khoản ngân hàng",
     bankHint:
-      "Dùng để sinh mã VietQR khi nhóm của bạn chốt chi phí. Thành viên trong nhóm sẽ thấy thông tin này.",
+      "Hiển thị cho thành viên khi nhóm chốt chi phí để họ chuyển khoản. Bạn có thể tải mã QR riêng bên dưới.",
     bank: "Ngân hàng",
     selectBank: "— Chọn ngân hàng —",
     accountNumber: "Số tài khoản",
@@ -585,7 +585,7 @@ const en: typeof vi = {
     errTag: "Failed to save tag.",
     bankTitle: "Bank account",
     bankHint:
-      "Used to generate a VietQR code when your group settles costs. Group members will see this.",
+      "Shown to members when a match is settled so they can transfer to you. You can upload your own QR below.",
     bank: "Bank",
     selectBank: "— Select a bank —",
     accountNumber: "Account number",

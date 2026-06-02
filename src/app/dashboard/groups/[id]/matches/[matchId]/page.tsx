@@ -793,11 +793,11 @@ function PaymentCard({
   };
 
   const bank = bankByCode(payee?.bankId);
-  const hasUploadedQr = Boolean(payee?.bankQrUrl);
+  const qrSrc = payee?.bankQrUrl ?? null;
   const hasBank = Boolean(bank && payee?.bankAccount);
-  const rounded = Math.max(0, Math.round(amount));
 
-  if (!payee || (!hasUploadedQr && !hasBank)) {
+  // Only an admin-uploaded QR is shown; otherwise just the text details.
+  if (!payee || (!qrSrc && !hasBank)) {
     return (
       <section className="glass-panel rounded-2xl p-5">
         <div className="mb-3 flex items-center gap-2">
@@ -808,15 +808,6 @@ function PaymentCard({
       </section>
     );
   }
-
-  const vietqrSrc =
-    !hasUploadedQr && hasBank && bank
-      ? `https://img.vietqr.io/image/${bank.vietqr}-${payee!.bankAccount}-compact.png` +
-        `?${rounded > 0 ? `amount=${rounded}&` : ""}addInfo=${encodeURIComponent(
-          memo
-        )}&accountName=${encodeURIComponent(payee!.bankAccountName ?? payee!.name)}`
-      : null;
-  const qrSrc = hasUploadedQr ? payee!.bankQrUrl! : vietqrSrc;
 
   return (
     <section className="glass-panel rounded-2xl p-5">

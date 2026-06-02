@@ -340,29 +340,13 @@ All elements above remain visible (for transparency), but:
 
 #### 5.4.3 Payment section (shipped)
 
-When the match is closed, **below the receipt card**, a **"Thanh toán"** card renders the **group creator's** payment info: the uploaded QR if set, otherwise a dynamic VietQR (per-person amount + memo), plus bank name / account number / holder with **copy** buttons (account + transfer memo) and the per-person amount. Empty state if no bank info: **"Quản trị viên chưa thiết lập thông tin thanh toán."**
+When the match is closed, **below the receipt card**, a **"Thanh toán"** card renders the **group creator's** payment info: their **uploaded QR only if they added one** (we deliberately do **not** auto-generate a VietQR), plus bank name / account number / holder / memo as **copyable** text, and the per-person amount. Empty state if no bank info: **"Quản trị viên chưa thiết lập thông tin thanh toán."**
 
 Below it, a **"Trạng thái thanh toán"** list (shipped) shows each attendee with a status pill — **Chưa đóng** (slate) / **Chờ duyệt** (amber) / **Đã thanh toán** (emerald) — and the amount. The viewer's own unpaid row has a lime **"Tôi đã CK"** button; an admin sees **"Xác nhận"** on pending rows (and **"Hủy"** to undo). Updates live via Realtime. Source detail:
 
-**A) Admin's pre-uploaded payment QR** (already implemented as upload — see §5.5 Profile, "Mã QR thanh toán"). If `users.bank_qr_url` is set on the match's group admin, render that image inline (256×256 mobile, 320×320 desktop) inside a glass panel:
-- Section heading **"Thanh toán"**.
-- The uploaded QR image (no dynamic data — admin's static personal QR).
-- Below the QR: helper note showing the per-person amount **"Mỗi người trả {amount} ₫"** in lime.
+**Payment info source:** the **group creator's** profile. If `users.bank_qr_url` is set, render that uploaded QR image inside the card with a **"Quét mã QR để chuyển khoản"** caption. **No dynamic VietQR is generated** — we don't call `img.vietqr.io`. Always show the bank name / account number / holder / memo as text, with **copy** buttons on the account number and the transfer memo (`Cau long {match-date}`). The memo is plain text built client-side.
 
-**B) Dynamic VietQR** (fallback if no uploaded QR but `users.bank_id` + `users.bank_account` are set):
-- Image source pattern: `https://img.vietqr.io/image/<BANK_ID>-<ACCOUNT_NO>-compact.png?amount={feePerPerson}&addInfo={memo}&accountName={adminName}`
-- The `memo` follows the pattern `BADMINTON {GROUP_SLUG} {MATCH_SHORTID} {USER_NAME_NO_ACCENT}`.
-
-Below either QR, two secondary buttons:
-- **"Sao chép số tài khoản"** (copies admin's account number)
-- **"Sao chép nội dung CK"** (copies the memo string)
-
-Per-attendee payment status row (admin view): for each "Yes" attendee, show name + a pill:
-- Default (unpaid): **"Chưa đóng"** — slate.
-- User-claimed: **"Chờ duyệt"** — amber. With admin button **"Xác nhận đã nhận"**.
-- Admin-confirmed: **"Đã thanh toán"** — emerald.
-
-For a member viewing their own row: show **"Tôi đã chuyển khoản"** button to move themselves to "Chờ duyệt".
+Per-attendee status (the "Trạng thái thanh toán" list above): each "Yes" attendee shows a pill — **Chưa đóng** (slate) / **Chờ duyệt** (amber) / **Đã thanh toán** (emerald). The viewer's own unpaid row has **"Tôi đã CK"**; an admin sees **"Xác nhận"** on pending rows and **"Hủy"** to undo. Confirming notifies the member.
 
 ---
 
@@ -385,7 +369,7 @@ For a member viewing their own row: show **"Tôi đã chuyển khoản"** button
 
 **Section 2 — Tài khoản ngân hàng** (glass card):
 - Heading: `Landmark` icon + **"Tài khoản ngân hàng"**.
-- Body copy: **"Dùng để sinh mã VietQR khi nhóm của bạn chốt chi phí. Thành viên trong nhóm sẽ thấy thông tin này."**
+- Body copy: **"Hiển thị cho thành viên khi nhóm chốt chi phí để họ chuyển khoản. Bạn có thể tải mã QR riêng bên dưới."**
 - Three inputs:
   - **"Ngân hàng"** — themed `SelectField` (14 common Vietnamese banks; codes vcb, tcb, mbbank, vpb, bidv, vietinbank, acb, sacombank, hdbank, agribank, tpbank, vib, shb, ocb).
   - **"Số tài khoản"** (numeric inputMode).
@@ -504,7 +488,7 @@ When porting Stitch output back to code, override these recurring drifts:
 - Matches gained an optional `location_url` field with a "Mở Google Maps" header pill on the match detail.
 - Group rename + delete (type-to-confirm) live in the Cài đặt tab.
 - Avatar uploader added to profile §5.5. Bank QR uploader added in the bank section.
-- Payment section (§5.4.3) now branches between an admin-uploaded QR image and the dynamic VietQR API.
+- Payment section (§5.4.3) shows an admin-uploaded QR if present + copyable bank text; no dynamic VietQR (removed by request).
 - Sign-out moved off the dashboard header into the profile page.
 - **i18n shipped:** app is bilingual VI (default) + EN via `src/lib/i18n/`. Vietnamese stays the source-of-truth for design copy. Language switcher added to Profile §5.5 (Section 4); sign-out is now Section 5. Dates/currency and the `DateField` picker follow the active locale.
 - **Invite by username or email** (Members tab §5.3.2) — field no longer email-only.
@@ -513,5 +497,5 @@ When porting Stitch output back to code, override these recurring drifts:
 - **Realtime** (§5.4): match detail updates live (RSVPs, settle/reopen, receipt).
 - **Notifications** (§5.6c, route `/dashboard/notifications`): in-app feed (new match, added to group, group invite) with a live unread **bell** badge in the dashboard header (§5.2).
 - **Group invites require acceptance** (§5.2): admin invite → pending invite + notification → invitee accepts/declines on the dashboard. No force-add.
-- **Payment surface shipped** (§5.4.3): closed match shows the group creator's QR/VietQR + copyable bank details + per-person amount.
+- **Payment surface shipped** (§5.4.3): closed match shows the group creator's uploaded QR (if any) + copyable bank details + per-person amount. No dynamic VietQR.
 - **Payment tracking shipped** (§5.4.3): per-attendee status (Tôi đã CK → admin Xác nhận), live; plus a **"Công nợ của tôi"** widget on the dashboard (§5.2).
