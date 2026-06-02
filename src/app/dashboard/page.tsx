@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import { ensureUserProfile } from "@/lib/userProfile";
@@ -136,10 +137,6 @@ export default function DashboardPage() {
           </button>
         </header>
 
-        <section className="glass-panel rounded-2xl p-4 text-sm text-slate-300">
-          Tổng quan công nợ và lịch đấu sẽ được cập nhật trong Phase 2.
-        </section>
-
         <section className="space-y-4">
           <div className="flex items-center justify-between">
             <h2 className="text-lg font-semibold">Danh sách nhóm</h2>
@@ -168,7 +165,11 @@ export default function DashboardPage() {
           ) : (
             <div className="grid gap-4 sm:grid-cols-2">
               {groups.map((group) => (
-                <div key={group.id} className="glass-panel rounded-2xl p-5">
+                <Link
+                  key={group.id}
+                  href={`/dashboard/groups/${group.id}`}
+                  className="glass-panel block rounded-2xl p-5 transition hover:border-lime-500/40"
+                >
                   <div className="flex items-center justify-between">
                     <h3 className="text-lg font-semibold">{group.name}</h3>
                     <span className="rounded-full bg-slate-900/80 px-3 py-1 text-xs text-lime-300">
@@ -179,7 +180,7 @@ export default function DashboardPage() {
                     <p>{group.memberCount} thành viên</p>
                     <p className="text-slate-400">Admin: {group.adminName}</p>
                   </div>
-                </div>
+                </Link>
               ))}
             </div>
           )}
