@@ -7,10 +7,15 @@ import { ensureUserProfile } from "@/lib/userProfile";
 
 type Mode = "login" | "register";
 
+const USERNAME_REGEX = /^[a-zA-Z0-9._-]{3,20}$/;
+
+const isEmail = (value: string) => value.includes("@");
+
 export default function HomePage() {
   const router = useRouter();
   const [mode, setMode] = useState<Mode>("login");
-  const [name, setName] = useState("");
+  const [username, setUsername] = useState("");
+  const [identifier, setIdentifier] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
@@ -54,12 +59,29 @@ export default function HomePage() {
 
     try {
       if (mode === "register") {
+        const trimmedUsername = username.trim();
+        if (!USERNAME_REGEX.test(trimmedUsername)) {
+          throw new Error(
+            "Tên đăng nhập 3-20 ký tự, chỉ chữ/số và . _ -"
+          );
+        }
+
+        const { data: availData, error: availError } = await supabase.rpc(
+          "is_username_available",
+          { target_username: trimmedUsername }
+        );
+        if (availError) throw new Error(availError.message);
+        if (availData === false) {
+          throw new Error("Tên đăng nhập này đã có người dùng.");
+        }
+
         const { data, error: signUpError } = await supabase.auth.signUp({
           email,
           password,
           options: {
             data: {
-              name: name.trim(),
+              name: trimmedUsername,
+              username: trimmedUsername,
             },
           },
         });
@@ -77,8 +99,22 @@ export default function HomePage() {
           await ensureUserProfile(data.user);
         }
       } else {
+        let signInEmail = identifier.trim();
+
+        if (!isEmail(signInEmail)) {
+          const { data: resolved, error: resolveError } = await supabase.rpc(
+            "email_for_username",
+            { target_username: signInEmail }
+          );
+          if (resolveError) throw new Error(resolveError.message);
+          if (typeof resolved !== "string" || !resolved) {
+            throw new Error("Tên đăng nhập không tồn tại.");
+          }
+          signInEmail = resolved;
+        }
+
         const { data, error: signInError } = await supabase.auth.signInWithPassword({
-          email,
+          email: signInEmail,
           password,
         });
 
@@ -164,34 +200,61 @@ export default function HomePage() {
 
         <div className="my-5 flex items-center gap-3 text-[10px] uppercase tracking-[0.25em] text-slate-500">
           <span className="h-px flex-1 bg-slate-800" />
-          Hoặc dùng email
+          {mode === "login" ? "Hoặc dùng tài khoản" : "Hoặc tạo tài khoản"}
           <span className="h-px flex-1 bg-slate-800" />
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
           {mode === "register" && (
+            <>
+              <div className="space-y-1 text-sm">
+                <label className="ml-1 text-xs text-slate-400">
+                  Tên đăng nhập
+                </label>
+                <input
+                  className="w-full rounded-xl border border-slate-800 bg-slate-950/60 px-4 py-3 text-slate-100 placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-lime-500/70"
+                  placeholder="nguyenvana"
+                  value={username}
+                  onChange={(event) => setUsername(event.target.value)}
+                  autoComplete="username"
+                  required
+                />
+                <p className="ml-1 text-[11px] text-slate-500">
+                  Dùng làm tên hiển thị và để đăng nhập. 3-20 ký tự, chỉ chữ/số
+                  và . _ -
+                </p>
+              </div>
+              <div className="space-y-1 text-sm">
+                <label className="ml-1 text-xs text-slate-400">Email</label>
+                <input
+                  type="email"
+                  className="w-full rounded-xl border border-slate-800 bg-slate-950/60 px-4 py-3 text-slate-100 placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-lime-500/70"
+                  placeholder="email@vi-du.com"
+                  value={email}
+                  onChange={(event) => setEmail(event.target.value)}
+                  autoComplete="email"
+                  required
+                />
+              </div>
+            </>
+          )}
+
+          {mode === "login" && (
             <div className="space-y-1 text-sm">
-              <label className="ml-1 text-xs text-slate-400">Tên hiển thị</label>
+              <label className="ml-1 text-xs text-slate-400">
+                Tên đăng nhập hoặc email
+              </label>
               <input
                 className="w-full rounded-xl border border-slate-800 bg-slate-950/60 px-4 py-3 text-slate-100 placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-lime-500/70"
-                placeholder="Nguyễn Văn A"
-                value={name}
-                onChange={(event) => setName(event.target.value)}
+                placeholder="nguyenvana hoặc email@vi-du.com"
+                value={identifier}
+                onChange={(event) => setIdentifier(event.target.value)}
+                autoComplete="username"
                 required
               />
             </div>
           )}
-          <div className="space-y-1 text-sm">
-            <label className="ml-1 text-xs text-slate-400">Email</label>
-            <input
-              type="email"
-              className="w-full rounded-xl border border-slate-800 bg-slate-950/60 px-4 py-3 text-slate-100 placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-lime-500/70"
-              placeholder="email@vi-du.com"
-              value={email}
-              onChange={(event) => setEmail(event.target.value)}
-              required
-            />
-          </div>
+
           <div className="space-y-1 text-sm">
             <label className="ml-1 text-xs text-slate-400">Mật khẩu</label>
             <input
@@ -200,6 +263,9 @@ export default function HomePage() {
               placeholder="••••••••"
               value={password}
               onChange={(event) => setPassword(event.target.value)}
+              autoComplete={
+                mode === "register" ? "new-password" : "current-password"
+              }
               required
             />
           </div>

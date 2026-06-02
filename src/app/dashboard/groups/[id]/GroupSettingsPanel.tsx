@@ -2,16 +2,26 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { AlertTriangle, Trash2 } from "lucide-react";
+import { AlertTriangle, Pencil, Save, Trash2 } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 
 type Props = {
   groupId: string;
   groupName: string;
+  onRenamed: (newName: string) => void;
 };
 
-export default function GroupSettingsPanel({ groupId, groupName }: Props) {
+export default function GroupSettingsPanel({
+  groupId,
+  groupName,
+  onRenamed,
+}: Props) {
   const router = useRouter();
+
+  const [name, setName] = useState(groupName);
+  const [renameBusy, setRenameBusy] = useState(false);
+  const [renameMsg, setRenameMsg] = useState("");
+
   const [open, setOpen] = useState(false);
   const [confirmText, setConfirmText] = useState("");
   const [busy, setBusy] = useState(false);
@@ -25,6 +35,40 @@ export default function GroupSettingsPanel({ groupId, groupName }: Props) {
   };
 
   const canDelete = confirmText.trim() === groupName.trim();
+
+  const handleRename = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const trimmed = name.trim();
+    if (!trimmed) {
+      setRenameMsg("Tên nhóm không được để trống.");
+      return;
+    }
+    if (trimmed.length > 80) {
+      setRenameMsg("Tên nhóm tối đa 80 ký tự.");
+      return;
+    }
+    if (trimmed === groupName.trim()) {
+      setRenameMsg("Tên không thay đổi.");
+      return;
+    }
+
+    setRenameBusy(true);
+    setRenameMsg("");
+    try {
+      const { error: updateError } = await supabase
+        .from("groups")
+        .update({ name: trimmed })
+        .eq("id", groupId);
+      if (updateError) throw new Error(updateError.message);
+
+      onRenamed(trimmed);
+      setRenameMsg("Đã đổi tên nhóm.");
+    } catch (err) {
+      setRenameMsg(err instanceof Error ? err.message : "Lỗi đổi tên nhóm.");
+    } finally {
+      setRenameBusy(false);
+    }
+  };
 
   const handleDelete = async () => {
     if (!canDelete) return;
@@ -45,6 +89,42 @@ export default function GroupSettingsPanel({ groupId, groupName }: Props) {
 
   return (
     <section className="space-y-4">
+      <div className="glass-panel rounded-2xl p-5">
+        <div className="mb-4 flex items-center gap-2">
+          <Pencil size={18} strokeWidth={1.75} className="text-lime-400" />
+          <h2 className="text-base font-semibold">Tên nhóm</h2>
+        </div>
+        <form onSubmit={handleRename} className="space-y-3">
+          <input
+            className="w-full rounded-xl border border-slate-800 bg-slate-950/60 px-4 py-3 text-slate-100 placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-lime-500/70"
+            value={name}
+            onChange={(event) => setName(event.target.value)}
+            placeholder="Tên nhóm"
+            maxLength={80}
+            required
+          />
+          {renameMsg && (
+            <p
+              className={`text-xs ${
+                renameMsg.startsWith("Đã")
+                  ? "text-lime-300"
+                  : "text-rose-400"
+              }`}
+            >
+              {renameMsg}
+            </p>
+          )}
+          <button
+            type="submit"
+            className="inline-flex items-center gap-2 rounded-xl bg-lime-500 px-4 py-2 text-sm font-semibold text-slate-950 shadow-[0_0_20px_rgba(163,230,53,0.25)] transition hover:scale-[1.02] active:scale-95 disabled:opacity-60 disabled:hover:scale-100"
+            disabled={renameBusy || name.trim() === groupName.trim()}
+          >
+            <Save size={14} strokeWidth={2} />
+            {renameBusy ? "Đang lưu..." : "Lưu tên mới"}
+          </button>
+        </form>
+      </div>
+
       <div className="glass-panel rounded-2xl border-rose-700/40 p-5">
         <div className="mb-3 flex items-center gap-2">
           <AlertTriangle

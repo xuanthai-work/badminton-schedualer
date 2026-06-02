@@ -82,7 +82,11 @@ Hover state (only on interactive cards): border becomes `border-lime-500/40`.
 ### 3.5 Inputs
 - `rounded-xl border border-slate-800 bg-slate-950/60 text-slate-100 px-3 py-2`.
 - Focus: `ring-2 ring-lime-500/70`, no border color change.
-- Date/time/number inputs use native pickers — style the wrapper, not the popup.
+- Date/time inputs and select dropdowns use **custom popover components** (`DateField`, `TimeField`, `SelectField` in `src/components/`), not native HTML pickers. Native pickers escape the viewport inside DevTools mobile emulation and break the modal experience.
+  - `DateField` wraps `react-day-picker` v10 with Vietnamese locale, week starts Monday, lime selection.
+  - `TimeField` is a two-column popover (hours 00–23, minutes 00–55 in 5-min steps), auto-scrolls active item.
+  - `SelectField` is a themed dropdown popover with optional scrolling and a Check icon next to the active option.
+  - All three close on outside-click and preserve `required` form validation via a hidden input.
 
 ### 3.6 Status pill
 - `rounded-full px-3 py-1 text-xs`.
@@ -100,18 +104,33 @@ Hover state (only on interactive cards): border becomes `border-lime-500/40`.
 - Inactive tab: `text-slate-300 py-2 flex-1`.
 
 ### 3.8 Floating action button (FAB)
-- `fixed bottom-6 right-6 rounded-full bg-lime-500 px-5 py-3 text-sm font-semibold text-slate-950 shadow-lg shadow-lime-500/20`.
+- `fixed bottom-24 right-6 rounded-full bg-lime-500 px-5 py-3 text-sm font-semibold text-slate-950 shadow-lg shadow-lime-500/20`.
 - Hover: glow `shadow-[0_0_24px_rgba(163,230,53,0.45)]`.
+- **`bottom-24`** so it clears the bottom mobile nav.
+
+### 3.9 Bottom mobile nav (shipped)
+- Fixed glass bar, `h-16`, `bg-slate-950/80 backdrop-blur-xl` with a top border `border-white/10` and a faint top-glow shadow.
+- Two items currently: **Trang chủ** (`Home` Lucide → `/dashboard`) and **Tài khoản** (`User` Lucide → `/dashboard/profile`).
+- Active item: lime icon + lime label on a `bg-lime-500/10` rounded pill. Inactive: `text-slate-400`.
+- Active-route detection via `usePathname`. `/dashboard/groups/*` is treated as "Trang chủ".
+
+### 3.10 Image upload area (shipped)
+- Reusable `ImageUpload` component. Shape `circle` or `square`, size in px.
+- Empty state shows a `Camera` (circle) or `ImagePlus` (square) icon + caption inside a slate-bg rounded area.
+- Filled state shows the image cover-fit. Hover overlay says **"Đổi ảnh"**.
+- Below the picker: small **"Xoá ảnh"** button (rose) when an image is present.
+- 5MB cap, `image/*` accept.
 
 ---
 
 ## 4. Routes (current implementation)
 
 ```
-/                                              Landing / Auth
-/dashboard                                     List of my groups
-/dashboard/groups/[id]                         Group detail (tabs: Matches, Members)
-/dashboard/groups/[id]/matches/[matchId]       Match detail (RSVP + expense split)
+/                                              Landing / Auth (username|email + password)
+/dashboard                                     List of my groups + personalized greeting
+/dashboard/groups/[id]                         Group detail (tabs: Matches, Members, Cài đặt)
+/dashboard/groups/[id]/matches/[matchId]       Match detail (RSVP + expense + Maps link)
+/dashboard/profile                             Avatar / login / bank / QR / password / sign-out
 ```
 
 Stitch should design **mobile portrait** as primary and provide a wider desktop layout as a secondary deliverable per screen.
@@ -133,11 +152,18 @@ Stitch should design **mobile portrait** as primary and provide a wider desktop 
 
 **Form card (glass panel, 16px radius):**
 - Segmented control pill at top: two tabs **"Đăng nhập" / "Đăng ký"**. Active tab has lime background.
-- Full-width primary button styled as secondary (slate glass with lime hover glow): **"Đăng nhập với Google"**.
-- Divider with text **"hoặc"**.
-- If "Đăng ký" tab: a "Tên hiển thị" field appears at top.
-- Always: **"Email"** field, **"Mật khẩu"** field.
-- Primary lime CTA at bottom: **"Đăng nhập"** or **"Tạo tài khoản"** depending on tab. Loading state: **"Đang xử lý..."**.
+- Full-width OAuth button (slate glass with lime hover glow + inline Google "G" SVG): **"Đăng nhập với Google"**.
+- Divider with caps text: **"HOẶC DÙNG TÀI KHOẢN"** (Sign-in) or **"HOẶC TẠO TÀI KHOẢN"** (Sign-up).
+- **Sign-in form:**
+  - Single field labeled **"Tên đăng nhập hoặc email"** — placeholder `nguyenvana hoặc email@vi-du.com`. Branches on `@`.
+  - **"Mật khẩu"** field.
+  - Primary lime CTA **"Đăng nhập"**.
+- **Sign-up form:**
+  - **"Tên đăng nhập"** field — placeholder `nguyenvana`, helper text "Dùng làm tên hiển thị và để đăng nhập. 3-20 ký tự, chỉ chữ/số và . _ -".
+  - **"Email"** field.
+  - **"Mật khẩu"** field.
+  - Primary lime CTA **"Tạo tài khoản"**. Loading: **"Đang xử lý..."**.
+- A single field serves as both display name and login handle. Uniqueness checked client-side via the `is_username_available` RPC before sign-up.
 
 **Background flourish:**
 - Top-right radial volt-lime glow (existing).
@@ -154,29 +180,38 @@ Stitch should design **mobile portrait** as primary and provide a wider desktop 
 
 **Header:**
 - Lime tracking label: **"DASHBOARD"**.
-- Page title (24px semibold): **"Nhóm của tôi"**.
-- Top-right secondary button: **"Đăng xuất"**.
+- Page title (24px semibold, lime text): **"Nhóm của tôi"**.
+- No sign-out button (moved to the profile page; reachable from bottom nav).
+
+**Welcome section:**
+- Big greeting (28px semibold): **"Chào bạn, {username}"** with the username highlighted lime. Fallback **"Chào bạn, lông thủ"** while loading.
+- Subhead (slate-300): **"Sẵn sàng cho các trận đấu hôm nay?"**
 
 **Body:**
-- Section header row: **"Danh sách nhóm"** on left, member count chip on right (`{n} nhóm`).
+- Section header row: **"Danh sách nhóm"** on left, count chip on right (`{n} nhóm`).
 - Grid of group cards (2 columns desktop, 1 column mobile, gap 16px). Each card:
-  - Group name (18px semibold)
-  - Role pill in top-right corner (Admin / Member)
-  - Body lines: `{n} thành viên` and `Admin: {name}` (smaller, slate-400)
+  - Top row: rounded lime-tinted icon box (currently `Users` from Lucide) on the left, **"ADMIN"** / **"MEMBER"** uppercase pill on the right.
+  - Group name (20px semibold).
+  - `Users` icon + `{n} thành viên`.
+  - Bottom row separated by `border-t border-white/10 pt-4`: admin initial-avatar + name (label "ADMIN") on the left, hover-shifting `ChevronRight` on the right.
   - Whole card is a tappable link; hover lights the border lime.
-- Empty state (no groups yet): a single glass card with: **"Bạn chưa tham gia nhóm nào. Hãy tạo nhóm mới để bắt đầu."**
+  - Soft lime corner glow that intensifies on hover.
+- Empty state: a single glass card with: **"Bạn chưa tham gia nhóm nào. Hãy tạo nhóm mới để bắt đầu."**
 - Loading state: 2 skeleton cards using `animate-pulse`.
 
 **FAB (always visible):**
-- **"+ Tạo nhóm mới"** — opens a bottom-sheet on mobile, centered modal on desktop.
+- **"+ Tạo nhóm mới"** — opens a bottom-sheet on mobile, centered modal on desktop. Positioned `bottom-24 right-6` to clear the bottom nav.
 
 **Create-group modal:**
 - Glass panel, title **"Tạo nhóm mới"**, close button labeled **"Đóng"**.
 - One input: label **"Tên nhóm"**, placeholder **"Ví dụ: Thứ 3 vui vẻ"**.
 - Footer: secondary **"Hủy"** + primary **"Tạo nhóm"** (loading: **"Đang tạo..."**).
 
-**(Planned, design even though not built yet):**
-- Below the group grid, an optional **"Công nợ của tôi"** widget summarizing unpaid shares across all groups: rose number for "phải đóng", emerald for "phải thu".
+**Bottom nav:** mounted at the bottom of every dashboard route (see §3.9).
+
+**(Planned, not yet built):**
+- Below the group grid, an optional **"Công nợ của tôi"** widget summarizing unpaid shares across all groups (rose number "Cần đóng" + emerald "Chờ thu" + lime CTA "Thanh toán ngay").
+- Use the user's `avatar_url` (now uploadable on the profile page) for the admin avatar on each group card instead of the initial fallback.
 
 ---
 
@@ -187,22 +222,22 @@ Stitch should design **mobile portrait** as primary and provide a wider desktop 
 - Group name (24px semibold).
 - Role pill on the right.
 
-**Tab bar:** two tabs — **"Lịch đánh"** (Matches), **"Thành viên"** (Members). Pill style from §3.7.
+**Tab bar:** three tabs — **"Lịch đánh"** (Matches), **"Thành viên"** (Members), **"Cài đặt"** (Settings, **admin-only — hidden for members**). Pill style from §3.7.
 
 #### 5.3.1 Matches tab
 
-- Section row: **"Lịch đánh"** + primary button **"+ Tạo lịch"** (admin only).
-- Grid of match cards (2 cols desktop, 1 col mobile). Each card:
-  - Top row: date+time on the left (slate-400, `Thứ 3, 03/06/2026 · 20:00`), status pill on the right.
-  - Body: location/court name in 16px medium.
-  - Footer: `{n} người tham gia` in slate-400.
-  - Card hover: border lime.
+- Section row: **"Lịch đánh"** + primary button **"+ Tạo lịch"** (admin only, with `Plus` icon).
+- Grid of match cards (3 cols desktop, 2 cols md, 1 col mobile). Each card is a tappable link:
+  - Top row: caps line **`{date}`** (lime if open, slate otherwise) above the big time text. Status pill on the right (`Đang mở` / `Đã chốt`).
+  - Two icon rows below: `MapPin` + location (line-clamped to 1), `Users` + `{n} người tham gia`.
+  - Footer separated by `border-t border-white/10 pt-3`: caps lime **"Chi tiết"** + `ChevronRight` (translate-x on hover).
 - Empty state: **"Chưa có lịch nào. Bấm Tạo lịch để bắt đầu."**
 
 **Create-match modal:**
 - Title **"Tạo lịch đánh"**.
-- Two-column grid: **"Ngày"** (date picker), **"Giờ"** (time picker).
+- Two-column grid: **"Ngày"** (DateField popover from §3.5), **"Giờ"** (TimeField popover).
 - Full-width input: **"Sân / Địa điểm"** with placeholder **"Ví dụ: Sân Phú Mỹ Hưng - Sân 3"**.
+- Optional **"Link Google Maps (tùy chọn)"** field with placeholder `https://maps.app.goo.gl/...`. Validated to start with `http(s)://`.
 - Footer: **"Hủy"** + **"Tạo lịch"** (loading: **"Đang tạo..."**).
 
 #### 5.3.2 Members tab
@@ -217,6 +252,22 @@ Stitch should design **mobile portrait** as primary and provide a wider desktop 
   - Right: role pill (Admin / Member). If user is the group creator, append **"· Tạo nhóm"** to the pill.
   - Admin-only buttons (right of pill, hidden for the creator and for the row of the viewing admin): **"Hạ quyền"** / **"Phong admin"** (toggles based on current role) and **"Xóa"** (destructive style).
 
+#### 5.3.3 Settings tab (admin-only)
+
+Two glass cards stacked:
+
+1. **Tên nhóm** card:
+   - Section header: `Pencil` icon + **"Tên nhóm"**.
+   - Single input pre-filled with current name; max 80 chars.
+   - Primary CTA **"Lưu tên mới"** with `Save` icon. Disabled while unchanged.
+   - Inline status: lime **"Đã đổi tên nhóm."** or rose error text.
+
+2. **Vùng nguy hiểm** card (`border-rose-700/40`):
+   - `AlertTriangle` + rose heading **"Vùng nguy hiểm"**.
+   - Body: "Xóa nhóm sẽ **xóa vĩnh viễn** tất cả lịch đánh, RSVP, và chi phí đã ghi nhận. Hành động này **không thể hoàn tác**."
+   - Rose-outlined button **"Xóa nhóm"** with `Trash2` icon.
+   - Clicking opens a **type-to-confirm modal**: heading "Xóa nhóm này?" + paragraph reiterating the cascade, then a single input labeled **"Gõ tên nhóm để xác nhận"** (placeholder = the group name). The destructive button **"Xóa vĩnh viễn"** is disabled until the typed text exactly matches the group name.
+
 ---
 
 ### 5.4 Match detail (`/dashboard/groups/[id]/matches/[matchId]`)
@@ -224,18 +275,23 @@ Stitch should design **mobile portrait** as primary and provide a wider desktop 
 The most important screen. Mobile-first, vertical scroll. Two visual states: **Open** and **Closed**.
 
 **Header (both states):**
-- Small lime back-link **"← QUAY LẠI NHÓM"**.
-- Location name (24px semibold).
-- Date+time line in slate-400: **"Thứ 3, 03/06/2026 · 20:00"**.
-- Status pill on the right: **"Đang mở"** or **"Đã chốt"**.
+- Small lime back-link with `ChevronLeft`: **"← QUAY LẠI NHÓM"**.
+- Title **"Chi tiết trận đấu"** (28px semibold).
+- Below title: `MapPin` icon + location text. If the match has a `location_url`, append a small lime pill link **"↗ MỞ GOOGLE MAPS"** (with `ExternalLink` icon, opens in new tab).
+- Status pill on the right: **"Đang mở"** (emerald) or **"Đã chốt"** (slate).
+
+**Hero info card (under header):**
+- Lime-tinted rounded icon box with `Calendar` icon.
+- Caps label **"THỜI GIAN"** above the prominent date+time line: **"Thứ 3, 03/06/2026 · 20:00"**.
 
 #### 5.4.1 Open state
 
 1. **Your RSVP card** (glass panel):
-   - Heading **"RSVP của bạn"**.
-   - Two side-by-side buttons, full-width split 50/50:
-     - **"Tham gia"** — when active = filled lime; when inactive = slate outline with lime hover border.
-     - **"Nghỉ"** — when active = filled rose; when inactive = slate outline with rose hover border.
+   - Heading (centered, 18px semibold): **"Bạn có tham gia không?"**
+   - Two side-by-side icon buttons, full-width split 50/50, large tap targets (5-unit vertical padding):
+     - **"Tham gia"** — `CheckCircle2` icon stacked above label. Active = filled lime with strong glow.
+     - **"Nghỉ"** — `XCircle` icon stacked above label. Active = filled rose.
+     - Inactive state for either: white/10 border on slate panel, hover border in the tone color.
 
 2. **Attendee lists** (2-column grid on desktop, stacked on mobile):
    - Card A: heading `Tham gia ({n})` in lime tracking caps. List of names below.
@@ -269,26 +325,70 @@ All elements above remain visible (for transparency), but:
    - Same three fee inputs, pre-filled with stored values.
    - Primary CTA: **"Cập nhật chi phí"**.
 
-#### 5.4.3 VietQR section (planned — Phase 3)
+#### 5.4.3 Payment section (planned — Phase 3)
 
-When the match is closed, **below the receipt card**, render a VietQR block:
+When the match is closed, **below the receipt card**, render a payment block. Two sources are now available:
 
+**A) Admin's pre-uploaded payment QR** (already implemented as upload — see §5.5 Profile, "Mã QR thanh toán"). If `users.bank_qr_url` is set on the match's group admin, render that image inline (256×256 mobile, 320×320 desktop) inside a glass panel:
 - Section heading **"Thanh toán"**.
-- Centered QR image (256×256 mobile, 320×320 desktop) inside a glass panel:
-  - Image source pattern: `https://img.vietqr.io/image/<BANK_ID>-<ACCOUNT_NO>-compact.png?amount={feePerPerson}&addInfo={memo}&accountName={adminName}`
-  - The `memo` follows the pattern `BADMINTON {GROUP_SLUG} {MATCH_SHORTID} {USER_NAME_NO_ACCENT}`.
-- Below the QR, two secondary buttons:
-  - **"Sao chép số tài khoản"** (copies admin's account number)
-  - **"Sao chép nội dung CK"** (copies the memo string)
-- Per-attendee payment status row (admin view): for each "Yes" attendee, show name + a pill:
-  - Default (unpaid): **"Chưa đóng"** — slate.
-  - User-claimed: **"Chờ duyệt"** — amber. With admin button **"Xác nhận đã nhận"**.
-  - Admin-confirmed: **"Đã thanh toán"** — emerald.
-- For a member viewing their own row: show **"Tôi đã chuyển khoản"** button to move themselves to "Chờ duyệt".
+- The uploaded QR image (no dynamic data — admin's static personal QR).
+- Below the QR: helper note showing the per-person amount **"Mỗi người trả {amount} ₫"** in lime.
+
+**B) Dynamic VietQR** (fallback if no uploaded QR but `users.bank_id` + `users.bank_account` are set):
+- Image source pattern: `https://img.vietqr.io/image/<BANK_ID>-<ACCOUNT_NO>-compact.png?amount={feePerPerson}&addInfo={memo}&accountName={adminName}`
+- The `memo` follows the pattern `BADMINTON {GROUP_SLUG} {MATCH_SHORTID} {USER_NAME_NO_ACCENT}`.
+
+Below either QR, two secondary buttons:
+- **"Sao chép số tài khoản"** (copies admin's account number)
+- **"Sao chép nội dung CK"** (copies the memo string)
+
+Per-attendee payment status row (admin view): for each "Yes" attendee, show name + a pill:
+- Default (unpaid): **"Chưa đóng"** — slate.
+- User-claimed: **"Chờ duyệt"** — amber. With admin button **"Xác nhận đã nhận"**.
+- Admin-confirmed: **"Đã thanh toán"** — emerald.
+
+For a member viewing their own row: show **"Tôi đã chuyển khoản"** button to move themselves to "Chờ duyệt".
 
 ---
 
-### 5.5 Empty/loading/error patterns (apply everywhere)
+### 5.5 Profile (`/dashboard/profile`) — shipped
+
+**Header:**
+- Lime back-link **"← DASHBOARD"** with `ChevronLeft`.
+- Lime caps label **"TÀI KHOẢN"**.
+- Title (28px semibold): **"Hồ sơ & cài đặt"**.
+
+**Section 1 — Thông tin cá nhân** (glass card):
+- Heading: `UserCog` icon + **"Thông tin cá nhân"**.
+- Top row: 80px round `ImageUpload` (bucket `avatars`, prefix `avatar`) on the left, helper text on the right: **"Ảnh đại diện hiển thị bên cạnh tên của bạn trong các nhóm. JPG/PNG, <5MB."**
+- **"Tên đăng nhập"** input (regex `^[a-zA-Z0-9._-]{3,20}$`) with helper text **"Dùng làm tên hiển thị và để đăng nhập. 3-20 ký tự, chỉ chữ/số và . _ -"**.
+- **"Email"** input (read-only, disabled styling). Helper text: **"Email gắn với tài khoản đăng nhập, không thể đổi tại đây."**
+- Primary CTA with `Save` icon: **"Lưu tên"** (disabled when unchanged). Inline lime success or rose error message.
+
+**Section 2 — Tài khoản ngân hàng** (glass card):
+- Heading: `Landmark` icon + **"Tài khoản ngân hàng"**.
+- Body copy: **"Dùng để sinh mã VietQR khi nhóm của bạn chốt chi phí. Thành viên trong nhóm sẽ thấy thông tin này."**
+- Three inputs:
+  - **"Ngân hàng"** — themed `SelectField` (14 common Vietnamese banks; codes vcb, tcb, mbbank, vpb, bidv, vietinbank, acb, sacombank, hdbank, agribank, tpbank, vib, shb, ocb).
+  - **"Số tài khoản"** (numeric inputMode).
+  - **"Tên chủ tài khoản"**.
+- Primary CTA **"Lưu thông tin ngân hàng"** with `Save` icon.
+- Divider, then sub-section:
+  - Caps label **"MÃ QR THANH TOÁN"**.
+  - Body: **"Thay vì nhập số tài khoản, bạn có thể tải lên mã QR riêng để các thành viên quét và chuyển khoản trực tiếp."**
+  - 192px square `ImageUpload` (bucket `bank-qr`, prefix `qr`).
+
+**Section 3 — Đổi mật khẩu** (glass card):
+- Heading: `KeyRound` icon + **"Đổi mật khẩu"**.
+- If the user signed up with email/password (i.e. `email` provider): two password inputs (`Mật khẩu mới`, `Xác nhận mật khẩu`) with min 8 chars + match validation. Primary CTA **"Cập nhật mật khẩu"**.
+- If OAuth-only: replace the form with the line **"Tài khoản đăng nhập bằng Google. Không thể đổi mật khẩu tại đây."**
+
+**Section 4 — Sign out:**
+- Full-width rose-tinted button **"Đăng xuất"** with `LogOut` icon.
+
+---
+
+### 5.6 Empty/loading/error patterns (apply everywhere)
 
 - **Loading:** 1–3 glass-panel skeletons at 40–60% opacity with `animate-pulse`. Never a spinner.
 - **Empty state:** glass panel with friendly Vietnamese microcopy, no illustration unless requested.
@@ -297,14 +397,14 @@ When the match is closed, **below the receipt card**, render a VietQR block:
 
 ---
 
-## 6. Mobile navigation (planned)
+## 6. Mobile navigation (shipped — 2 items)
 
-A bottom navigation bar on mobile only, fixed to the viewport:
+A bottom navigation bar visible across all logged-in pages:
 
-- Three icons (Lucide): `Home`, `Users`, `User`.
-- Labels under each: **"Trang chủ"**, **"Nhóm"**, **"Tài khoản"**.
-- Active state: lime icon + lime label; inactive: slate-400.
-- Container: glass panel with extra top border `border-t border-slate-800/80`, height 64px.
+- Two items (Lucide icons): `Home` → "Trang chủ" (`/dashboard`), `User` → "Tài khoản" (`/dashboard/profile`).
+- Active state: lime icon + lime label on a `bg-lime-500/10` rounded pill. Inactive: slate-400.
+- Container: fixed bottom, `h-16`, glass panel with top border `border-white/10` and a faint lime top-glow shadow.
+- A third item (e.g. "Lịch" for an upcoming-matches feed) can be added once that route exists.
 
 ---
 
@@ -312,24 +412,36 @@ A bottom navigation bar on mobile only, fixed to the viewport:
 
 When pasting into Stitch, end your prompt with this directive (edit per screen):
 
-> Generate the **mobile portrait** layout first, then a **desktop** variation. Use the locked palette and components above. Render every Vietnamese string verbatim. Keep dark mode only. Surface every interactive control in two states (default + hover/active). Output as a clickable mockup with the screens linked in the order: Auth → Dashboard → Group detail (Matches tab) → Match detail (open) → Match detail (closed with VietQR) → Group detail (Members tab) → modals.
+> Generate the **mobile portrait** layout first, then a **desktop** variation. Use the locked palette and components above. Render every Vietnamese string verbatim. Keep dark mode only. Surface every interactive control in two states (default + hover/active). Output as a clickable mockup with the screens linked in the order: Auth → Dashboard → Group detail (Matches) → Match detail (open) → Match detail (closed with payment QR) → Group detail (Members) → Group detail (Cài đặt) → Profile → modals.
+
+When porting Stitch output back to code, override these recurring drifts:
+- **Palette:** use `#A3E635 / #84CC16` lime and `slate-950 #020617` background. Stitch tends to output `#9ee939 / #051424`.
+- **Icons:** Lucide only — replace any Material Symbols Stitch uses.
+- **Tabs:** pill segmented control (not underline).
+- **No CDN Tailwind script** — re-express via the project's Tailwind v4 setup.
+- **No external `<img>` URLs** from `aida-public` — use real data or `InitialAvatar` fallback.
 
 ---
 
 ## 8. Out of scope (do not design)
 
 - Light mode.
-- Profile / account-settings screen (not built yet; future).
-- Admin user management beyond per-group roles.
 - Notifications inbox.
 - Onboarding tutorial / coachmarks.
+- Multi-account switcher.
 
 ---
 
 ## 9. Change log (vs. previous version of this doc)
 
-- Routes aligned to the implemented App Router structure (`/dashboard/groups/[id]/...`).
-- Member invite is by email lookup (security-definer RPC), not invite-link generation. Link-based invites stay in Phase 3 backlog.
-- Tabs in group detail are **Matches** and **Members** only; the Stats tab moves to Phase 3.
-- Per-match attendance cap and waiting list removed from Phase 2 spec (not built); kept in the VietQR section as a planned addition only if explicitly requested.
-- VietQR section explicitly tagged as Phase 3 so Stitch can design it but the team knows it isn't wired yet.
+- All four core screens ported from Stitch and shipped. Layouts and microcopy in §5 now match production.
+- Group detail has **three** tabs: Matches, Members, **Cài đặt** (admin-only).
+- Profile route `/dashboard/profile` shipped — moved out of "out of scope".
+- Bottom mobile nav shipped (2 items).
+- Date/time inputs replaced with custom `DateField` / `TimeField` popovers; native `<select>` replaced with `SelectField` — all in `src/components/`.
+- Sign-up uses a unified "Tên đăng nhập" field (both display name and login handle). Sign-in field accepts either username or email.
+- Matches gained an optional `location_url` field with a "Mở Google Maps" header pill on the match detail.
+- Group rename + delete (type-to-confirm) live in the Cài đặt tab.
+- Avatar uploader added to profile §5.5. Bank QR uploader added in the bank section.
+- Payment section (§5.4.3) now branches between an admin-uploaded QR image and the dynamic VietQR API.
+- Sign-out moved off the dashboard header into the profile page.

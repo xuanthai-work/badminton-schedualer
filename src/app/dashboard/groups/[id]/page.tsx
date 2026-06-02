@@ -180,7 +180,13 @@ export default function GroupDetailPage() {
               createdBy={group.createdBy}
             />
           ) : tab === "settings" && isAdmin ? (
-            <GroupSettingsPanel groupId={group.id} groupName={group.name} />
+            <GroupSettingsPanel
+              groupId={group.id}
+              groupName={group.name}
+              onRenamed={(newName) =>
+                setGroup((prev) => (prev ? { ...prev, name: newName } : prev))
+              }
+            />
           ) : null
         ) : null}
       </div>

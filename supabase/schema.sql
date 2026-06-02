@@ -10,6 +10,11 @@ create table if not exists public.users (
 alter table public.users add column if not exists bank_id text;
 alter table public.users add column if not exists bank_account text;
 alter table public.users add column if not exists bank_account_name text;
+alter table public.users add column if not exists username text;
+create unique index if not exists users_username_lower_uidx
+  on public.users (lower(username));
+alter table public.users add column if not exists avatar_url text;
+alter table public.users add column if not exists bank_qr_url text;
 
 create table if not exists public.groups (
   id uuid primary key default gen_random_uuid(),

@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ChevronRight, LogOut, Users } from "lucide-react";
+import { ChevronRight, Users } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { ensureUserProfile } from "@/lib/userProfile";
 import BottomNav from "@/components/BottomNav";
@@ -126,11 +126,6 @@ export default function DashboardPage() {
     void init();
   }, [router]);
 
-  const handleSignOut = async () => {
-    await supabase.auth.signOut();
-    router.replace("/");
-  };
-
   return (
     <main className="relative min-h-screen overflow-hidden bg-slate-950 px-6 py-10 pb-28 text-slate-50">
       <div
@@ -143,23 +138,13 @@ export default function DashboardPage() {
       />
 
       <div className="relative mx-auto flex w-full max-w-5xl flex-col gap-8 pb-16">
-        <header className="flex items-center justify-between gap-4">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.3em] text-lime-400">
-              Dashboard
-            </p>
-            <h1 className="mt-1 text-2xl font-semibold leading-tight text-lime-400">
-              Nhóm của tôi
-            </h1>
-          </div>
-          <button
-            type="button"
-            className="inline-flex items-center gap-2 rounded-lg border border-slate-800 bg-slate-900/70 px-3 py-1.5 text-sm text-slate-200 transition hover:border-slate-600 active:scale-95"
-            onClick={handleSignOut}
-          >
-            <LogOut size={14} strokeWidth={1.75} />
-            Đăng xuất
-          </button>
+        <header>
+          <p className="text-xs font-semibold uppercase tracking-[0.3em] text-lime-400">
+            Dashboard
+          </p>
+          <h1 className="mt-1 text-2xl font-semibold leading-tight text-lime-400">
+            Nhóm của tôi
+          </h1>
         </header>
 
         <section className="space-y-1">

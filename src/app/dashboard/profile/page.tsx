@@ -13,6 +13,8 @@ import {
 } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import BottomNav from "@/components/BottomNav";
+import SelectField from "@/components/SelectField";
+import ImageUpload from "@/components/ImageUpload";
 
 const BANK_OPTIONS: { code: string; label: string }[] = [
   { code: "vcb", label: "Vietcombank" },
@@ -33,11 +35,16 @@ const BANK_OPTIONS: { code: string; label: string }[] = [
 
 type ProfileRow = {
   name: string;
+  username: string;
   email: string;
   bankId: string | null;
   bankAccount: string | null;
   bankAccountName: string | null;
+  avatarUrl: string | null;
+  bankQrUrl: string | null;
 };
+
+const USERNAME_REGEX = /^[a-zA-Z0-9._-]{3,20}$/;
 
 export default function ProfilePage() {
   const router = useRouter();
@@ -83,7 +90,9 @@ export default function ProfilePage() {
 
         const { data: row, error: queryError } = await supabase
           .from("users")
-          .select("name, email, bank_id, bank_account, bank_account_name")
+          .select(
+            "name, username, email, bank_id, bank_account, bank_account_name, avatar_url, bank_qr_url"
+          )
           .eq("id", u.id)
           .maybeSingle();
         if (queryError) throw queryError;
@@ -91,13 +100,16 @@ export default function ProfilePage() {
 
         const profileRow: ProfileRow = {
           name: row.name,
+          username: row.username ?? "",
           email: row.email,
           bankId: row.bank_id ?? null,
           bankAccount: row.bank_account ?? null,
           bankAccountName: row.bank_account_name ?? null,
+          avatarUrl: row.avatar_url ?? null,
+          bankQrUrl: row.bank_qr_url ?? null,
         };
         setProfile(profileRow);
-        setName(profileRow.name);
+        setName(profileRow.username || profileRow.name);
         setBankId(profileRow.bankId ?? "");
         setBankAccount(profileRow.bankAccount ?? "");
         setBankAccountName(profileRow.bankAccountName ?? "");
@@ -115,20 +127,34 @@ export default function ProfilePage() {
   const handleSaveName = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const trimmed = name.trim();
-    if (!trimmed) {
-      setNameMsg("Tên không được để trống.");
+    if (!USERNAME_REGEX.test(trimmed)) {
+      setNameMsg("Tên đăng nhập 3-20 ký tự, chỉ chữ/số và . _ -");
       return;
     }
     setNameBusy(true);
     setNameMsg("");
     try {
+      const current = profile?.username ?? "";
+      if (trimmed.toLowerCase() !== current.toLowerCase()) {
+        const { data: avail, error: availError } = await supabase.rpc(
+          "is_username_available",
+          { target_username: trimmed }
+        );
+        if (availError) throw new Error(availError.message);
+        if (avail === false) {
+          throw new Error("Tên đăng nhập này đã có người dùng.");
+        }
+      }
+
       const { error: updateError } = await supabase
         .from("users")
-        .update({ name: trimmed })
+        .update({ name: trimmed, username: trimmed })
         .eq("id", userId);
       if (updateError) throw new Error(updateError.message);
-      setProfile((p) => (p ? { ...p, name: trimmed } : p));
-      setNameMsg("Đã lưu tên hiển thị.");
+      setProfile((p) =>
+        p ? { ...p, name: trimmed, username: trimmed } : p
+      );
+      setNameMsg("Đã lưu tên đăng nhập.");
     } catch (err) {
       setNameMsg(err instanceof Error ? err.message : "Lỗi cập nhật tên.");
     } finally {
@@ -202,6 +228,22 @@ export default function ProfilePage() {
     router.replace("/");
   };
 
+  const persistImageUrl = async (
+    column: "avatar_url" | "bank_qr_url",
+    url: string | null
+  ) => {
+    const { error: updateError } = await supabase
+      .from("users")
+      .update({ [column]: url })
+      .eq("id", userId);
+    if (updateError) throw new Error(updateError.message);
+    setProfile((p) => {
+      if (!p) return p;
+      if (column === "avatar_url") return { ...p, avatarUrl: url };
+      return { ...p, bankQrUrl: url };
+    });
+  };
+
   return (
     <main className="relative min-h-screen overflow-hidden bg-slate-950 px-6 py-10 pb-28 text-slate-50">
       <div
@@ -243,18 +285,41 @@ export default function ProfilePage() {
                 />
                 <h2 className="text-base font-semibold">Thông tin cá nhân</h2>
               </div>
+
+              <div className="mb-4 flex items-center gap-4">
+                <ImageUpload
+                  userId={userId}
+                  bucket="avatars"
+                  prefix="avatar"
+                  currentUrl={profile.avatarUrl}
+                  shape="circle"
+                  size={80}
+                  emptyLabel="Ảnh"
+                  onUploaded={(url) => persistImageUrl("avatar_url", url)}
+                  onRemoved={() => persistImageUrl("avatar_url", null)}
+                />
+                <p className="text-xs text-slate-400">
+                  Ảnh đại diện hiển thị bên cạnh tên của bạn trong các nhóm. JPG/PNG, &lt;5MB.
+                </p>
+              </div>
+
               <form onSubmit={handleSaveName} className="space-y-4">
                 <div className="space-y-1">
                   <label className="ml-1 text-[10px] font-semibold uppercase tracking-[0.2em] text-slate-400">
-                    Tên hiển thị
+                    Tên đăng nhập
                   </label>
                   <input
                     className="w-full rounded-xl border border-slate-800 bg-slate-950/60 px-4 py-3 text-slate-100 placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-lime-500/70"
                     value={name}
                     onChange={(event) => setName(event.target.value)}
-                    placeholder="Nguyễn Văn A"
+                    placeholder="nguyenvana"
+                    autoComplete="username"
                     required
                   />
+                  <p className="ml-1 text-[11px] text-slate-500">
+                    Dùng làm tên hiển thị và để đăng nhập. 3-20 ký tự, chỉ
+                    chữ/số và . _ -
+                  </p>
                 </div>
                 <div className="space-y-1">
                   <label className="ml-1 text-[10px] font-semibold uppercase tracking-[0.2em] text-slate-400">
@@ -282,7 +347,10 @@ export default function ProfilePage() {
                 )}
                 <button
                   className="inline-flex items-center gap-2 rounded-xl bg-lime-500 px-4 py-2 text-sm font-semibold text-slate-950 shadow-[0_0_20px_rgba(163,230,53,0.25)] transition hover:scale-[1.02] active:scale-95 disabled:opacity-60 disabled:hover:scale-100"
-                  disabled={nameBusy || name.trim() === profile.name}
+                  disabled={
+                    nameBusy ||
+                    name.trim() === (profile.username || profile.name)
+                  }
                 >
                   <Save size={14} strokeWidth={2} />
                   {nameBusy ? "Đang lưu..." : "Lưu tên"}
@@ -308,18 +376,15 @@ export default function ProfilePage() {
                   <label className="ml-1 text-[10px] font-semibold uppercase tracking-[0.2em] text-slate-400">
                     Ngân hàng
                   </label>
-                  <select
-                    className="w-full rounded-xl border border-slate-800 bg-slate-950/60 px-4 py-3 text-slate-100 focus:outline-none focus:ring-2 focus:ring-lime-500/70"
+                  <SelectField
                     value={bankId}
-                    onChange={(event) => setBankId(event.target.value)}
-                  >
-                    <option value="">— Chọn ngân hàng —</option>
-                    {BANK_OPTIONS.map((bank) => (
-                      <option key={bank.code} value={bank.code}>
-                        {bank.label}
-                      </option>
-                    ))}
-                  </select>
+                    onChange={setBankId}
+                    placeholder="— Chọn ngân hàng —"
+                    options={BANK_OPTIONS.map((bank) => ({
+                      value: bank.code,
+                      label: bank.label,
+                    }))}
+                  />
                 </div>
                 <div className="space-y-1">
                   <label className="ml-1 text-[10px] font-semibold uppercase tracking-[0.2em] text-slate-400">
@@ -363,6 +428,26 @@ export default function ProfilePage() {
                   {bankBusy ? "Đang lưu..." : "Lưu thông tin ngân hàng"}
                 </button>
               </form>
+
+              <div className="mt-6 space-y-3 border-t border-white/10 pt-5">
+                <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-slate-400">
+                  Mã QR thanh toán
+                </p>
+                <p className="text-xs text-slate-400">
+                  Thay vì nhập số tài khoản, bạn có thể tải lên mã QR riêng để các thành viên quét và chuyển khoản trực tiếp.
+                </p>
+                <ImageUpload
+                  userId={userId}
+                  bucket="bank-qr"
+                  prefix="qr"
+                  currentUrl={profile.bankQrUrl}
+                  shape="square"
+                  size={192}
+                  emptyLabel="Tải mã QR"
+                  onUploaded={(url) => persistImageUrl("bank_qr_url", url)}
+                  onRemoved={() => persistImageUrl("bank_qr_url", null)}
+                />
+              </div>
             </section>
 
             <section className="glass-panel rounded-2xl p-5">
