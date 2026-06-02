@@ -192,6 +192,9 @@ Stitch should design **mobile portrait** as primary and provide a wider desktop 
 - Big greeting (28px semibold): **"Chào bạn, {username}"** with the username highlighted lime. Fallback **"Chào bạn, lông thủ"** while loading.
 - Subhead (slate-300): **"Sẵn sàng cho các trận đấu hôm nay?"**
 
+**Pending group invites (shipped, shown only when you have any):**
+- Section **"Lời mời vào nhóm"**; each invite is a lime-tinted glass row: **"{inviter} mời bạn vào nhóm {group}"** + **"Tham gia"** (accept → joins + the row disappears) and **"Từ chối"** (decline). Group membership now requires this acceptance — admins can't force-add.
+
 **Body:**
 - Section header row: **"Danh sách nhóm"** on left, count chip on right (`{n} nhóm`).
 - Grid of group cards (2 columns desktop, 1 column mobile, gap 16px). Each card:
@@ -252,8 +255,8 @@ Stitch should design **mobile portrait** as primary and provide a wider desktop 
   - Email input (placeholder `email@example.com`).
   - Primary button **"Mời"** (loading: **"Đang mời..."**).
   - Helper line under the form for status messages: **"Đã thêm thành viên." / "Người này đã có trong nhóm." / "Email chưa đăng ký tài khoản trên hệ thống."**
-  - Label is now **"Mời thêm thành viên (tên đăng nhập hoặc email)"** — the field accepts a **username or email** (resolved server-side). **You can only invite accepted friends**; a non-friend returns the message **"Bạn chỉ có thể thêm bạn bè vào nhóm. Hãy kết bạn trước."** Status line also covers a generic not-found: **"Không tìm thấy người dùng với tên đăng nhập hoặc email này."**
-- **Mời từ bạn bè** card (admin-only, shipped): a glass panel with a `UserPlus` heading listing the admin's accepted friends **not already in the group**, each as `name @username#tag` + a small lime **"Mời"** button. Empty state when all friends are already members: **"Tất cả bạn bè đã ở trong nhóm."**
+  - Label is now **"Mời thêm thành viên (tên đăng nhập hoặc email)"** — the field accepts a **username or email** (resolved server-side). **You can only invite accepted friends**; a non-friend returns **"Bạn chỉ có thể thêm bạn bè vào nhóm. Hãy kết bạn trước."** Inviting now **sends a pending invite** (not an instant add): success says **"Đã gửi lời mời vào nhóm."**, and **"Người này đã được mời."** if one is already pending. The invitee approves it on their dashboard.
+- **Mời từ bạn bè** card (admin-only, shipped): a glass panel with a `UserPlus` heading listing the admin's accepted friends **not already in the group**, each as `name @username#tag` + a small lime **"Mời"** button that flips to a **"Đã mời"** chip once invited. Empty state when all friends are already members: **"Tất cả bạn bè đã ở trong nhóm."**
 - Member list (vertical, gap 12px). Each row is a glass panel:
   - Left: name (medium) with optional **"(bạn)"** badge after own name; email below in slate-400.
   - Right: role pill (Admin / Member). If user is the group creator, append **"· Tạo nhóm"** to the pill.
@@ -332,9 +335,9 @@ All elements above remain visible (for transparency), but:
    - Same three fee inputs, pre-filled with stored values.
    - Primary CTA: **"Cập nhật chi phí"**.
 
-#### 5.4.3 Payment section (planned — Phase 3)
+#### 5.4.3 Payment section (shipped)
 
-When the match is closed, **below the receipt card**, render a payment block. Two sources are now available:
+When the match is closed, **below the receipt card**, a **"Thanh toán"** card renders the **group creator's** payment info: the uploaded QR if set, otherwise a dynamic VietQR (per-person amount + memo), plus bank name / account number / holder with **copy** buttons (account + transfer memo) and the per-person amount. Empty state if no bank info: **"Quản trị viên chưa thiết lập thông tin thanh toán."** Per-attendee paid/confirm tracking is still the next step. Source detail:
 
 **A) Admin's pre-uploaded payment QR** (already implemented as upload — see §5.5 Profile, "Mã QR thanh toán"). If `users.bank_qr_url` is set on the match's group admin, render that image inline (256×256 mobile, 320×320 desktop) inside a glass panel:
 - Section heading **"Thanh toán"**.
@@ -503,4 +506,6 @@ When porting Stitch output back to code, override these recurring drifts:
 - **Profile tag** (§5.5 Section 1): `@username#0000` handle + set-once 4-digit tag picker.
 - **Friends** (§5.6b, route `/dashboard/friends`): add by `username#tag`, requests in/out, friends list; bottom nav is now **3 items** (Trang chủ / Bạn bè / Tài khoản). Members tab gained a **"Mời từ bạn bè"** quick-invite, and group invites are now **friends-only**.
 - **Realtime** (§5.4): match detail updates live (RSVPs, settle/reopen, receipt).
-- **Notifications** (§5.6c, route `/dashboard/notifications`): in-app feed (new match, added to group) with a live unread **bell** badge in the dashboard header (§5.2).
+- **Notifications** (§5.6c, route `/dashboard/notifications`): in-app feed (new match, added to group, group invite) with a live unread **bell** badge in the dashboard header (§5.2).
+- **Group invites require acceptance** (§5.2): admin invite → pending invite + notification → invitee accepts/declines on the dashboard. No force-add.
+- **Payment surface shipped** (§5.4.3): closed match shows the group creator's QR/VietQR + copyable bank details + per-person amount.

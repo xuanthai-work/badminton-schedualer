@@ -1,19 +1,24 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import Image from "next/image";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import {
   Calendar,
+  Check,
   CheckCircle2,
   ChevronLeft,
+  Copy,
   ExternalLink,
   MapPin,
+  QrCode,
   ReceiptText,
   XCircle,
 } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { useI18n } from "@/lib/i18n";
+import { bankByCode } from "@/lib/banks";
 import BottomNav from "@/components/BottomNav";
 
 type Rsvp = {
@@ -40,6 +45,14 @@ type Expense = {
   feePerPerson: number;
 };
 
+type Payee = {
+  name: string;
+  bankId: string | null;
+  bankAccount: string | null;
+  bankAccountName: string | null;
+  bankQrUrl: string | null;
+};
+
 export default function MatchDetailPage() {
   const router = useRouter();
   const { t, formatVnd, formatDate } = useI18n();
@@ -52,6 +65,7 @@ export default function MatchDetailPage() {
   const [match, setMatch] = useState<Match | null>(null);
   const [rsvps, setRsvps] = useState<Rsvp[]>([]);
   const [expense, setExpense] = useState<Expense | null>(null);
+  const [payee, setPayee] = useState<Payee | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [rsvpBusy, setRsvpBusy] = useState(false);
@@ -135,6 +149,32 @@ export default function MatchDetailPage() {
         setWaterFee(String(expenseRow.water_fee));
       } else {
         setExpense(null);
+      }
+
+      // Payee for the closed-match payment card = the group's creator (the
+      // main admin who collects). RLS lets group members read peers' rows.
+      const { data: groupRow } = await supabase
+        .from("groups")
+        .select("created_by")
+        .eq("id", groupId)
+        .maybeSingle();
+      if (groupRow?.created_by) {
+        const { data: payeeRow } = await supabase
+          .from("users")
+          .select("name, bank_id, bank_account, bank_account_name, bank_qr_url")
+          .eq("id", groupRow.created_by)
+          .maybeSingle();
+        setPayee(
+          payeeRow
+            ? {
+                name: payeeRow.name,
+                bankId: payeeRow.bank_id ?? null,
+                bankAccount: payeeRow.bank_account ?? null,
+                bankAccountName: payeeRow.bank_account_name ?? null,
+                bankQrUrl: payeeRow.bank_qr_url ?? null,
+              }
+            : null
+        );
       }
     },
     [groupId, matchId, t]
@@ -441,6 +481,14 @@ export default function MatchDetailPage() {
               </section>
             )}
 
+            {match.status === "closed" && expense && (
+              <PaymentCard
+                payee={payee}
+                amount={expense.feePerPerson}
+                memo={`Cau long ${match.date}`}
+              />
+            )}
+
             {isAdmin && (
               <section className="glass-panel rounded-2xl border-lime-500/20 bg-lime-500/5 p-5">
                 <div className="mb-4 flex items-center justify-between">
@@ -510,6 +558,155 @@ export default function MatchDetailPage() {
       </div>
       <BottomNav />
     </main>
+  );
+}
+
+function CopyButton({
+  copied,
+  onClick,
+  label,
+  copiedLabel,
+}: {
+  copied: boolean;
+  onClick: () => void;
+  label: string;
+  copiedLabel: string;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="inline-flex items-center gap-1 rounded-lg border border-slate-700 px-2.5 py-1 text-[11px] font-semibold text-slate-200 transition hover:border-slate-500 active:scale-95"
+    >
+      {copied ? (
+        <Check size={12} strokeWidth={2.25} className="text-lime-400" />
+      ) : (
+        <Copy size={12} strokeWidth={1.75} />
+      )}
+      {copied ? copiedLabel : label}
+    </button>
+  );
+}
+
+function PaymentCard({
+  payee,
+  amount,
+  memo,
+}: {
+  payee: Payee | null;
+  amount: number;
+  memo: string;
+}) {
+  const { t, formatVnd } = useI18n();
+  const [copied, setCopied] = useState<string | null>(null);
+
+  const copy = async (key: string, value: string) => {
+    try {
+      await navigator.clipboard.writeText(value);
+      setCopied(key);
+      window.setTimeout(() => setCopied((c) => (c === key ? null : c)), 1500);
+    } catch {
+      /* clipboard unavailable — ignore */
+    }
+  };
+
+  const bank = bankByCode(payee?.bankId);
+  const hasUploadedQr = Boolean(payee?.bankQrUrl);
+  const hasBank = Boolean(bank && payee?.bankAccount);
+  const rounded = Math.max(0, Math.round(amount));
+
+  if (!payee || (!hasUploadedQr && !hasBank)) {
+    return (
+      <section className="glass-panel rounded-2xl p-5">
+        <div className="mb-3 flex items-center gap-2">
+          <QrCode size={18} strokeWidth={1.75} className="text-lime-400" />
+          <h2 className="text-base font-semibold">{t("match.payTitle")}</h2>
+        </div>
+        <p className="text-sm text-slate-400">{t("match.payNone")}</p>
+      </section>
+    );
+  }
+
+  const vietqrSrc =
+    !hasUploadedQr && hasBank && bank
+      ? `https://img.vietqr.io/image/${bank.vietqr}-${payee!.bankAccount}-compact.png` +
+        `?${rounded > 0 ? `amount=${rounded}&` : ""}addInfo=${encodeURIComponent(
+          memo
+        )}&accountName=${encodeURIComponent(payee!.bankAccountName ?? payee!.name)}`
+      : null;
+  const qrSrc = hasUploadedQr ? payee!.bankQrUrl! : vietqrSrc;
+
+  return (
+    <section className="glass-panel rounded-2xl p-5">
+      <div className="mb-4 flex items-center gap-2">
+        <QrCode size={18} strokeWidth={1.75} className="text-lime-400" />
+        <h2 className="text-base font-semibold">{t("match.payTitle")}</h2>
+      </div>
+
+      {qrSrc && (
+        <div className="flex flex-col items-center gap-2">
+          <div className="overflow-hidden rounded-2xl border border-white/10 bg-white p-2">
+            <Image
+              src={qrSrc}
+              alt="Payment QR"
+              width={220}
+              height={220}
+              unoptimized
+            />
+          </div>
+          <p className="text-xs text-slate-400">{t("match.payScan")}</p>
+        </div>
+      )}
+
+      <dl className="mt-4 space-y-2 text-sm">
+        {bank && (
+          <div className="flex items-center justify-between gap-3">
+            <dt className="text-slate-400">{t("match.payBank")}</dt>
+            <dd className="text-slate-100">{bank.label}</dd>
+          </div>
+        )}
+        {payee.bankAccount && (
+          <div className="flex items-center justify-between gap-3">
+            <dt className="text-slate-400">{t("match.payAccount")}</dt>
+            <dd className="flex items-center gap-2 text-slate-100">
+              <span className="font-semibold tracking-wider">
+                {payee.bankAccount}
+              </span>
+              <CopyButton
+                copied={copied === "acc"}
+                onClick={() => copy("acc", payee.bankAccount!)}
+                label={t("match.payCopyAccount")}
+                copiedLabel={t("match.payCopied")}
+              />
+            </dd>
+          </div>
+        )}
+        {(payee.bankAccountName || payee.name) && (
+          <div className="flex items-center justify-between gap-3">
+            <dt className="text-slate-400">{t("match.payHolder")}</dt>
+            <dd className="text-slate-100">
+              {payee.bankAccountName || payee.name}
+            </dd>
+          </div>
+        )}
+        <div className="flex items-center justify-between gap-3 border-t border-white/10 pt-2">
+          <dt className="text-slate-400">{t("match.payMemoLabel")}</dt>
+          <dd className="flex items-center gap-2 text-slate-100">
+            <span className="truncate">{memo}</span>
+            <CopyButton
+              copied={copied === "memo"}
+              onClick={() => copy("memo", memo)}
+              label={t("match.payCopyMemo")}
+              copiedLabel={t("match.payCopied")}
+            />
+          </dd>
+        </div>
+      </dl>
+
+      <p className="mt-4 rounded-xl bg-lime-500/10 px-3 py-2 text-center text-sm font-semibold text-lime-200">
+        {t("match.perPerson", { amount: formatVnd(amount) })}
+      </p>
+    </section>
   );
 }
 

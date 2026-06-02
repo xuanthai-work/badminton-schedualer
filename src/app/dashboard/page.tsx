@@ -19,14 +19,36 @@ type GroupCard = {
   adminName: string;
 };
 
+type GroupInvite = {
+  inviteId: string;
+  groupId: string;
+  groupName: string;
+  inviterName: string;
+};
+
 export default function DashboardPage() {
   const router = useRouter();
   const { t } = useI18n();
   const [userId, setUserId] = useState<string | null>(null);
   const [displayName, setDisplayName] = useState<string>("");
   const [groups, setGroups] = useState<GroupCard[]>([]);
+  const [invites, setInvites] = useState<GroupInvite[]>([]);
+  const [inviteBusy, setInviteBusy] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+
+  const loadInvites = useCallback(async () => {
+    const { data } = await supabase.rpc("get_group_invites");
+    const rows = (data as Array<Record<string, unknown>> | null) ?? [];
+    setInvites(
+      rows.map((r) => ({
+        inviteId: r.invite_id as string,
+        groupId: r.group_id as string,
+        groupName: (r.group_name as string) ?? "",
+        inviterName: (r.inviter_name as string) ?? "",
+      }))
+    );
+  }, []);
 
   const loadGroups = useCallback(async (uid: string) => {
     setError("");
@@ -118,7 +140,7 @@ export default function DashboardPage() {
           setDisplayName(profile.name);
         }
 
-        await loadGroups(data.session.user.id);
+        await Promise.all([loadGroups(data.session.user.id), loadInvites()]);
       } catch (err) {
         setError(err instanceof Error ? err.message : t("dashboard.loadError"));
       } finally {
@@ -127,7 +149,25 @@ export default function DashboardPage() {
     };
 
     void init();
-  }, [router, loadGroups, t]);
+  }, [router, loadGroups, loadInvites, t]);
+
+  const respondInvite = async (invite: GroupInvite, accept: boolean) => {
+    setInviteBusy(invite.inviteId);
+    setError("");
+    try {
+      const { error: rpcError } = await supabase.rpc("respond_group_invite", {
+        invite_id: invite.inviteId,
+        accept,
+      });
+      if (rpcError) throw new Error(rpcError.message);
+      await loadInvites();
+      if (accept && userId) await loadGroups(userId);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t("dashboard.inviteError"));
+    } finally {
+      setInviteBusy(null);
+    }
+  };
 
   return (
     <main className="relative min-h-screen overflow-hidden bg-slate-950 px-6 py-10 pb-28 text-slate-50">
@@ -164,6 +204,45 @@ export default function DashboardPage() {
             {t("dashboard.readyToday")}
           </p>
         </section>
+
+        {invites.length > 0 && (
+          <section className="space-y-3">
+            <h3 className="text-lg font-semibold">
+              {t("dashboard.invitesTitle")}
+            </h3>
+            {invites.map((invite) => (
+              <div
+                key={invite.inviteId}
+                className="glass-panel flex flex-wrap items-center justify-between gap-3 rounded-2xl border-lime-500/20 p-4"
+              >
+                <p className="min-w-0 text-sm text-slate-200">
+                  {t("dashboard.inviteFrom", {
+                    inviter: invite.inviterName,
+                    group: invite.groupName,
+                  })}
+                </p>
+                <div className="flex shrink-0 items-center gap-2">
+                  <button
+                    type="button"
+                    disabled={inviteBusy === invite.inviteId}
+                    onClick={() => respondInvite(invite, true)}
+                    className="rounded-lg bg-lime-500 px-3 py-1.5 text-xs font-semibold text-slate-950 transition hover:scale-[1.03] active:scale-95 disabled:opacity-60"
+                  >
+                    {t("dashboard.inviteAccept")}
+                  </button>
+                  <button
+                    type="button"
+                    disabled={inviteBusy === invite.inviteId}
+                    onClick={() => respondInvite(invite, false)}
+                    className="rounded-lg border border-slate-700 px-3 py-1.5 text-xs text-slate-200 transition hover:border-slate-500 active:scale-95 disabled:opacity-60"
+                  >
+                    {t("dashboard.inviteDecline")}
+                  </button>
+                </div>
+              </div>
+            ))}
+          </section>
+        )}
 
         <section className="space-y-4">
           <div className="flex items-baseline justify-between">

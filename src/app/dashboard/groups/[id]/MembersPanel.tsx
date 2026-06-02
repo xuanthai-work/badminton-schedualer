@@ -42,6 +42,7 @@ export default function MembersPanel({
   const [inviteMsg, setInviteMsg] = useState("");
   const [actionBusy, setActionBusy] = useState<string | null>(null);
   const [friends, setFriends] = useState<FriendLite[]>([]);
+  const [invitedIds, setInvitedIds] = useState<Set<string>>(new Set());
 
   const load = useCallback(async () => {
     try {
@@ -76,8 +77,11 @@ export default function MembersPanel({
 
   const loadFriends = useCallback(async () => {
     if (!isAdmin) return;
-    const { data } = await supabase.rpc("get_friends");
-    const rows = (data as Array<Record<string, unknown>> | null) ?? [];
+    const [{ data: friendData }, { data: pendingData }] = await Promise.all([
+      supabase.rpc("get_friends"),
+      supabase.rpc("get_group_pending_invites", { target_group_id: groupId }),
+    ]);
+    const rows = (friendData as Array<Record<string, unknown>> | null) ?? [];
     setFriends(
       rows
         .filter((r) => r.relation === "friend")
@@ -88,7 +92,10 @@ export default function MembersPanel({
           tag: (r.tag as string | null) ?? null,
         }))
     );
-  }, [isAdmin]);
+    // Seed the "Đã mời" state from invites already pending for this group.
+    const pending = (pendingData as Array<{ invitee: string }> | null) ?? [];
+    setInvitedIds(new Set(pending.map((p) => p.invitee)));
+  }, [isAdmin, groupId]);
 
   useEffect(() => {
     const run = async () => {
@@ -119,17 +126,19 @@ export default function MembersPanel({
       const result = data as
         | {
             status:
-              | "added"
+              | "invited"
+              | "already_invited"
               | "already_member"
               | "not_friend"
               | "user_not_found";
           }
         | null;
 
-      if (result?.status === "added") {
-        setInviteMsg(t("members.added"));
+      if (result?.status === "invited") {
+        setInviteMsg(t("members.invited"));
         setInviteValue("");
-        await load();
+      } else if (result?.status === "already_invited") {
+        setInviteMsg(t("members.alreadyInvited"));
       } else if (result?.status === "already_member") {
         setInviteMsg(t("members.alreadyMember"));
       } else if (result?.status === "not_friend") {
@@ -156,9 +165,13 @@ export default function MembersPanel({
       );
       if (rpcError) throw new Error(rpcError.message);
       const result = data as { status?: string } | null;
-      if (result?.status === "added") {
-        setInviteMsg(t("members.added"));
-        await load();
+      if (result?.status === "invited" || result?.status === "already_invited") {
+        setInviteMsg(
+          result.status === "invited"
+            ? t("members.invited")
+            : t("members.alreadyInvited")
+        );
+        setInvitedIds((prev) => new Set(prev).add(friend.userId));
       } else if (result?.status === "already_member") {
         setInviteMsg(t("members.alreadyMember"));
       } else if (result?.status === "not_friend") {
@@ -287,14 +300,20 @@ export default function MembersPanel({
                       )}
                     </span>
                   </span>
-                  <button
-                    type="button"
-                    disabled={actionBusy === friend.userId}
-                    onClick={() => inviteFriend(friend)}
-                    className="shrink-0 rounded-lg bg-lime-500 px-3 py-1.5 text-xs font-semibold text-slate-950 transition hover:scale-[1.03] active:scale-95 disabled:opacity-60"
-                  >
-                    {t("members.invite")}
-                  </button>
+                  {invitedIds.has(friend.userId) ? (
+                    <span className="shrink-0 rounded-lg border border-slate-700 px-3 py-1.5 text-xs text-slate-400">
+                      {t("members.invitedShort")}
+                    </span>
+                  ) : (
+                    <button
+                      type="button"
+                      disabled={actionBusy === friend.userId}
+                      onClick={() => inviteFriend(friend)}
+                      className="shrink-0 rounded-lg bg-lime-500 px-3 py-1.5 text-xs font-semibold text-slate-950 transition hover:scale-[1.03] active:scale-95 disabled:opacity-60"
+                    >
+                      {t("members.invite")}
+                    </button>
+                  )}
                 </li>
               ))}
             </ul>

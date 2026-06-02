@@ -7,6 +7,7 @@
 - **Phase 2.6:** Internationalization — Vietnamese (default) + English via a client Context + `localStorage`. Every screen and shared component reads from `t()`. Language switcher on the profile page. Committed `74d7af5`.
 - **Phase 2.7:** Invite by username or email; profile tag (`@username#0000`, set-once); friends system (add by `username#tag`, requests, accept/decline, friends list at `/dashboard/friends`, quick-invite friends into a group from the Members tab). Group invites restricted to accepted friends.
 - **Phase 2.8:** Realtime — the match detail page updates live (RSVPs, settle/reopen, expense) via Supabase Realtime. In-app notifications — new-match and added-to-group triggers write `notifications` rows; a header bell on the dashboard shows a live unread badge; `/dashboard/notifications` lists them and marks them read.
+- **Phase 2.9:** Group invites now require the invitee's approval (admin invite → pending `group_invites` row + notification → invitee accepts/declines on the dashboard; no force-add). Payment surface on a closed match — shows the group creator's uploaded QR (else a dynamic VietQR), bank account + holder + copy buttons, and the per-person amount.
 
 ## Key files
 
@@ -56,6 +57,7 @@
 10. `supabase/invite-username.sql` — `invite_user_by_identifier(group_id, identifier)` RPC (matches email when `@` present, else `lower(username)`). **Run after `friends.sql`** — it references `public.friendships` to enforce that you can only invite accepted friends (`not_friend` otherwise). Re-run this file if you ran it before `friends.sql` existed.
 11. `supabase/realtime.sql` — adds `rsvps`/`matches`/`expenses` to the `supabase_realtime` publication + `replica identity full`. Enables live match-detail updates.
 12. `supabase/notifications.sql` — `notifications` table + RLS (own select/update/delete; no client insert) + triggers `notify_match_created` (after insert on `matches`) and `notify_added_to_group` (after insert on `group_members`, skips self) + adds `notifications` to the realtime publication.
+13. `supabase/group-invites.sql` — **run after `friends.sql` + `notifications.sql`.** `group_invites` table + RLS; **rewrites `invite_user_by_identifier`** to create a pending invite + notification (returns `invited | already_invited | already_member | not_friend | user_not_found`) instead of adding directly; `respond_group_invite(id, accept)` (invitee only → joins group + notifies inviter, or declines); `get_group_invites()` enriched list. Supersedes the direct-add behaviour in `invite-username.sql`.
 
 ## Setup requirements
 1. `.env.local` from `.env.example`:
@@ -69,7 +71,8 @@
 
 - **Sign in by username or email:** the sign-in input accepts either. If the value contains `@` it's used directly as the email; otherwise the client calls the `email_for_username` RPC to resolve the matching email, then `signInWithPassword`.
 - **Sign up:** one field "Tên đăng nhập" is used as both `name` and `username`. Client validates regex `^[a-zA-Z0-9._-]{3,20}$`, calls `is_username_available` before `signUp`, and passes the value in `signUp.options.data.username`. `ensureUserProfile` reads it from user_metadata and inserts into `public.users`.
-- **Invite member:** admin enters a **username or email** → `invite_user_by_identifier` RPC (security definer) resolves by email if the value has `@`, else by `lower(username)`, then inserts into `group_members`. **You can only invite an accepted friend of yours** — the RPC checks `public.friendships` and returns `not_friend` otherwise. Returns `{status: added | already_member | not_friend | user_not_found}`. Lookup stays server-side so the inviter never sees the invitee's email.
+- **Invite member (acceptance required):** admin enters a **username or email** → `invite_user_by_identifier` resolves the user (email if `@`, else `lower(username)`), enforces accepted-friend, and creates a **pending `group_invites` row + a `group_invite` notification** — it no longer adds the person directly. Returns `{status: invited | already_invited | already_member | not_friend | user_not_found}`. The invitee sees the pending invite on their dashboard and calls `respond_group_invite(id, accept)`: accept → inserted into `group_members` + the inviter gets a `group_invite_accepted` notification; decline → invite deleted.
+- **Payment (closed match):** the match detail fetches the **group creator's** bank fields (RLS allows reading group peers). Renders `users.bank_qr_url` if set, else a dynamic VietQR (`img.vietqr.io`, bank short-code from `src/lib/banks.ts` + account + per-person amount + memo), plus copyable account number / memo. Empty state if the creator set no bank info.
 - **Profile tag:** decorative `#0000` discriminator (username stays globally unique). Set **once** via a direct `update` on `users.tag` (client-enforced single-write — there is no server lock yet, see Known issues). Shown as `@username#tag`. Changing later is meant to go through the admin (contact email shown on the profile).
 - **Friends:** `send_friend_request(identifier)` resolves `username#tag` / `username` / `email` to a user, inserting a `pending` friendship (or auto-accepting if the target already requested you). `respond_friend_request(id, accept)` (addressee only) accepts/declines; `remove_friend(id)` unfriends or cancels an outgoing request. `get_friends()` returns the enriched list (friend / incoming / outgoing) joined to each other user's profile — needed because the `users` SELECT policy only exposes self + group peers.
 - **Quick-invite friends to a group:** Members tab (admin) calls `get_friends()`, filters out current members, and invites a chosen friend via `invite_user_by_identifier` using their username.
@@ -103,7 +106,8 @@
 - Lint: `npm run lint`
 
 ## Next steps (Phase 3 candidates)
-- Payment surface on a closed match (admin QR / dynamic VietQR + per-attendee paid/confirm tracking) — closes the core bill-split loop. Then a "Công nợ của tôi" debt rollup on the dashboard.
+- Payment **tracking** on top of the now-shipped payment surface: per-attendee "đã chuyển khoản" → admin "đã nhận", then a "Công nợ của tôi" debt rollup on the dashboard.
+- Let the settling admin (not just the group creator) be the payee; verify VietQR bank short-codes against a real transfer.
 - Email notifications via a Supabase Edge Function + provider (Resend), reusing the `notifications` rows / triggers as the source.
 - More notification types (friend request received/accepted, match settled); fold friend requests into the bell.
 - Enforce the tag set-once lock server-side (`set_tag` RPC), and/or let users change it; show `@username#tag` in more places (dashboard greeting, member rows, RSVP rows).

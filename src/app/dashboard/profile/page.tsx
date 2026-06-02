@@ -21,23 +21,7 @@ import { LANGS } from "@/lib/i18n/translations";
 import BottomNav from "@/components/BottomNav";
 import SelectField from "@/components/SelectField";
 import ImageUpload from "@/components/ImageUpload";
-
-const BANK_OPTIONS: { code: string; label: string }[] = [
-  { code: "vcb", label: "Vietcombank" },
-  { code: "tcb", label: "Techcombank" },
-  { code: "mbbank", label: "MB Bank" },
-  { code: "vpb", label: "VPBank" },
-  { code: "bidv", label: "BIDV" },
-  { code: "vietinbank", label: "VietinBank" },
-  { code: "acb", label: "ACB" },
-  { code: "sacombank", label: "Sacombank" },
-  { code: "hdbank", label: "HDBank" },
-  { code: "agribank", label: "Agribank" },
-  { code: "tpbank", label: "TPBank" },
-  { code: "vib", label: "VIB" },
-  { code: "shb", label: "SHB" },
-  { code: "ocb", label: "OCB" },
-];
+import { BANKS } from "@/lib/banks";
 
 type ProfileRow = {
   name: string;
@@ -525,7 +509,7 @@ export default function ProfilePage() {
                     value={bankId}
                     onChange={setBankId}
                     placeholder={t("profile.selectBank")}
-                    options={BANK_OPTIONS.map((bank) => ({
+                    options={BANKS.map((bank) => ({
                       value: bank.code,
                       label: bank.label,
                     }))}

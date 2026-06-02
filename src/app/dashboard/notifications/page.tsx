@@ -91,6 +91,18 @@ export default function NotificationsPage() {
         group: String(n.data.group_name ?? ""),
       });
     }
+    if (n.type === "group_invite") {
+      return t("notifications.groupInvite", {
+        inviter: String(n.data.inviter ?? ""),
+        group: String(n.data.group_name ?? ""),
+      });
+    }
+    if (n.type === "group_invite_accepted") {
+      return t("notifications.groupInviteAccepted", {
+        member: String(n.data.member ?? ""),
+        group: String(n.data.group_name ?? ""),
+      });
+    }
     return n.type;
   };
 
@@ -98,6 +110,9 @@ export default function NotificationsPage() {
     if (n.type === "match_created" && n.groupId && n.matchId) {
       return `/dashboard/groups/${n.groupId}/matches/${n.matchId}`;
     }
+    // A pending invite goes to the dashboard (accept/decline card) — the
+    // invitee isn't a group member yet, so the group page would reject them.
+    if (n.type === "group_invite") return "/dashboard";
     if (n.groupId) return `/dashboard/groups/${n.groupId}`;
     return "/dashboard";
   };
@@ -145,7 +160,7 @@ export default function NotificationsPage() {
         ) : (
           <ul className="space-y-3">
             {items.map((n) => {
-              const Icon = n.type === "added_to_group" ? UserPlus : Calendar;
+              const Icon = n.type === "match_created" ? Calendar : UserPlus;
               return (
                 <li key={n.id}>
                   <Link
