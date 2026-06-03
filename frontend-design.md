@@ -135,6 +135,7 @@ Hover state (only on interactive cards): border becomes `border-lime-500/40`.
 /dashboard/friends                             Friends (add by username#tag, requests, list)
 /dashboard/notifications                       Notifications list (new match, added to group)
 /dashboard/profile                             Handle/tag / avatar / login / bank / QR / password / language / sign-out
+/dashboard/debts                               Công nợ detail — "Tôi nợ" + "Chờ thu" (TO DESIGN, §5.7)
 ```
 
 Stitch should design **mobile portrait** as primary and provide a wider desktop layout as a secondary deliverable per screen.
@@ -192,8 +193,8 @@ Stitch should design **mobile portrait** as primary and provide a wider desktop 
 - Big greeting (28px semibold): **"Chào bạn, {username}"** with the username highlighted lime. Fallback **"Chào bạn, lông thủ"** while loading.
 - Subhead (slate-300): **"Sẵn sàng cho các trận đấu hôm nay?"**
 
-**Công nợ của tôi (shipped, shown only when you owe something):**
-- An amber-tinted glass card with a `Wallet` icon: the total you owe (28px), with a breakdown line **"Cần đóng {x} · Chờ duyệt {y}"**. Sourced from `get_payment_summary` (unpaid + submitted across all closed matches).
+**Công nợ của tôi (shipped, shown when you owe or are owed):**
+- Section heading **"Công nợ của tôi"** + an `Info` icon linking to the detail. A glass card with up to two rows: **Cần đóng** (rose `Wallet`, total you owe + "{n} sân đang chờ") and **Chờ thu** (emerald `Banknote`, total owed to you + "Từ {group}"). Full-width lime **"Thanh toán ngay"** button → `/dashboard/debts` (§5.7). Sourced from `get_debt_overview`.
 
 **Pending group invites (shipped, shown only when you have any):**
 - Section **"Lời mời vào nhóm"**; each invite is a lime-tinted glass row: **"{inviter} mời bạn vào nhóm {group}"** + **"Tham gia"** (accept → joins + the row disappears) and **"Từ chối"** (decline). Group membership now requires this acceptance — admins can't force-add.
@@ -433,6 +434,39 @@ Per-attendee status (the "Trạng thái thanh toán" list above): each "Yes" att
 
 ---
 
+### 5.7 Công nợ / Debts (`/dashboard/debts`) — shipped
+
+**Purpose:** the detail screen behind the dashboard **"Công nợ của tôi"** card. Two angles: what *I* still owe (and pay it), and — if I run a group — who still owes *me*. This is the only net-new screen in this round; everything it references (statuses, payment actions) already exists on the match detail.
+
+**How it's reached:** tapping the **"Công nợ của tôi"** card on the dashboard (§5.2) — that card becomes a link to this page. (Today the card is static; this round makes it tappable.)
+
+**Header:** lime back-link **"← DASHBOARD"** + title **"Công nợ"** + the notification bell top-right (same as other nav pages).
+
+**Tab bar (pill, §3.7):** **"Tôi nợ"** and **"Chờ thu"**. The **"Chờ thu"** tab is shown **only to users who are a group admin/creator** (others see just "Tôi nợ", no tab bar needed).
+
+#### Tab 1 — "Tôi nợ" (what I owe)
+- **Summary band** at top: a glass card with the big total still outstanding (unpaid + submitted) in lime, and a breakdown line **"Cần đóng {x} · Chờ duyệt {y}"** (mirrors the dashboard card).
+- **List** of outstanding items, newest first, grouped under a small caps section header per group (group name). Each row is a glass panel and a **link to that match detail**:
+  - Left: date (e.g. **"Thứ 6, 26/06"**) + location (line-clamped), with the group name as a small slate caption.
+  - Right: amount (e.g. **"125.000 ₫"**) + status pill — **"Chưa đóng"** (slate) or **"Chờ duyệt"** (amber).
+  - On an unpaid row, a lime **"Tôi đã CK"** button (marks it submitted in place, like the match screen). Submitted rows show the amber pill only.
+- Confirmed/paid items are **excluded** (this list is only what's still owed). Optional: a collapsed **"Đã thanh toán"** group at the bottom for history — leave out unless asked.
+- **Empty state:** **"Bạn không nợ khoản nào 🎉"**
+
+#### Tab 2 — "Chờ thu" (owed to me — admin/collector)
+- **Summary band:** total others still owe you across the groups you run, in amber: **"Tổng chờ thu {amount}"**.
+- **List** of outstanding payments owed to you, grouped by group then by match (small caps headers). Each row:
+  - Left: payer **name** + `#tag` and the match date/group caption.
+  - Right: amount + status pill — **"Chưa đóng"** (slate, waiting on them) or **"Chờ duyệt"** (amber).
+  - On a **"Chờ duyệt"** row, an emerald **"Xác nhận"** button (confirms receipt — same action as the match screen; the payer gets a notification).
+- **Empty state:** **"Chưa ai nợ bạn."**
+
+**Live:** both tabs reflect payment-status changes in real time (same Realtime source as the match detail).
+
+**Desktop:** same two-column max-w-2xl column; tabs stay; rows are comfortable single-line.
+
+---
+
 ### 5.6 Empty/loading/error patterns (apply everywhere)
 
 - **Loading:** 1–3 glass-panel skeletons at 40–60% opacity with `animate-pulse`. Never a spinner.
@@ -442,14 +476,14 @@ Per-attendee status (the "Trạng thái thanh toán" list above): each "Yes" att
 
 ---
 
-## 6. Mobile navigation (shipped — 2 items)
+## 6. Mobile navigation (shipped — 3 items)
 
 A bottom navigation bar visible across all logged-in pages:
 
-- Two items (Lucide icons): `Home` → "Trang chủ" (`/dashboard`), `User` → "Tài khoản" (`/dashboard/profile`).
+- Three items (Lucide icons): `Home` → "Trang chủ" (`/dashboard`), `Users` → "Bạn bè" (`/dashboard/friends`), `User` → "Tài khoản" (`/dashboard/profile`).
 - Active state: lime icon + lime label on a `bg-lime-500/10` rounded pill. Inactive: slate-400.
 - Container: fixed bottom, `h-16`, glass panel with top border `border-white/10` and a faint lime top-glow shadow.
-- A third item (e.g. "Lịch" for an upcoming-matches feed) can be added once that route exists.
+- The **Công nợ** detail (§5.7) is reached from the dashboard card, not the nav bar.
 
 ---
 
@@ -458,6 +492,8 @@ A bottom navigation bar visible across all logged-in pages:
 When pasting into Stitch, end your prompt with this directive (edit per screen):
 
 > Generate the **mobile portrait** layout first, then a **desktop** variation. Use the locked palette and components above. Render every Vietnamese string verbatim. Keep dark mode only. Surface every interactive control in two states (default + hover/active). Output as a clickable mockup with the screens linked in the order: Auth → Dashboard → Group detail (Matches) → Match detail (open) → Match detail (closed with payment QR) → Group detail (Members) → Group detail (Cài đặt) → Profile → modals.
+
+> **Status:** all screens above are shipped, including **Công nợ / Debts (§5.7)**. Only send Stitch a screen here if you're iterating on its look or adding a brand-new flow.
 
 When porting Stitch output back to code, override these recurring drifts:
 - **Palette:** use `#A3E635 / #84CC16` lime and `slate-950 #020617` background. Stitch tends to output `#9ee939 / #051424`.
@@ -499,3 +535,4 @@ When porting Stitch output back to code, override these recurring drifts:
 - **Group invites require acceptance** (§5.2): admin invite → pending invite + notification → invitee accepts/declines on the dashboard. No force-add.
 - **Payment surface shipped** (§5.4.3): closed match shows the group creator's uploaded QR (if any) + copyable bank details + per-person amount. No dynamic VietQR.
 - **Payment tracking shipped** (§5.4.3): per-attendee status (Tôi đã CK → admin Xác nhận), live; plus a **"Công nợ của tôi"** widget on the dashboard (§5.2).
+- **Công nợ / Debts shipped** (§5.7, route `/dashboard/debts`): "Tôi nợ" + "Chờ thu" tabs. Dashboard "Công nợ của tôi" card redesigned (Cần đóng rose + Chờ thu emerald + "Thanh toán ngay" → debts page).

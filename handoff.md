@@ -9,6 +9,7 @@
 - **Phase 2.8:** Realtime — the match detail page updates live (RSVPs, settle/reopen, expense) via Supabase Realtime. In-app notifications — new-match and added-to-group triggers write `notifications` rows; a header bell on the dashboard shows a live unread badge; `/dashboard/notifications` lists them and marks them read.
 - **Phase 2.9:** Group invites now require the invitee's approval (admin invite → pending `group_invites` row + notification → invitee accepts/declines on the dashboard; no force-add). Payment surface on a closed match — shows the group creator's uploaded QR if they added one, otherwise the bank name / account / holder / memo as copyable text (no auto-generated QR), plus the per-person amount.
 - **Phase 2.10:** Payment tracking — settling a match seeds `payments` rows (unpaid) for attendees; a member taps "Tôi đã CK" (→submitted), an admin confirms (→confirmed, notifies the member). Live status list on the match detail; a "Công nợ của tôi" widget on the dashboard. Notifications bell now sits on all 3 nav pages; friend request/accept generate notifications too (no forced popup).
+- **Phase 2.11:** Debts detail — dashboard "Công nợ của tôi" card redesigned (Cần đóng + Chờ thu + "Thanh toán ngay") and links to a new `/dashboard/debts` page with "Tôi nợ" (pay) + "Chờ thu" (admin/creator confirms) tabs. Payment QR card no longer auto-generates VietQR (uploaded QR or text only).
 
 ## Key files
 
@@ -23,7 +24,8 @@
 - `src/app/dashboard/groups/[id]/matches/[matchId]/page.tsx` — Hero info card, big RSVP buttons, expense receipt, admin settle/reopen.
 - `src/app/dashboard/groups/[id]/MembersPanel.tsx` — also has an admin-only "Mời từ bạn bè" quick-invite that lists accepted friends not yet in the group.
 - `src/app/dashboard/friends/page.tsx` — Friends: add by `username#tag`/email, incoming requests (accept/decline), outgoing (cancel), friends list (remove).
-- `src/app/dashboard/notifications/page.tsx` — Notifications list; renders text from `type`+`data` via i18n; marks all read on view. Bell entry point is `src/components/NotificationBell.tsx` (dashboard header, live unread badge via Realtime).
+- `src/app/dashboard/notifications/page.tsx` — Notifications list; renders text from `type`+`data` via i18n; marks all read on view. Bell entry point is `src/components/NotificationBell.tsx` (in every nav-page header, live unread badge via Realtime).
+- `src/app/dashboard/debts/page.tsx` — Công nợ detail: "Tôi nợ" tab (my outstanding payments + Tôi đã CK) and "Chờ thu" tab (owed to me in groups I created + Xác nhận; shown only when non-empty). Uses `get_my_debts` / `get_owed_to_me` + `submit_payment` / `confirm_payment`.
 - `src/app/dashboard/groups/[id]/matches/[matchId]/page.tsx` — also subscribes to Realtime (`rsvps`/`matches`/`expenses` for this match) and refetches on change.
 - `src/app/dashboard/profile/page.tsx` — `@username#tag` handle + set-once tag picker, avatar upload, display-name/login edit, bank info + QR upload, password, language switch, sign-out.
 
@@ -60,6 +62,7 @@
 12. `supabase/notifications.sql` — `notifications` table + RLS (own select/update/delete; no client insert) + triggers `notify_match_created` (after insert on `matches`) and `notify_added_to_group` (after insert on `group_members`, skips self) + adds `notifications` to the realtime publication.
 13. `supabase/group-invites.sql` — **run after `friends.sql` + `notifications.sql`.** `group_invites` table + RLS; **rewrites `invite_user_by_identifier`** to create a pending invite + notification (returns `invited | already_invited | already_member | not_friend | user_not_found`) instead of adding directly; `respond_group_invite(id, accept)` (invitee only → joins group + notifies inviter, or declines); `get_group_invites()` enriched list. Supersedes the direct-add behaviour in `invite-username.sql`.
 14. `supabase/payments.sql` — **run after `phase2.sql` + `notifications.sql`.** `payments` table (`(match_id,user_id)`, amount, status unpaid/submitted/confirmed) + RLS (group members read; RPC-only writes) + realtime. **Redefines `settle_match`** to also seed payment rows. RPCs: `submit_payment`, `confirm_payment` (+ `payment_confirmed` notification), `get_payment_summary`.
+15. `supabase/debts.sql` — **run after `payments.sql`.** Read-only RPCs for the debt views: `get_debt_overview` (dashboard card), `get_my_debts` ("Tôi nợ"), `get_owed_to_me` ("Chờ thu" = unconfirmed payments by others in groups you created).
 
 ## Setup requirements
 1. `.env.local` from `.env.example`:
@@ -109,8 +112,7 @@
 - Lint: `npm run lint`
 
 ## Next steps (Phase 3 candidates)
-- Debt detail page (tap "Công nợ của tôi" → list of matches you owe), and an admin "Chờ thu" (money owed to me) rollup.
-- Notify the admin/payee when a member submits a payment (currently they only see it on the match page / realtime).
+- Notify the admin/payee when a member submits a payment (currently they only see it on the match page / debts page / realtime).
 - Let the settling admin (not just the group creator) be the payee.
 - Production readiness: custom SMTP (password reset + re-enable email confirmation); RSVP cutoff + match reminders.
 - Email notifications via a Supabase Edge Function + provider (Resend), reusing the `notifications` rows / triggers as the source.

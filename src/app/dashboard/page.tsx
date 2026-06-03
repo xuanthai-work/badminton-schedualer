@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ChevronRight, Users, Wallet } from "lucide-react";
+import { Banknote, ChevronRight, Info, Users, Wallet } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { ensureUserProfile } from "@/lib/userProfile";
 import { useI18n } from "@/lib/i18n";
@@ -34,10 +34,13 @@ export default function DashboardPage() {
   const [groups, setGroups] = useState<GroupCard[]>([]);
   const [invites, setInvites] = useState<GroupInvite[]>([]);
   const [inviteBusy, setInviteBusy] = useState<string | null>(null);
-  const [debt, setDebt] = useState<{ unpaid: number; submitted: number }>({
-    unpaid: 0,
-    submitted: 0,
-  });
+  const [debt, setDebt] = useState<{
+    owe: number;
+    oweMatches: number;
+    collect: number;
+    collectMatches: number;
+    collectGroup: string | null;
+  }>({ owe: 0, oweMatches: 0, collect: 0, collectMatches: 0, collectGroup: null });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -55,11 +58,14 @@ export default function DashboardPage() {
   }, []);
 
   const loadDebt = useCallback(async () => {
-    const { data } = await supabase.rpc("get_payment_summary");
+    const { data } = await supabase.rpc("get_debt_overview");
     const row = (data as Array<Record<string, unknown>> | null)?.[0];
     setDebt({
-      unpaid: Number(row?.owe_unpaid ?? 0),
-      submitted: Number(row?.owe_submitted ?? 0),
+      owe: Number(row?.owe_amount ?? 0),
+      oweMatches: Number(row?.owe_matches ?? 0),
+      collect: Number(row?.collect_amount ?? 0),
+      collectMatches: Number(row?.collect_matches ?? 0),
+      collectGroup: (row?.collect_group as string | null) ?? null,
     });
   }, []);
 
@@ -222,22 +228,70 @@ export default function DashboardPage() {
           </p>
         </section>
 
-        {debt.unpaid + debt.submitted > 0 && (
-          <div className="glass-panel flex items-center justify-between gap-4 rounded-2xl border-amber-500/20 p-5">
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-amber-300">
-                {t("dashboard.debtTitle")}
-              </p>
-              <p className="mt-1 text-2xl font-semibold leading-tight">
-                {formatVnd(debt.unpaid + debt.submitted)}
-              </p>
-              <p className="mt-1 text-xs text-slate-400">
-                {t("dashboard.debtToPay")} {formatVnd(debt.unpaid)} ·{" "}
-                {t("dashboard.debtPending")} {formatVnd(debt.submitted)}
-              </p>
+        {debt.owe + debt.collect > 0 && (
+          <section className="space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="text-lg font-semibold">{t("dashboard.debtTitle")}</h3>
+              <Link
+                href="/dashboard/debts"
+                aria-label={t("dashboard.debtTitle")}
+                className="text-slate-500 transition hover:text-slate-300"
+              >
+                <Info size={18} strokeWidth={1.75} />
+              </Link>
             </div>
-            <Wallet size={28} strokeWidth={1.5} className="text-amber-300" />
-          </div>
+            <div className="glass-panel space-y-5 rounded-2xl p-5">
+              {debt.owe > 0 && (
+                <div className="flex items-center gap-4">
+                  <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-rose-500/10 text-rose-300">
+                    <Wallet size={22} strokeWidth={1.75} />
+                  </span>
+                  <div>
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-400">
+                      {t("dashboard.debtToPay")}
+                    </p>
+                    <p className="text-2xl font-bold leading-tight text-rose-400">
+                      {formatVnd(debt.owe)}
+                    </p>
+                    <p className="text-xs text-slate-500">
+                      {t("dashboard.debtOweMatches", { count: debt.oweMatches })}
+                    </p>
+                  </div>
+                </div>
+              )}
+              {debt.collect > 0 && (
+                <div className="flex items-center gap-4">
+                  <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-emerald-500/10 text-emerald-300">
+                    <Banknote size={22} strokeWidth={1.75} />
+                  </span>
+                  <div>
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-400">
+                      {t("dashboard.debtCollect")}
+                    </p>
+                    <p className="text-2xl font-bold leading-tight text-emerald-400">
+                      {formatVnd(debt.collect)}
+                    </p>
+                    <p className="text-xs text-slate-500">
+                      {debt.collectGroup
+                        ? t("dashboard.debtCollectFrom", {
+                            group: debt.collectGroup,
+                          })
+                        : t("dashboard.debtCollectGroups", {
+                            count: debt.collectMatches,
+                          })}
+                    </p>
+                  </div>
+                </div>
+              )}
+              <Link
+                href="/dashboard/debts"
+                className="flex items-center justify-center gap-2 rounded-xl bg-lime-500 py-3 text-sm font-semibold text-slate-950 shadow-[0_0_20px_rgba(163,230,53,0.3)] transition hover:scale-[1.01] active:scale-[0.98]"
+              >
+                {t("dashboard.debtCta")}
+                <ChevronRight size={16} strokeWidth={2.25} />
+              </Link>
+            </div>
+          </section>
         )}
 
         {invites.length > 0 && (
