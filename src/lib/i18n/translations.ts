@@ -392,6 +392,20 @@ const vi = {
     available: "Đã có bản mới của ứng dụng.",
     action: "Cập nhật",
   },
+  push: {
+    title: "Thông báo đẩy",
+    body: "Nhận thông báo ngay cả khi không mở app.",
+    enable: "Bật",
+    disable: "Tắt",
+    working: "Đang xử lý...",
+    enabledMsg: "Đã bật thông báo đẩy.",
+    disabledMsg: "Đã tắt thông báo đẩy.",
+    unsupported: "Thiết bị/trình duyệt này không hỗ trợ thông báo đẩy.",
+    denied: "Bạn đã chặn quyền thông báo. Hãy bật lại trong cài đặt trình duyệt.",
+    iosHint:
+      "iPhone: cần thêm app vào màn hình chính rồi mở từ đó (iOS 16.4 trở lên).",
+    error: "Không thể cập nhật thông báo đẩy.",
+  },
   upload: {
     change: "Đổi ảnh",
     uploading: "Đang tải...",
@@ -794,6 +808,20 @@ const en: typeof vi = {
   update: {
     available: "A new version is available.",
     action: "Update",
+  },
+  push: {
+    title: "Push notifications",
+    body: "Get notified even when the app is closed.",
+    enable: "Enable",
+    disable: "Disable",
+    working: "Working...",
+    enabledMsg: "Push notifications enabled.",
+    disabledMsg: "Push notifications disabled.",
+    unsupported: "This device/browser doesn't support push notifications.",
+    denied: "Notifications are blocked. Re-enable them in your browser settings.",
+    iosHint:
+      "iPhone: add the app to your home screen and open it from there (iOS 16.4+).",
+    error: "Couldn't update push notifications.",
   },
   upload: {
     change: "Change photo",

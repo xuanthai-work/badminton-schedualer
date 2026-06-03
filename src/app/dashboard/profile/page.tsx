@@ -19,6 +19,7 @@ import { LANGS } from "@/lib/i18n/translations";
 import BottomNav from "@/components/BottomNav";
 import NotificationBell from "@/components/NotificationBell";
 import SelectField from "@/components/SelectField";
+import PushToggle from "@/components/PushToggle";
 import ImageUpload from "@/components/ImageUpload";
 import { BANKS } from "@/lib/banks";
 
@@ -651,6 +652,10 @@ export default function ProfilePage() {
                 onChange={(next) => setLang(next as typeof lang)}
                 options={LANGS.map((l) => ({ value: l.value, label: l.label }))}
               />
+            </section>
+
+            <section className="glass-panel rounded-2xl p-5">
+              <PushToggle />
             </section>
 
             <button
