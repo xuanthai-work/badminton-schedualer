@@ -3,7 +3,16 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Banknote, ChevronRight, Info, Users, Wallet } from "lucide-react";
+import {
+  Banknote,
+  CalendarClock,
+  ChevronRight,
+  Clock,
+  Info,
+  MapPin,
+  Users,
+  Wallet,
+} from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { ensureUserProfile } from "@/lib/userProfile";
 import { useI18n } from "@/lib/i18n";
@@ -26,13 +35,25 @@ type GroupInvite = {
   inviterName: string;
 };
 
+type UpcomingMatch = {
+  id: string;
+  groupId: string;
+  groupName: string;
+  date: string;
+  time: string;
+  location: string;
+  yesCount: number;
+  myStatus: "yes" | "no" | "maybe" | null;
+};
+
 export default function DashboardPage() {
   const router = useRouter();
-  const { t, formatVnd } = useI18n();
+  const { t, formatVnd, formatDate } = useI18n();
   const [userId, setUserId] = useState<string | null>(null);
   const [displayName, setDisplayName] = useState<string>("");
   const [groups, setGroups] = useState<GroupCard[]>([]);
   const [invites, setInvites] = useState<GroupInvite[]>([]);
+  const [upcoming, setUpcoming] = useState<UpcomingMatch[]>([]);
   const [inviteBusy, setInviteBusy] = useState<string | null>(null);
   const [debt, setDebt] = useState<{
     owe: number;
@@ -98,7 +119,7 @@ export default function DashboardPage() {
 
     if (groupIds.length === 0) {
       setGroups([]);
-      return;
+      return [] as string[];
     }
 
     const { data: members, error: membersError } = await supabase
@@ -136,7 +157,56 @@ export default function DashboardPage() {
         };
       })
     );
+
+    return groupIds;
   }, [t]);
+
+  const loadUpcoming = useCallback(
+    async (uid: string, groupIds: string[]) => {
+      if (groupIds.length === 0) {
+        setUpcoming([]);
+        return;
+      }
+
+      const today = new Date().toISOString().slice(0, 10);
+      const { data } = await supabase
+        .from("matches")
+        .select(
+          "id, match_date, match_time, location, group_id, groups ( name ), rsvps ( status, user_id )"
+        )
+        .in("group_id", groupIds)
+        .eq("status", "open")
+        .gte("match_date", today)
+        .order("match_date", { ascending: true })
+        .order("match_time", { ascending: true });
+
+      const rows = (data as Array<Record<string, unknown>> | null) ?? [];
+      const mapped: UpcomingMatch[] = rows.map((row) => {
+        const group = Array.isArray(row.groups)
+          ? (row.groups[0] as { name?: string } | undefined)
+          : (row.groups as { name?: string } | undefined);
+        const rsvps = Array.isArray(row.rsvps)
+          ? (row.rsvps as Array<{ status: string; user_id: string }>)
+          : [];
+        const mine = rsvps.find((r) => r.user_id === uid);
+        const yesCount = rsvps.filter((r) => r.status === "yes").length;
+        return {
+          id: row.id as string,
+          groupId: row.group_id as string,
+          groupName: group?.name ?? "",
+          date: row.match_date as string,
+          time: row.match_time as string,
+          location: (row.location as string) ?? "",
+          yesCount,
+          myStatus:
+            (mine?.status as UpcomingMatch["myStatus"]) ?? null,
+        };
+      });
+
+      setUpcoming(mapped);
+    },
+    []
+  );
 
   useEffect(() => {
     const init = async () => {
@@ -159,11 +229,13 @@ export default function DashboardPage() {
           setDisplayName(profile.name);
         }
 
-        await Promise.all([
-          loadGroups(data.session.user.id),
+        const uid = data.session.user.id;
+        const [groupIds] = await Promise.all([
+          loadGroups(uid),
           loadInvites(),
           loadDebt(),
         ]);
+        await loadUpcoming(uid, groupIds ?? []);
       } catch (err) {
         setError(err instanceof Error ? err.message : t("dashboard.loadError"));
       } finally {
@@ -172,7 +244,28 @@ export default function DashboardPage() {
     };
 
     void init();
-  }, [router, loadGroups, loadInvites, loadDebt, t]);
+  }, [router, loadGroups, loadInvites, loadDebt, loadUpcoming, t]);
+
+  // Surface newly created matches live, so members never miss them.
+  useEffect(() => {
+    if (!userId || groups.length === 0) return;
+    const groupIds = groups.map((g) => g.id);
+    const topic = `dash-matches-${Math.random().toString(36).slice(2)}`;
+    const channel = supabase
+      .channel(topic)
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "matches" },
+        () => {
+          void loadUpcoming(userId, groupIds);
+        }
+      )
+      .subscribe();
+
+    return () => {
+      void supabase.removeChannel(channel);
+    };
+  }, [userId, groups, loadUpcoming]);
 
   const respondInvite = async (invite: GroupInvite, accept: boolean) => {
     setInviteBusy(invite.inviteId);
@@ -184,7 +277,10 @@ export default function DashboardPage() {
       });
       if (rpcError) throw new Error(rpcError.message);
       await loadInvites();
-      if (accept && userId) await loadGroups(userId);
+      if (accept && userId) {
+        const groupIds = await loadGroups(userId);
+        await loadUpcoming(userId, groupIds ?? []);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : t("dashboard.inviteError"));
     } finally {
@@ -227,6 +323,93 @@ export default function DashboardPage() {
             {t("dashboard.readyToday")}
           </p>
         </section>
+
+        {upcoming.length > 0 && (
+          <section className="space-y-3">
+            <h3 className="text-lg font-semibold">
+              {t("dashboard.upcomingTitle")}
+            </h3>
+            <div className="grid gap-3 sm:grid-cols-2">
+              {upcoming.map((match) => {
+                const needsRsvp = match.myStatus === null;
+                return (
+                  <Link
+                    key={match.id}
+                    href={`/dashboard/groups/${match.groupId}/matches/${match.id}`}
+                    className={`glass-panel group flex flex-col gap-3 rounded-2xl p-4 transition hover:border-lime-500/40 ${
+                      needsRsvp ? "border-lime-500/30" : ""
+                    }`}
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="truncate text-[11px] font-semibold uppercase tracking-[0.2em] text-lime-400">
+                          {match.groupName}
+                        </p>
+                        <p className="mt-1 text-base font-semibold leading-tight">
+                          {formatDate(match.date, {
+                            weekday: "short",
+                            day: "2-digit",
+                            month: "2-digit",
+                          })}
+                        </p>
+                      </div>
+                      {needsRsvp ? (
+                        <span className="shrink-0 rounded-lg border border-lime-500/30 bg-lime-500/20 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-lime-300">
+                          {t("dashboard.upcomingNeedsRsvp")}
+                        </span>
+                      ) : (
+                        <span
+                          className={`shrink-0 rounded-lg border px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.18em] ${
+                            match.myStatus === "yes"
+                              ? "border-emerald-500/30 bg-emerald-500/20 text-emerald-300"
+                              : "border-white/10 bg-slate-800 text-slate-400"
+                          }`}
+                        >
+                          {match.myStatus === "yes"
+                            ? t("dashboard.upcomingGoing")
+                            : t("dashboard.upcomingNotGoing")}
+                        </span>
+                      )}
+                    </div>
+
+                    <div className="space-y-1.5 text-sm text-slate-300">
+                      <div className="flex items-center gap-2">
+                        <Clock
+                          size={15}
+                          strokeWidth={1.75}
+                          className="text-slate-400"
+                        />
+                        <span>{match.time.slice(0, 5)}</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <MapPin
+                          size={15}
+                          strokeWidth={1.75}
+                          className="text-slate-400"
+                        />
+                        <span className="line-clamp-1">{match.location}</span>
+                      </div>
+                    </div>
+
+                    <div className="mt-auto flex items-center justify-between border-t border-white/10 pt-2.5 text-xs">
+                      <span className="inline-flex items-center gap-1.5 text-slate-400">
+                        <Users size={14} strokeWidth={1.75} />
+                        {t("dashboard.upcomingAttendees", {
+                          count: match.yesCount,
+                        })}
+                      </span>
+                      <CalendarClock
+                        size={15}
+                        strokeWidth={1.75}
+                        className="text-lime-400 transition-transform group-hover:translate-x-1"
+                      />
+                    </div>
+                  </Link>
+                );
+              })}
+            </div>
+          </section>
+        )}
 
         {debt.owe + debt.collect > 0 && (
           <section className="space-y-4">

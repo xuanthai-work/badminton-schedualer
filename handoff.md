@@ -9,7 +9,7 @@
 - **Phase 2.8:** Realtime — the match detail page updates live (RSVPs, settle/reopen, expense) via Supabase Realtime. In-app notifications — new-match and added-to-group triggers write `notifications` rows; a header bell on the dashboard shows a live unread badge; `/dashboard/notifications` lists them and marks them read.
 - **Phase 2.9:** Group invites now require the invitee's approval (admin invite → pending `group_invites` row + notification → invitee accepts/declines on the dashboard; no force-add). Payment surface on a closed match — shows the group creator's uploaded QR if they added one, otherwise the bank name / account / holder / memo as copyable text (no auto-generated QR), plus the per-person amount.
 - **Phase 2.10:** Payment tracking — settling a match seeds `payments` rows (unpaid) for attendees; a member taps "Tôi đã CK" (→submitted), an admin confirms (→confirmed, notifies the member). Live status list on the match detail; a "Công nợ của tôi" widget on the dashboard. Notifications bell now sits on all 3 nav pages; friend request/accept generate notifications too (no forced popup).
-- **Phase 2.11:** Debts detail — dashboard "Công nợ của tôi" card redesigned (Cần đóng + Chờ thu + "Thanh toán ngay") and links to a new `/dashboard/debts` page with "Tôi nợ" (pay) + "Chờ thu" (admin/creator confirms) tabs. Payment QR card no longer auto-generates VietQR (uploaded QR or text only).
+- **Phase 2.11:** Debts detail — dashboard "Công nợ của tôi" card redesigned (Cần đóng + Chờ thu + "Thanh toán ngay") and links to a new `/dashboard/debts` page with "Tôi nợ" (pay) + "Chờ thu" (admin/creator confirms) tabs; **Công nợ added as a 4th bottom-nav tab**. Payment QR card no longer auto-generates VietQR (uploaded QR or text only).
 
 ## Key files
 
@@ -30,7 +30,7 @@
 - `src/app/dashboard/profile/page.tsx` — `@username#tag` handle + set-once tag picker, avatar upload, display-name/login edit, bank info + QR upload, password, language switch, sign-out.
 
 ### Shared UI (src/components/)
-- `BottomNav.tsx` — Fixed glass nav (Trang chủ → /dashboard, Tài khoản → /dashboard/profile). Active route via usePathname. Mounted on all logged-in pages.
+- `BottomNav.tsx` — Fixed glass nav, 4 items: Trang chủ → /dashboard, Công nợ → /dashboard/debts, Bạn bè → /dashboard/friends, Tài khoản → /dashboard/profile. Active route via usePathname. Mounted on all logged-in pages.
 - `DateField.tsx` — Themed button → in-DOM popover with `react-day-picker` (locale follows `useI18n().dateLocale`, Monday start). Returns `yyyy-MM-dd`.
 - `TimeField.tsx` — Two-column hour/minute popover (00-23, 00-55 in 5-min steps; column labels via `t()`). Returns `HH:mm`. Auto-scrolls active item.
 - `SelectField.tsx` — Themed dropdown popover, replaces native `<select>` (used for bank selector).
@@ -110,6 +110,18 @@
 - `npm run dev`
 - Build: `npm run build`
 - Lint: `npm run lint`
+
+## ▶ Next step (recommended)
+
+**Production readiness — custom SMTP.** The core product loop (schedule → RSVP → split → track payment → debts) is feature-complete, so the highest-value next move is making it safe for real users:
+
+1. **Custom SMTP** in Supabase (Authentication → Emails → SMTP) with a provider (Resend / SES / Postmark). The built-in mailer is rate-limited to a few/hour — it tripped us during testing.
+2. **Re-enable "Confirm email"** (turned off during dev to dodge that rate limit) so addresses are verified, and confirm the **password-reset** flow works (it relies on email and currently can't send reliably).
+3. Lock down Supabase **URL config** for prod (Site URL + redirect allow-list already set to the Vercel domain — re-verify) and Google OAuth redirect URIs.
+
+This is mostly Supabase dashboard + a provider account; little app code. A good quick win to pair with it: **notify the payee when a member submits a payment** (first item below) so collectors don't have to watch the match page.
+
+After that, pick from the candidates below.
 
 ## Next steps (Phase 3 candidates)
 - Notify the admin/payee when a member submits a payment (currently they only see it on the match page / debts page / realtime).

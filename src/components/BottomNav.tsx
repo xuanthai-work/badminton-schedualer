@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, Users, User } from "lucide-react";
+import { Home, Users, User, Wallet } from "lucide-react";
 import { useI18n } from "@/lib/i18n";
 
 type Item = {
@@ -19,6 +19,12 @@ const items: Item[] = [
     icon: Home,
     matches: (path) =>
       path === "/dashboard" || path.startsWith("/dashboard/groups"),
+  },
+  {
+    href: "/dashboard/debts",
+    labelKey: "nav.debts",
+    icon: Wallet,
+    matches: (path) => path.startsWith("/dashboard/debts"),
   },
   {
     href: "/dashboard/friends",
@@ -39,7 +45,7 @@ export default function BottomNav() {
   const { t } = useI18n();
 
   return (
-    <nav className="fixed bottom-0 left-0 z-40 flex h-16 w-full items-center justify-around border-t border-white/10 bg-slate-950/80 px-4 backdrop-blur-xl shadow-[0_-4px_20px_rgba(163,230,53,0.06)]">
+    <nav className="fixed bottom-0 left-0 z-40 flex h-16 w-full items-center justify-around border-t border-white/10 bg-slate-950/80 px-2 backdrop-blur-xl shadow-[0_-4px_20px_rgba(163,230,53,0.06)]">
       {items.map((item) => {
         const active = item.matches(pathname);
         const Icon = item.icon;
@@ -47,7 +53,7 @@ export default function BottomNav() {
           <Link
             key={item.href}
             href={item.href}
-            className={`flex flex-col items-center justify-center gap-0.5 rounded-xl px-4 py-1 transition active:scale-90 ${
+            className={`flex flex-col items-center justify-center gap-0.5 rounded-xl px-3 py-1 transition active:scale-90 ${
               active
                 ? "bg-lime-500/10 text-lime-400"
                 : "text-slate-400 hover:text-slate-200"

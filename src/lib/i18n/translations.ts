@@ -69,6 +69,11 @@ const vi = {
     debtCollectFrom: "Từ {group}",
     debtCollectGroups: "Từ {count} sân",
     debtCta: "Thanh toán ngay",
+    upcomingTitle: "Lịch sắp tới",
+    upcomingNeedsRsvp: "Chưa trả lời",
+    upcomingGoing: "Sẽ tham gia",
+    upcomingNotGoing: "Không tham gia",
+    upcomingAttendees: "{count} tham gia",
   },
   createGroup: {
     fab: "+ Tạo nhóm mới",
@@ -112,6 +117,11 @@ const vi = {
     errRequired: "Vui lòng nhập đủ ngày, giờ và địa điểm.",
     errMapsUrl: "Link Google Maps phải bắt đầu bằng http:// hoặc https://.",
     errCreate: "Tạo lịch thất bại.",
+    delete: "Xóa lịch",
+    confirmDelete:
+      "Xóa lịch này? Toàn bộ RSVP, chi phí và thanh toán sẽ bị xóa vĩnh viễn.",
+    deleting: "Đang xóa...",
+    errDelete: "Xóa lịch thất bại.",
   },
   members: {
     inviteLabel: "Mời thêm thành viên (tên đăng nhập hoặc email)",
@@ -340,6 +350,7 @@ const vi = {
   },
   nav: {
     home: "Trang chủ",
+    debts: "Công nợ",
     friends: "Bạn bè",
     account: "Tài khoản",
   },
@@ -422,6 +433,11 @@ const en: typeof vi = {
     debtCollectFrom: "From {group}",
     debtCollectGroups: "From {count} match(es)",
     debtCta: "Pay now",
+    upcomingTitle: "Upcoming matches",
+    upcomingNeedsRsvp: "Not replied",
+    upcomingGoing: "Going",
+    upcomingNotGoing: "Not going",
+    upcomingAttendees: "{count} going",
   },
   createGroup: {
     fab: "+ New group",
@@ -465,6 +481,11 @@ const en: typeof vi = {
     errRequired: "Please enter date, time and location.",
     errMapsUrl: "Google Maps link must start with http:// or https://.",
     errCreate: "Failed to create match.",
+    delete: "Delete match",
+    confirmDelete:
+      "Delete this match? All RSVPs, expenses and payments will be permanently removed.",
+    deleting: "Deleting...",
+    errDelete: "Failed to delete match.",
   },
   members: {
     inviteLabel: "Invite a member (username or email)",
@@ -694,6 +715,7 @@ const en: typeof vi = {
   },
   nav: {
     home: "Home",
+    debts: "Debts",
     friends: "Friends",
     account: "Account",
   },

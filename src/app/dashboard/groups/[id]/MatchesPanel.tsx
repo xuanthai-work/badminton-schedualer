@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { ChevronRight, MapPin, Plus, Users } from "lucide-react";
+import { ChevronRight, MapPin, Plus, Trash2, Users } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { useI18n } from "@/lib/i18n";
 import DateField from "@/components/DateField";
@@ -34,6 +34,7 @@ export default function MatchesPanel({ groupId, isAdmin }: Props) {
   const [locationUrl, setLocationUrl] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState("");
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -130,6 +131,26 @@ export default function MatchesPanel({ groupId, isAdmin }: Props) {
     }
   };
 
+  const handleDelete = async (id: string) => {
+    if (!confirm(t("matches.confirmDelete"))) return;
+    setDeletingId(id);
+    setError("");
+    try {
+      const { error: deleteError } = await supabase
+        .from("matches")
+        .delete()
+        .eq("id", id);
+      if (deleteError) {
+        throw new Error(deleteError.message);
+      }
+      setMatches((prev) => prev.filter((m) => m.id !== id));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t("matches.errDelete"));
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
   const formatDate = (value: string) => {
     const parsed = new Date(`${value}T00:00:00`);
     if (Number.isNaN(parsed.getTime())) return value;
@@ -220,13 +241,34 @@ export default function MatchesPanel({ groupId, isAdmin }: Props) {
                   </div>
                 </div>
 
-                <div className="mt-auto flex items-center justify-end border-t border-white/10 pt-3 text-xs font-semibold uppercase tracking-[0.18em] text-lime-400">
-                  {t("matches.details")}
-                  <ChevronRight
-                    size={14}
-                    strokeWidth={2}
-                    className="ml-1 transition-transform group-hover:translate-x-1"
-                  />
+                <div className="mt-auto flex items-center justify-between border-t border-white/10 pt-3 text-xs font-semibold uppercase tracking-[0.18em]">
+                  {isAdmin && match.status === "closed" ? (
+                    <button
+                      type="button"
+                      onClick={(event) => {
+                        event.preventDefault();
+                        event.stopPropagation();
+                        void handleDelete(match.id);
+                      }}
+                      disabled={deletingId === match.id}
+                      className="inline-flex items-center gap-1 text-rose-400 transition hover:text-rose-300 disabled:opacity-60"
+                    >
+                      <Trash2 size={14} strokeWidth={2} />
+                      {deletingId === match.id
+                        ? t("matches.deleting")
+                        : t("matches.delete")}
+                    </button>
+                  ) : (
+                    <span />
+                  )}
+                  <span className="inline-flex items-center text-lime-400">
+                    {t("matches.details")}
+                    <ChevronRight
+                      size={14}
+                      strokeWidth={2}
+                      className="ml-1 transition-transform group-hover:translate-x-1"
+                    />
+                  </span>
                 </div>
               </Link>
             </li>

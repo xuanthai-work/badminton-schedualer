@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Check, ChevronLeft } from "lucide-react";
+import { Check } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { useI18n } from "@/lib/i18n";
 import BottomNav from "@/components/BottomNav";
@@ -146,13 +146,6 @@ export default function DebtsPage() {
 
       <div className="relative mx-auto flex w-full max-w-2xl flex-col gap-6">
         <header className="space-y-3">
-          <Link
-            href="/dashboard"
-            className="inline-flex items-center gap-1 text-xs font-semibold uppercase tracking-[0.3em] text-lime-400 transition hover:text-lime-300"
-          >
-            <ChevronLeft size={14} strokeWidth={2} />
-            {t("dashboard.eyebrow")}
-          </Link>
           <div className="flex items-start justify-between gap-4">
             <h1 className="text-[28px] font-semibold leading-tight">
               {t("debts.title")}

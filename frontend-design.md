@@ -112,7 +112,7 @@ Hover state (only on interactive cards): border becomes `border-lime-500/40`.
 
 ### 3.9 Bottom mobile nav (shipped)
 - Fixed glass bar, `h-16`, `bg-slate-950/80 backdrop-blur-xl` with a top border `border-white/10` and a faint top-glow shadow.
-- Three items: **Trang chủ** (`Home` → `/dashboard`), **Bạn bè** (`Users` → `/dashboard/friends`), **Tài khoản** (`User` → `/dashboard/profile`).
+- Four items: **Trang chủ** (`Home` → `/dashboard`), **Công nợ** (`Wallet` → `/dashboard/debts`), **Bạn bè** (`Users` → `/dashboard/friends`), **Tài khoản** (`User` → `/dashboard/profile`).
 - Active item: lime icon + lime label on a `bg-lime-500/10` rounded pill. Inactive: `text-slate-400`.
 - Active-route detection via `usePathname`. `/dashboard/groups/*` is treated as "Trang chủ".
 
@@ -438,7 +438,7 @@ Per-attendee status (the "Trạng thái thanh toán" list above): each "Yes" att
 
 **Purpose:** the detail screen behind the dashboard **"Công nợ của tôi"** card. Two angles: what *I* still owe (and pay it), and — if I run a group — who still owes *me*. This is the only net-new screen in this round; everything it references (statuses, payment actions) already exists on the match detail.
 
-**How it's reached:** tapping the **"Công nợ của tôi"** card on the dashboard (§5.2) — that card becomes a link to this page. (Today the card is static; this round makes it tappable.)
+**How it's reached:** the **Công nợ** bottom-nav tab (`Wallet`), and the **"Thanh toán ngay"** button / `Info` icon on the dashboard "Công nợ của tôi" card (§5.2).
 
 **Header:** lime back-link **"← DASHBOARD"** + title **"Công nợ"** + the notification bell top-right (same as other nav pages).
 
@@ -476,14 +476,13 @@ Per-attendee status (the "Trạng thái thanh toán" list above): each "Yes" att
 
 ---
 
-## 6. Mobile navigation (shipped — 3 items)
+## 6. Mobile navigation (shipped — 4 items)
 
 A bottom navigation bar visible across all logged-in pages:
 
-- Three items (Lucide icons): `Home` → "Trang chủ" (`/dashboard`), `Users` → "Bạn bè" (`/dashboard/friends`), `User` → "Tài khoản" (`/dashboard/profile`).
+- Four items (Lucide icons): `Home` → "Trang chủ" (`/dashboard`), `Wallet` → "Công nợ" (`/dashboard/debts`), `Users` → "Bạn bè" (`/dashboard/friends`), `User` → "Tài khoản" (`/dashboard/profile`).
 - Active state: lime icon + lime label on a `bg-lime-500/10` rounded pill. Inactive: slate-400.
-- Container: fixed bottom, `h-16`, glass panel with top border `border-white/10` and a faint lime top-glow shadow.
-- The **Công nợ** detail (§5.7) is reached from the dashboard card, not the nav bar.
+- Container: fixed bottom, `h-16`, glass panel with top border `border-white/10` and a faint lime top-glow shadow. Item padding is tightened (`px-3`) to fit four labels on narrow phones.
 
 ---
 
@@ -535,4 +534,4 @@ When porting Stitch output back to code, override these recurring drifts:
 - **Group invites require acceptance** (§5.2): admin invite → pending invite + notification → invitee accepts/declines on the dashboard. No force-add.
 - **Payment surface shipped** (§5.4.3): closed match shows the group creator's uploaded QR (if any) + copyable bank details + per-person amount. No dynamic VietQR.
 - **Payment tracking shipped** (§5.4.3): per-attendee status (Tôi đã CK → admin Xác nhận), live; plus a **"Công nợ của tôi"** widget on the dashboard (§5.2).
-- **Công nợ / Debts shipped** (§5.7, route `/dashboard/debts`): "Tôi nợ" + "Chờ thu" tabs. Dashboard "Công nợ của tôi" card redesigned (Cần đóng rose + Chờ thu emerald + "Thanh toán ngay" → debts page).
+- **Công nợ / Debts shipped** (§5.7, route `/dashboard/debts`): "Tôi nợ" + "Chờ thu" tabs. Dashboard "Công nợ của tôi" card redesigned (Cần đóng rose + Chờ thu emerald + "Thanh toán ngay" → debts page). **Bottom nav is now 4 items** — added **Công nợ** (`Wallet`).
