@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Image from "next/image";
-import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import {
   Calendar,
@@ -32,6 +31,7 @@ type Match = {
   groupId: string;
   date: string;
   time: string;
+  endTime: string | null;
   location: string;
   locationUrl: string | null;
   status: "open" | "closed";
@@ -76,6 +76,7 @@ export default function MatchDetailPage() {
   const [rsvps, setRsvps] = useState<Rsvp[]>([]);
   const [expense, setExpense] = useState<Expense | null>(null);
   const [payee, setPayee] = useState<Payee | null>(null);
+  const [payeeId, setPayeeId] = useState<string | null>(null);
   const [payments, setPayments] = useState<Payment[]>([]);
   const [payBusy, setPayBusy] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -95,7 +96,9 @@ export default function MatchDetailPage() {
 
       const { data: matchRow, error: matchError } = await supabase
         .from("matches")
-        .select("id, group_id, match_date, match_time, location, location_url, status")
+        .select(
+          "id, group_id, match_date, match_time, match_end_time, location, location_url, status"
+        )
         .eq("id", matchId)
         .maybeSingle();
 
@@ -110,6 +113,7 @@ export default function MatchDetailPage() {
         groupId: matchRow.group_id,
         date: matchRow.match_date,
         time: matchRow.match_time,
+        endTime: matchRow.match_end_time ?? null,
         location: matchRow.location,
         locationUrl: matchRow.location_url ?? null,
         status: matchRow.status === "closed" ? "closed" : "open",
@@ -170,6 +174,7 @@ export default function MatchDetailPage() {
         .select("created_by")
         .eq("id", groupId)
         .maybeSingle();
+      setPayeeId(groupRow?.created_by ?? null);
       if (groupRow?.created_by) {
         const { data: payeeRow } = await supabase
           .from("users")
@@ -393,13 +398,20 @@ export default function MatchDetailPage() {
 
       <div className="relative mx-auto flex w-full max-w-3xl flex-col gap-6">
         <header className="space-y-3">
-          <Link
-            href={`/dashboard/groups/${groupId ?? ""}`}
+          <button
+            type="button"
+            onClick={() => {
+              if (typeof window !== "undefined" && window.history.length > 1) {
+                router.back();
+              } else {
+                router.push(`/dashboard/groups/${groupId ?? ""}`);
+              }
+            }}
             className="inline-flex items-center gap-1 text-xs font-semibold uppercase tracking-[0.3em] text-lime-400 transition hover:text-lime-300"
           >
             <ChevronLeft size={14} strokeWidth={2} />
-            {t("match.backToGroup")}
-          </Link>
+            {t("match.back")}
+          </button>
 
           {match && (
             <div className="flex flex-wrap items-end justify-between gap-3">
@@ -467,6 +479,7 @@ export default function MatchDetailPage() {
                       year: "numeric",
                     })}{" "}
                     · {match.time.slice(0, 5)}
+                    {match.endTime ? ` - ${match.endTime.slice(0, 5)}` : ""}
                   </p>
                 </div>
               </div>
@@ -563,6 +576,7 @@ export default function MatchDetailPage() {
               <PaymentStatusList
                 payments={payments}
                 currentUserId={userId}
+                payeeId={payeeId}
                 isAdmin={isAdmin}
                 busyId={payBusy}
                 onSubmit={handleSubmitPayment}
@@ -645,6 +659,7 @@ export default function MatchDetailPage() {
 function PaymentStatusList({
   payments,
   currentUserId,
+  payeeId,
   isAdmin,
   busyId,
   onSubmit,
@@ -652,6 +667,7 @@ function PaymentStatusList({
 }: {
   payments: Payment[];
   currentUserId: string | null;
+  payeeId: string | null;
   isAdmin: boolean;
   busyId: string | null;
   onSubmit: () => void;
@@ -680,6 +696,7 @@ function PaymentStatusList({
       <ul className="space-y-2">
         {payments.map((p) => {
           const isSelf = p.userId === currentUserId;
+          const isPayee = p.userId === payeeId;
           const busy = busyId === p.userId;
           return (
             <li
@@ -699,12 +716,18 @@ function PaymentStatusList({
                 <p className="text-xs text-slate-500">{formatVnd(p.amount)}</p>
               </div>
               <div className="flex shrink-0 items-center gap-2">
-                <span
-                  className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${pill[p.status].cls}`}
-                >
-                  {pill[p.status].label}
-                </span>
-                {isSelf && p.status === "unpaid" && (
+                {isPayee ? (
+                  <span className="rounded-full bg-lime-500/15 px-2.5 py-1 text-[11px] font-semibold text-lime-300">
+                    {t("match.payCollector")}
+                  </span>
+                ) : (
+                  <span
+                    className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${pill[p.status].cls}`}
+                  >
+                    {pill[p.status].label}
+                  </span>
+                )}
+                {isSelf && !isPayee && p.status === "unpaid" && (
                   <button
                     type="button"
                     disabled={busy}
@@ -714,7 +737,7 @@ function PaymentStatusList({
                     {t("match.payIPaid")}
                   </button>
                 )}
-                {isAdmin && p.status === "submitted" && (
+                {isAdmin && !isPayee && p.status === "submitted" && (
                   <button
                     type="button"
                     disabled={busy}
@@ -724,7 +747,7 @@ function PaymentStatusList({
                     {t("match.payConfirm")}
                   </button>
                 )}
-                {isAdmin && p.status === "confirmed" && (
+                {isAdmin && !isPayee && p.status === "confirmed" && (
                   <button
                     type="button"
                     disabled={busy}

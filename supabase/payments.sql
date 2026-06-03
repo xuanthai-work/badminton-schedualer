@@ -41,6 +41,7 @@ set search_path = public
 as $$
 declare
   match_group uuid;
+  match_payee uuid;
   attendees int;
   total numeric;
   per_person numeric;
@@ -53,6 +54,9 @@ begin
   if match_group is null then
     raise exception 'match_not_found';
   end if;
+
+  -- The group creator collects the money, so they never pay themselves.
+  select g.created_by into match_payee from public.groups g where g.id = match_group;
   if not public.is_group_admin(match_group) then
     raise exception 'not_authorized';
   end if;
@@ -81,12 +85,22 @@ begin
   update public.matches set status = 'closed' where id = target_match_id;
 
   -- Seed/refresh payment rows for the attendees, preserving paid statuses.
+  -- The payee's own row is auto-confirmed (they collect, not pay).
   insert into public.payments (match_id, user_id, amount, status, updated_at)
-  select target_match_id, r.user_id, per_person, 'unpaid', now()
+  select target_match_id, r.user_id, per_person,
+    case when r.user_id = match_payee then 'confirmed' else 'unpaid' end,
+    now()
   from public.rsvps r
   where r.match_id = target_match_id and r.status = 'yes'
   on conflict (match_id, user_id) do update set
     amount = excluded.amount, updated_at = now();
+
+  -- Ensure the payee's row stays confirmed even when re-settling.
+  update public.payments
+    set status = 'confirmed', updated_at = now()
+    where match_id = target_match_id
+      and user_id = match_payee
+      and status <> 'confirmed';
 
   delete from public.payments p
   where p.match_id = target_match_id
@@ -185,6 +199,16 @@ $$;
 grant execute on function public.submit_payment(uuid) to authenticated;
 grant execute on function public.confirm_payment(uuid, uuid, boolean) to authenticated;
 grant execute on function public.get_payment_summary() to authenticated;
+
+-- Backfill: auto-confirm the payee's (group creator's) own rows in matches
+-- that were settled before this rule existed, so they never self-confirm.
+update public.payments p
+set status = 'confirmed', updated_at = now()
+from public.matches m
+join public.groups g on g.id = m.group_id
+where p.match_id = m.id
+  and p.user_id = g.created_by
+  and p.status <> 'confirmed';
 
 -- Realtime so payment status updates live on the match detail page.
 alter table public.payments replica identity full;

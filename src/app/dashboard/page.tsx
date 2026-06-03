@@ -1,15 +1,17 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   Banknote,
   CalendarClock,
+  ChevronDown,
   ChevronRight,
-  Clock,
+  ChevronUp,
   Info,
   MapPin,
+  Trash2,
   Users,
   Wallet,
 } from "lucide-react";
@@ -19,6 +21,7 @@ import { useI18n } from "@/lib/i18n";
 import BottomNav from "@/components/BottomNav";
 import NotificationBell from "@/components/NotificationBell";
 import CreateGroupPanel from "./CreateGroupPanel";
+import CreateMatchPanel from "./CreateMatchPanel";
 
 type GroupCard = {
   id: string;
@@ -35,26 +38,29 @@ type GroupInvite = {
   inviterName: string;
 };
 
-type UpcomingMatch = {
+type GroupMatch = {
   id: string;
   groupId: string;
   groupName: string;
   date: string;
   time: string;
+  endTime: string | null;
   location: string;
+  status: "open" | "closed";
   yesCount: number;
   myStatus: "yes" | "no" | "maybe" | null;
 };
 
 export default function DashboardPage() {
   const router = useRouter();
-  const { t, formatVnd, formatDate } = useI18n();
+  const { t, formatVnd } = useI18n();
   const [userId, setUserId] = useState<string | null>(null);
   const [displayName, setDisplayName] = useState<string>("");
   const [groups, setGroups] = useState<GroupCard[]>([]);
   const [invites, setInvites] = useState<GroupInvite[]>([]);
-  const [upcoming, setUpcoming] = useState<UpcomingMatch[]>([]);
+  const [matches, setMatches] = useState<GroupMatch[]>([]);
   const [inviteBusy, setInviteBusy] = useState<string | null>(null);
+  const [deletingMatchId, setDeletingMatchId] = useState<string | null>(null);
   const [debt, setDebt] = useState<{
     owe: number;
     oweMatches: number;
@@ -161,27 +167,24 @@ export default function DashboardPage() {
     return groupIds;
   }, [t]);
 
-  const loadUpcoming = useCallback(
+  const loadMatches = useCallback(
     async (uid: string, groupIds: string[]) => {
       if (groupIds.length === 0) {
-        setUpcoming([]);
+        setMatches([]);
         return;
       }
 
-      const today = new Date().toISOString().slice(0, 10);
       const { data } = await supabase
         .from("matches")
         .select(
-          "id, match_date, match_time, location, group_id, groups ( name ), rsvps ( status, user_id )"
+          "id, match_date, match_time, match_end_time, location, group_id, status, groups ( name ), rsvps ( status, user_id )"
         )
         .in("group_id", groupIds)
-        .eq("status", "open")
-        .gte("match_date", today)
-        .order("match_date", { ascending: true })
-        .order("match_time", { ascending: true });
+        .order("match_date", { ascending: false })
+        .order("match_time", { ascending: false });
 
       const rows = (data as Array<Record<string, unknown>> | null) ?? [];
-      const mapped: UpcomingMatch[] = rows.map((row) => {
+      const mapped: GroupMatch[] = rows.map((row) => {
         const group = Array.isArray(row.groups)
           ? (row.groups[0] as { name?: string } | undefined)
           : (row.groups as { name?: string } | undefined);
@@ -196,16 +199,37 @@ export default function DashboardPage() {
           groupName: group?.name ?? "",
           date: row.match_date as string,
           time: row.match_time as string,
+          endTime: (row.match_end_time as string | null) ?? null,
           location: (row.location as string) ?? "",
+          status: row.status === "closed" ? "closed" : "open",
           yesCount,
-          myStatus:
-            (mine?.status as UpcomingMatch["myStatus"]) ?? null,
+          myStatus: (mine?.status as GroupMatch["myStatus"]) ?? null,
         };
       });
 
-      setUpcoming(mapped);
+      setMatches(mapped);
     },
     []
+  );
+
+  const handleDeleteMatch = useCallback(
+    async (id: string) => {
+      if (!confirm(t("matches.confirmDelete"))) return;
+      setDeletingMatchId(id);
+      try {
+        const { error: deleteError } = await supabase
+          .from("matches")
+          .delete()
+          .eq("id", id);
+        if (deleteError) throw new Error(deleteError.message);
+        setMatches((prev) => prev.filter((m) => m.id !== id));
+      } catch (err) {
+        setError(err instanceof Error ? err.message : t("matches.errDelete"));
+      } finally {
+        setDeletingMatchId(null);
+      }
+    },
+    [t]
   );
 
   useEffect(() => {
@@ -235,7 +259,7 @@ export default function DashboardPage() {
           loadInvites(),
           loadDebt(),
         ]);
-        await loadUpcoming(uid, groupIds ?? []);
+        await loadMatches(uid, groupIds ?? []);
       } catch (err) {
         setError(err instanceof Error ? err.message : t("dashboard.loadError"));
       } finally {
@@ -244,7 +268,7 @@ export default function DashboardPage() {
     };
 
     void init();
-  }, [router, loadGroups, loadInvites, loadDebt, loadUpcoming, t]);
+  }, [router, loadGroups, loadInvites, loadDebt, loadMatches, t]);
 
   // Surface newly created matches live, so members never miss them.
   useEffect(() => {
@@ -257,7 +281,7 @@ export default function DashboardPage() {
         "postgres_changes",
         { event: "*", schema: "public", table: "matches" },
         () => {
-          void loadUpcoming(userId, groupIds);
+          void loadMatches(userId, groupIds);
         }
       )
       .subscribe();
@@ -265,7 +289,37 @@ export default function DashboardPage() {
     return () => {
       void supabase.removeChannel(channel);
     };
-  }, [userId, groups, loadUpcoming]);
+  }, [userId, groups, loadMatches]);
+
+  const adminGroups = useMemo(
+    () =>
+      groups
+        .filter((g) => g.role === "admin")
+        .map((g) => ({ id: g.id, name: g.name })),
+    [groups]
+  );
+
+  const { openByGroup, closedByGroup } = useMemo(() => {
+    const today = new Date().toISOString().slice(0, 10);
+    const open = new Map<string, GroupMatch[]>();
+    const closed = new Map<string, GroupMatch[]>();
+    // Source list is newest-first; upcoming reads best oldest-first.
+    const ascending = [...matches].sort((a, b) =>
+      `${a.date}${a.time}`.localeCompare(`${b.date}${b.time}`)
+    );
+    for (const match of ascending) {
+      if (match.status === "open" && match.date >= today) {
+        const list = open.get(match.groupId) ?? [];
+        list.push(match);
+        open.set(match.groupId, list);
+      } else if (match.status === "closed") {
+        const list = closed.get(match.groupId) ?? [];
+        list.unshift(match); // newest closed first
+        closed.set(match.groupId, list);
+      }
+    }
+    return { openByGroup: open, closedByGroup: closed };
+  }, [matches]);
 
   const respondInvite = async (invite: GroupInvite, accept: boolean) => {
     setInviteBusy(invite.inviteId);
@@ -279,7 +333,7 @@ export default function DashboardPage() {
       await loadInvites();
       if (accept && userId) {
         const groupIds = await loadGroups(userId);
-        await loadUpcoming(userId, groupIds ?? []);
+        await loadMatches(userId, groupIds ?? []);
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : t("dashboard.inviteError"));
@@ -323,93 +377,6 @@ export default function DashboardPage() {
             {t("dashboard.readyToday")}
           </p>
         </section>
-
-        {upcoming.length > 0 && (
-          <section className="space-y-3">
-            <h3 className="text-lg font-semibold">
-              {t("dashboard.upcomingTitle")}
-            </h3>
-            <div className="grid gap-3 sm:grid-cols-2">
-              {upcoming.map((match) => {
-                const needsRsvp = match.myStatus === null;
-                return (
-                  <Link
-                    key={match.id}
-                    href={`/dashboard/groups/${match.groupId}/matches/${match.id}`}
-                    className={`glass-panel group flex flex-col gap-3 rounded-2xl p-4 transition hover:border-lime-500/40 ${
-                      needsRsvp ? "border-lime-500/30" : ""
-                    }`}
-                  >
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="min-w-0">
-                        <p className="truncate text-[11px] font-semibold uppercase tracking-[0.2em] text-lime-400">
-                          {match.groupName}
-                        </p>
-                        <p className="mt-1 text-base font-semibold leading-tight">
-                          {formatDate(match.date, {
-                            weekday: "short",
-                            day: "2-digit",
-                            month: "2-digit",
-                          })}
-                        </p>
-                      </div>
-                      {needsRsvp ? (
-                        <span className="shrink-0 rounded-lg border border-lime-500/30 bg-lime-500/20 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-lime-300">
-                          {t("dashboard.upcomingNeedsRsvp")}
-                        </span>
-                      ) : (
-                        <span
-                          className={`shrink-0 rounded-lg border px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.18em] ${
-                            match.myStatus === "yes"
-                              ? "border-emerald-500/30 bg-emerald-500/20 text-emerald-300"
-                              : "border-white/10 bg-slate-800 text-slate-400"
-                          }`}
-                        >
-                          {match.myStatus === "yes"
-                            ? t("dashboard.upcomingGoing")
-                            : t("dashboard.upcomingNotGoing")}
-                        </span>
-                      )}
-                    </div>
-
-                    <div className="space-y-1.5 text-sm text-slate-300">
-                      <div className="flex items-center gap-2">
-                        <Clock
-                          size={15}
-                          strokeWidth={1.75}
-                          className="text-slate-400"
-                        />
-                        <span>{match.time.slice(0, 5)}</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <MapPin
-                          size={15}
-                          strokeWidth={1.75}
-                          className="text-slate-400"
-                        />
-                        <span className="line-clamp-1">{match.location}</span>
-                      </div>
-                    </div>
-
-                    <div className="mt-auto flex items-center justify-between border-t border-white/10 pt-2.5 text-xs">
-                      <span className="inline-flex items-center gap-1.5 text-slate-400">
-                        <Users size={14} strokeWidth={1.75} />
-                        {t("dashboard.upcomingAttendees", {
-                          count: match.yesCount,
-                        })}
-                      </span>
-                      <CalendarClock
-                        size={15}
-                        strokeWidth={1.75}
-                        className="text-lime-400 transition-transform group-hover:translate-x-1"
-                      />
-                    </div>
-                  </Link>
-                );
-              })}
-            </div>
-          </section>
-        )}
 
         {debt.owe + debt.collect > 0 && (
           <section className="space-y-4">
@@ -542,9 +509,16 @@ export default function DashboardPage() {
               {t("dashboard.emptyGroups")}
             </div>
           ) : (
-            <div className="grid gap-4 sm:grid-cols-2">
+            <div className="space-y-5">
               {groups.map((group) => (
-                <GroupCardItem key={group.id} group={group} />
+                <GroupCardItem
+                  key={group.id}
+                  group={group}
+                  openMatches={openByGroup.get(group.id) ?? []}
+                  closedMatches={closedByGroup.get(group.id) ?? []}
+                  onDeleteMatch={handleDeleteMatch}
+                  deletingMatchId={deletingMatchId}
+                />
               ))}
             </div>
           )}
@@ -552,79 +526,216 @@ export default function DashboardPage() {
       </div>
 
       {userId ? <CreateGroupPanel onCreated={() => loadGroups(userId)} /> : null}
+      {userId ? (
+        <CreateMatchPanel
+          groups={adminGroups}
+          onCreated={() =>
+            loadMatches(
+              userId,
+              groups.map((g) => g.id)
+            )
+          }
+        />
+      ) : null}
       <BottomNav />
     </main>
   );
 }
 
-function GroupCardItem({ group }: { group: GroupCard }) {
+function GroupCardItem({
+  group,
+  openMatches,
+  closedMatches,
+  onDeleteMatch,
+  deletingMatchId,
+}: {
+  group: GroupCard;
+  openMatches: GroupMatch[];
+  closedMatches: GroupMatch[];
+  onDeleteMatch: (id: string) => void;
+  deletingMatchId: string | null;
+}) {
   const { t } = useI18n();
+  const [showClosed, setShowClosed] = useState(false);
   const isAdmin = group.role === "admin";
+  const hasMatches = openMatches.length > 0 || closedMatches.length > 0;
   return (
-    <Link
-      href={`/dashboard/groups/${group.id}`}
-      className="glass-panel group relative block overflow-hidden rounded-2xl p-5 transition hover:border-lime-500/40"
-    >
-      <div
-        aria-hidden
-        className="pointer-events-none absolute -right-16 -top-16 h-32 w-32 rounded-full bg-lime-500/5 blur-3xl transition-colors group-hover:bg-lime-500/10"
-      />
-
-      <div className="relative flex items-start justify-between">
-        <div className="rounded-lg bg-lime-500/10 p-3 text-lime-400">
-          <Users size={20} strokeWidth={1.75} />
-        </div>
-        <span
-          className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.18em] ${
-            isAdmin
-              ? "border-lime-500/30 bg-lime-500/20 text-lime-300"
-              : "border-white/10 bg-slate-800/80 text-slate-300"
-          }`}
-        >
-          {isAdmin ? t("common.admin") : t("common.member")}
+    <div className="space-y-2">
+      <Link
+        href={`/dashboard/groups/${group.id}`}
+        className="glass-panel group flex items-center gap-3 rounded-2xl p-4 transition hover:border-lime-500/40"
+      >
+        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-lime-500/10 text-lime-400">
+          <Users size={18} strokeWidth={1.75} />
         </span>
-      </div>
-
-      <h4 className="relative mt-4 text-xl font-semibold leading-tight">
-        {group.name}
-      </h4>
-      <div className="relative mt-1 flex items-center gap-2 text-sm text-slate-400">
-        <Users size={14} strokeWidth={1.75} />
-        <span>{t("dashboard.memberCount", { count: group.memberCount })}</span>
-      </div>
-
-      <div className="relative mt-5 flex items-center justify-between border-t border-white/10 pt-4">
-        <div className="flex items-center gap-3">
-          <InitialAvatar name={group.adminName} size={32} />
-          <div>
-            <p className="text-[10px] uppercase tracking-wider text-slate-400">
-              {t("common.admin")}
-            </p>
-            <p className="text-sm text-slate-100">{group.adminName}</p>
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2">
+            <h4 className="truncate text-base font-semibold leading-tight">
+              {group.name}
+            </h4>
+            <span
+              className={`shrink-0 rounded-full border px-2 py-0.5 text-[9px] font-semibold uppercase tracking-[0.16em] ${
+                isAdmin
+                  ? "border-lime-500/30 bg-lime-500/20 text-lime-300"
+                  : "border-white/10 bg-slate-800/80 text-slate-300"
+              }`}
+            >
+              {isAdmin ? t("common.admin") : t("common.member")}
+            </span>
           </div>
+          <p className="mt-0.5 truncate text-xs text-slate-400">
+            {t("dashboard.memberCount", { count: group.memberCount })} ·{" "}
+            {group.adminName}
+          </p>
         </div>
         <ChevronRight
           size={18}
           strokeWidth={1.75}
-          className="text-lime-400 transition-transform group-hover:translate-x-1"
+          className="shrink-0 text-lime-400 transition-transform group-hover:translate-x-1"
         />
-      </div>
-    </Link>
+      </Link>
+
+      {hasMatches && (
+        <div className="ml-3 space-y-2 border-l border-white/10 pl-4">
+          {openMatches.map((match) => (
+            <UpcomingMatchRow key={match.id} match={match} />
+          ))}
+
+          {closedMatches.length > 0 && (
+            <>
+              <button
+                type="button"
+                onClick={() => setShowClosed((v) => !v)}
+                className="flex w-full items-center gap-1.5 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-slate-400 transition hover:text-slate-200"
+              >
+                {showClosed ? (
+                  <ChevronUp size={14} strokeWidth={2} />
+                ) : (
+                  <ChevronDown size={14} strokeWidth={2} />
+                )}
+                {t("dashboard.closedMatches", { count: closedMatches.length })}
+              </button>
+              {showClosed &&
+                closedMatches.map((match) => (
+                  <ClosedMatchRow
+                    key={match.id}
+                    match={match}
+                    isAdmin={isAdmin}
+                    onDelete={onDeleteMatch}
+                    deleting={deletingMatchId === match.id}
+                  />
+                ))}
+            </>
+          )}
+        </div>
+      )}
+    </div>
   );
 }
 
-function InitialAvatar({ name, size = 32 }: { name: string; size?: number }) {
-  const initial = (name || "?").trim().charAt(0).toUpperCase() || "?";
+function ClosedMatchRow({
+  match,
+  isAdmin,
+  onDelete,
+  deleting,
+}: {
+  match: GroupMatch;
+  isAdmin: boolean;
+  onDelete: (id: string) => void;
+  deleting: boolean;
+}) {
+  const { t, formatDate } = useI18n();
   return (
-    <div
-      className="flex items-center justify-center rounded-full border border-white/10 bg-slate-800/80 font-semibold text-lime-300"
-      style={{
-        width: size,
-        height: size,
-        fontSize: Math.round(size * 0.42),
-      }}
-    >
-      {initial}
+    <div className="glass-panel flex items-center justify-between gap-2 rounded-xl p-3 opacity-70 transition hover:opacity-100">
+      <Link
+        href={`/dashboard/groups/${match.groupId}/matches/${match.id}`}
+        className="min-w-0 flex-1"
+      >
+        <div className="flex items-center gap-2 text-sm font-medium leading-tight text-slate-300">
+          <CalendarClock
+            size={14}
+            strokeWidth={1.75}
+            className="shrink-0 text-slate-500"
+          />
+          <span className="truncate">
+            {formatDate(match.date, {
+              weekday: "short",
+              day: "2-digit",
+              month: "2-digit",
+            })}{" "}
+            · {match.time.slice(0, 5)}
+            {match.endTime ? ` - ${match.endTime.slice(0, 5)}` : ""}
+          </span>
+        </div>
+        <div className="mt-1 flex items-center gap-1.5 text-xs text-slate-500">
+          <MapPin size={12} strokeWidth={1.75} className="shrink-0" />
+          <span className="line-clamp-1">{match.location}</span>
+        </div>
+      </Link>
+      {isAdmin && (
+        <button
+          type="button"
+          onClick={() => onDelete(match.id)}
+          disabled={deleting}
+          aria-label={t("matches.delete")}
+          className="shrink-0 rounded-lg p-1.5 text-rose-400 transition hover:bg-rose-500/10 hover:text-rose-300 disabled:opacity-50"
+        >
+          <Trash2 size={15} strokeWidth={2} />
+        </button>
+      )}
     </div>
+  );
+}
+
+function UpcomingMatchRow({ match }: { match: GroupMatch }) {
+  const { t, formatDate } = useI18n();
+  const needsRsvp = match.myStatus === null;
+  return (
+    <Link
+      href={`/dashboard/groups/${match.groupId}/matches/${match.id}`}
+      className={`glass-panel flex items-center justify-between gap-3 rounded-xl p-3 transition hover:border-lime-500/40 ${
+        needsRsvp ? "border-lime-500/30" : ""
+      }`}
+    >
+      <div className="min-w-0">
+        <div className="flex items-center gap-2 text-sm font-semibold leading-tight">
+          <CalendarClock
+            size={14}
+            strokeWidth={2}
+            className="shrink-0 text-lime-400"
+          />
+          <span className="truncate">
+            {formatDate(match.date, {
+              weekday: "short",
+              day: "2-digit",
+              month: "2-digit",
+            })}{" "}
+            · {match.time.slice(0, 5)}
+            {match.endTime ? ` - ${match.endTime.slice(0, 5)}` : ""}
+          </span>
+        </div>
+        <div className="mt-1 flex items-center gap-1.5 text-xs text-slate-400">
+          <MapPin size={12} strokeWidth={1.75} className="shrink-0" />
+          <span className="line-clamp-1">{match.location}</span>
+        </div>
+      </div>
+      {needsRsvp ? (
+        <span className="shrink-0 rounded-lg border border-lime-500/30 bg-lime-500/20 px-2 py-0.5 text-[9px] font-semibold uppercase tracking-[0.16em] text-lime-300">
+          {t("dashboard.upcomingNeedsRsvp")}
+        </span>
+      ) : (
+        <span
+          className={`shrink-0 rounded-lg border px-2 py-0.5 text-[9px] font-semibold uppercase tracking-[0.16em] ${
+            match.myStatus === "yes"
+              ? "border-emerald-500/30 bg-emerald-500/20 text-emerald-300"
+              : "border-white/10 bg-slate-800 text-slate-400"
+          }`}
+        >
+          {match.myStatus === "yes"
+            ? t("dashboard.upcomingGoing")
+            : t("dashboard.upcomingNotGoing")}
+        </span>
+      )}
+    </Link>
   );
 }

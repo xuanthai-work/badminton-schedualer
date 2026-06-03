@@ -8,10 +8,9 @@ import { supabase } from "@/lib/supabaseClient";
 import { useI18n } from "@/lib/i18n";
 import BottomNav from "@/components/BottomNav";
 import MembersPanel from "./MembersPanel";
-import MatchesPanel from "./MatchesPanel";
 import GroupSettingsPanel from "./GroupSettingsPanel";
 
-type Tab = "matches" | "members" | "settings";
+type Tab = "members" | "settings";
 type GroupInfo = {
   id: string;
   name: string;
@@ -27,7 +26,7 @@ export default function GroupDetailPage() {
   const [userId, setUserId] = useState<string | null>(null);
   const [group, setGroup] = useState<GroupInfo | null>(null);
   const [role, setRole] = useState<"admin" | "member" | null>(null);
-  const [tab, setTab] = useState<Tab>("matches");
+  const [tab, setTab] = useState<Tab>("members");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -133,17 +132,6 @@ export default function GroupDetailPage() {
           <button
             type="button"
             className={`flex-1 rounded-full py-2 transition ${
-              tab === "matches"
-                ? "bg-lime-500 text-slate-950"
-                : "text-slate-300 hover:text-slate-100"
-            }`}
-            onClick={() => setTab("matches")}
-          >
-            {t("group.tabMatches")}
-          </button>
-          <button
-            type="button"
-            className={`flex-1 rounded-full py-2 transition ${
               tab === "members"
                 ? "bg-lime-500 text-slate-950"
                 : "text-slate-300 hover:text-slate-100"
@@ -172,9 +160,7 @@ export default function GroupDetailPage() {
         ) : error ? (
           <p className="text-sm text-rose-400">{error}</p>
         ) : group && userId ? (
-          tab === "matches" ? (
-            <MatchesPanel groupId={group.id} isAdmin={isAdmin} />
-          ) : tab === "members" ? (
+          tab === "members" ? (
             <MembersPanel
               groupId={group.id}
               isAdmin={isAdmin}

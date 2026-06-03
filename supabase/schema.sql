@@ -54,6 +54,7 @@ create table if not exists public.matches (
 );
 
 alter table public.matches add column if not exists location_url text;
+alter table public.matches add column if not exists match_end_time time;
 
 create table if not exists public.rsvps (
   match_id uuid not null references public.matches(id) on delete cascade,
