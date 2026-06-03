@@ -28,6 +28,14 @@
     color: hsl(var(--foreground));
     font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
   }
+
+  /* Installed as a PWA: status bar is translucent, so keep content below the
+     notch. (Browser tabs are unaffected.) */
+  @media (display-mode: standalone) {
+    body {
+      padding-top: env(safe-area-inset-top);
+    }
+  }
 }
 
 @layer utilities {
