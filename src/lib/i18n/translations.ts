@@ -75,6 +75,9 @@ const vi = {
     upcomingNotGoing: "Không tham gia",
     upcomingAttendees: "{count} tham gia",
     closedMatches: "Lịch đã chốt ({count})",
+    tagReminderTitle: "Đặt tag định danh của bạn",
+    tagReminderBody: "Tạo tag như @tên#0000 để bạn bè tìm & thêm bạn.",
+    tagReminderAction: "Đặt tag",
   },
   createGroup: {
     fab: "+ Tạo nhóm mới",
@@ -385,6 +388,10 @@ const vi = {
     friends: "Bạn bè",
     account: "Tài khoản",
   },
+  update: {
+    available: "Đã có bản mới của ứng dụng.",
+    action: "Cập nhật",
+  },
   upload: {
     change: "Đổi ảnh",
     uploading: "Đang tải...",
@@ -470,6 +477,9 @@ const en: typeof vi = {
     upcomingNotGoing: "Not going",
     upcomingAttendees: "{count} going",
     closedMatches: "Closed matches ({count})",
+    tagReminderTitle: "Set your profile tag",
+    tagReminderBody: "Create a tag like @name#0000 so friends can find & add you.",
+    tagReminderAction: "Set tag",
   },
   createGroup: {
     fab: "+ New group",
@@ -780,6 +790,10 @@ const en: typeof vi = {
     debts: "Debts",
     friends: "Friends",
     account: "Account",
+  },
+  update: {
+    available: "A new version is available.",
+    action: "Update",
   },
   upload: {
     change: "Change photo",

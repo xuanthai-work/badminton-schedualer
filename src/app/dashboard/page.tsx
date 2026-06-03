@@ -9,6 +9,7 @@ import {
   ChevronDown,
   ChevronRight,
   ChevronUp,
+  Hash,
   Info,
   MapPin,
   Trash2,
@@ -56,6 +57,7 @@ export default function DashboardPage() {
   const { t, formatVnd } = useI18n();
   const [userId, setUserId] = useState<string | null>(null);
   const [displayName, setDisplayName] = useState<string>("");
+  const [tagMissing, setTagMissing] = useState(false);
   const [groups, setGroups] = useState<GroupCard[]>([]);
   const [invites, setInvites] = useState<GroupInvite[]>([]);
   const [matches, setMatches] = useState<GroupMatch[]>([]);
@@ -246,12 +248,13 @@ export default function DashboardPage() {
 
         const { data: profile } = await supabase
           .from("users")
-          .select("name")
+          .select("name, tag")
           .eq("id", data.session.user.id)
           .maybeSingle();
         if (profile?.name) {
           setDisplayName(profile.name);
         }
+        setTagMissing(Boolean(profile) && !profile?.tag);
 
         const uid = data.session.user.id;
         const [groupIds] = await Promise.all([
@@ -377,6 +380,31 @@ export default function DashboardPage() {
             {t("dashboard.readyToday")}
           </p>
         </section>
+
+        {tagMissing && (
+          <Link
+            href="/dashboard/profile#tag"
+            className="glass-panel flex items-center justify-between gap-3 rounded-2xl border-lime-500/30 bg-lime-500/5 p-4 transition hover:border-lime-500/50"
+          >
+            <div className="flex min-w-0 items-center gap-3">
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-lime-500/15 text-lime-300">
+                <Hash size={18} strokeWidth={2} />
+              </span>
+              <div className="min-w-0">
+                <p className="text-sm font-semibold text-slate-100">
+                  {t("dashboard.tagReminderTitle")}
+                </p>
+                <p className="truncate text-xs text-slate-400">
+                  {t("dashboard.tagReminderBody")}
+                </p>
+              </div>
+            </div>
+            <span className="inline-flex shrink-0 items-center gap-1 rounded-lg bg-lime-500 px-3 py-1.5 text-xs font-semibold text-slate-950">
+              {t("dashboard.tagReminderAction")}
+              <ChevronRight size={14} strokeWidth={2.25} />
+            </span>
+          </Link>
+        )}
 
         {debt.owe + debt.collect > 0 && (
           <section className="space-y-4">

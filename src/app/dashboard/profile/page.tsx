@@ -407,7 +407,10 @@ export default function ProfilePage() {
                 </button>
               </form>
 
-              <div className="mt-5 space-y-2 border-t border-white/10 pt-5">
+              <div
+                id="tag"
+                className="mt-5 scroll-mt-24 space-y-2 border-t border-white/10 pt-5"
+              >
                 <label className="ml-1 text-[10px] font-semibold uppercase tracking-[0.2em] text-slate-400">
                   {t("profile.tag")}
                 </label>
