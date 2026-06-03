@@ -63,6 +63,7 @@ export default function DashboardPage() {
   const [matches, setMatches] = useState<GroupMatch[]>([]);
   const [inviteBusy, setInviteBusy] = useState<string | null>(null);
   const [deletingMatchId, setDeletingMatchId] = useState<string | null>(null);
+  const [rsvpBusyId, setRsvpBusyId] = useState<string | null>(null);
   const [debt, setDebt] = useState<{
     owe: number;
     oweMatches: number;
@@ -232,6 +233,38 @@ export default function DashboardPage() {
       }
     },
     [t]
+  );
+
+  const handleQuickRsvp = useCallback(
+    async (matchId: string, status: "yes" | "no") => {
+      if (!userId) return;
+      setRsvpBusyId(matchId);
+      // Optimistic: reflect the choice immediately.
+      setMatches((prev) =>
+        prev.map((m) => (m.id === matchId ? { ...m, myStatus: status } : m))
+      );
+      try {
+        const { error: rsvpError } = await supabase.from("rsvps").upsert(
+          {
+            match_id: matchId,
+            user_id: userId,
+            status,
+            responded_at: new Date().toISOString(),
+          },
+          { onConflict: "match_id,user_id" }
+        );
+        if (rsvpError) throw new Error(rsvpError.message);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : t("dashboard.loadError"));
+        // Roll back on failure.
+        setMatches((prev) =>
+          prev.map((m) => (m.id === matchId ? { ...m, myStatus: null } : m))
+        );
+      } finally {
+        setRsvpBusyId(null);
+      }
+    },
+    [userId, t]
   );
 
   useEffect(() => {
@@ -546,6 +579,8 @@ export default function DashboardPage() {
                   closedMatches={closedByGroup.get(group.id) ?? []}
                   onDeleteMatch={handleDeleteMatch}
                   deletingMatchId={deletingMatchId}
+                  onRsvp={handleQuickRsvp}
+                  rsvpBusyId={rsvpBusyId}
                 />
               ))}
             </div>
@@ -576,12 +611,16 @@ function GroupCardItem({
   closedMatches,
   onDeleteMatch,
   deletingMatchId,
+  onRsvp,
+  rsvpBusyId,
 }: {
   group: GroupCard;
   openMatches: GroupMatch[];
   closedMatches: GroupMatch[];
   onDeleteMatch: (id: string) => void;
   deletingMatchId: string | null;
+  onRsvp: (matchId: string, status: "yes" | "no") => void;
+  rsvpBusyId: string | null;
 }) {
   const { t } = useI18n();
   const [showClosed, setShowClosed] = useState(false);
@@ -626,7 +665,12 @@ function GroupCardItem({
       {hasMatches && (
         <div className="ml-3 space-y-2 border-l border-white/10 pl-4">
           {openMatches.map((match) => (
-            <UpcomingMatchRow key={match.id} match={match} />
+            <UpcomingMatchRow
+              key={match.id}
+              match={match}
+              onRsvp={onRsvp}
+              busy={rsvpBusyId === match.id}
+            />
           ))}
 
           {closedMatches.length > 0 && (
@@ -715,55 +759,87 @@ function ClosedMatchRow({
   );
 }
 
-function UpcomingMatchRow({ match }: { match: GroupMatch }) {
+function UpcomingMatchRow({
+  match,
+  onRsvp,
+  busy,
+}: {
+  match: GroupMatch;
+  onRsvp: (matchId: string, status: "yes" | "no") => void;
+  busy: boolean;
+}) {
   const { t, formatDate } = useI18n();
   const needsRsvp = match.myStatus === null;
   return (
-    <Link
-      href={`/dashboard/groups/${match.groupId}/matches/${match.id}`}
-      className={`glass-panel flex items-center justify-between gap-3 rounded-xl p-3 transition hover:border-lime-500/40 ${
+    <div
+      className={`glass-panel rounded-xl p-3 transition ${
         needsRsvp ? "border-lime-500/30" : ""
       }`}
     >
-      <div className="min-w-0">
-        <div className="flex items-center gap-2 text-sm font-semibold leading-tight">
-          <CalendarClock
-            size={14}
-            strokeWidth={2}
-            className="shrink-0 text-lime-400"
-          />
-          <span className="truncate">
-            {formatDate(match.date, {
-              weekday: "short",
-              day: "2-digit",
-              month: "2-digit",
-            })}{" "}
-            · {match.time.slice(0, 5)}
-            {match.endTime ? ` - ${match.endTime.slice(0, 5)}` : ""}
-          </span>
-        </div>
-        <div className="mt-1 flex items-center gap-1.5 text-xs text-slate-400">
-          <MapPin size={12} strokeWidth={1.75} className="shrink-0" />
-          <span className="line-clamp-1">{match.location}</span>
-        </div>
-      </div>
-      {needsRsvp ? (
-        <span className="shrink-0 rounded-lg border border-lime-500/30 bg-lime-500/20 px-2 py-0.5 text-[9px] font-semibold uppercase tracking-[0.16em] text-lime-300">
-          {t("dashboard.upcomingNeedsRsvp")}
-        </span>
-      ) : (
-        <span
-          className={`shrink-0 rounded-lg border px-2 py-0.5 text-[9px] font-semibold uppercase tracking-[0.16em] ${
-            match.myStatus === "yes"
-              ? "border-emerald-500/30 bg-emerald-500/20 text-emerald-300"
-              : "border-white/10 bg-slate-800 text-slate-400"
-          }`}
+      <div className="flex items-center justify-between gap-3">
+        <Link
+          href={`/dashboard/groups/${match.groupId}/matches/${match.id}`}
+          className="min-w-0 flex-1"
         >
-          {match.myStatus === "yes"
-            ? t("dashboard.upcomingGoing")
-            : t("dashboard.upcomingNotGoing")}
-        </span>
+          <div className="flex items-center gap-2 text-sm font-semibold leading-tight">
+            <CalendarClock
+              size={14}
+              strokeWidth={2}
+              className="shrink-0 text-lime-400"
+            />
+            <span className="truncate">
+              {formatDate(match.date, {
+                weekday: "short",
+                day: "2-digit",
+                month: "2-digit",
+              })}{" "}
+              · {match.time.slice(0, 5)}
+              {match.endTime ? ` - ${match.endTime.slice(0, 5)}` : ""}
+            </span>
+          </div>
+          <div className="mt-1 flex items-center gap-1.5 text-xs text-slate-400">
+            <MapPin size={12} strokeWidth={1.75} className="shrink-0" />
+            <span className="line-clamp-1">{match.location}</span>
+          </div>
+        </Link>
+        {!needsRsvp && (
+          <span
+            className={`shrink-0 rounded-lg border px-2 py-0.5 text-[9px] font-semibold uppercase tracking-[0.16em] ${
+              match.myStatus === "yes"
+                ? "border-emerald-500/30 bg-emerald-500/20 text-emerald-300"
+                : "border-white/10 bg-slate-800 text-slate-400"
+            }`}
+          >
+            {match.myStatus === "yes"
+              ? t("dashboard.upcomingGoing")
+              : t("dashboard.upcomingNotGoing")}
+          </span>
+        )}
+      </div>
+
+      {needsRsvp && (
+        <div className="mt-3 flex items-center gap-2 border-t border-white/10 pt-3">
+          <p className="mr-auto text-xs text-lime-300">
+            {t("dashboard.upcomingJoinPrompt")}
+          </p>
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() => onRsvp(match.id, "yes")}
+            className="rounded-lg bg-lime-500 px-3 py-1.5 text-xs font-semibold text-slate-950 transition hover:scale-[1.03] active:scale-95 disabled:opacity-60"
+          >
+            {t("match.join")}
+          </button>
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() => onRsvp(match.id, "no")}
+            className="rounded-lg border border-slate-700 px-3 py-1.5 text-xs text-slate-200 transition hover:border-slate-500 active:scale-95 disabled:opacity-60"
+          >
+            {t("match.skip")}
+          </button>
+        </div>
       )}
-    </Link>
+    </div>
   );
 }
