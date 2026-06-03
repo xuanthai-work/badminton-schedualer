@@ -88,7 +88,7 @@ export default function CreateGroupPanel({ onCreated }: Props) {
     <>
       <button
         type="button"
-        className="fixed bottom-24 right-6 z-40 rounded-full bg-lime-500 px-5 py-3 text-sm font-semibold text-slate-950 shadow-lg shadow-lime-500/20 transition hover:shadow-[0_0_24px_rgba(163,230,53,0.45)]"
+        className="fixed bottom-[calc(6rem+env(safe-area-inset-bottom))] right-6 z-40 rounded-full bg-lime-500 px-5 py-3 text-sm font-semibold text-slate-950 shadow-lg shadow-lime-500/20 transition hover:shadow-[0_0_24px_rgba(163,230,53,0.45)]"
         onClick={() => setOpen(true)}
       >
         {t("createGroup.fab")}

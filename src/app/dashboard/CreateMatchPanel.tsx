@@ -103,7 +103,7 @@ export default function CreateMatchPanel({ groups, onCreated }: Props) {
     <>
       <button
         type="button"
-        className="fixed bottom-40 right-6 z-40 rounded-full bg-slate-900/90 px-5 py-3 text-sm font-semibold text-lime-300 shadow-lg ring-1 ring-lime-500/30 backdrop-blur transition hover:ring-lime-500/60"
+        className="fixed bottom-[calc(10rem+env(safe-area-inset-bottom))] right-6 z-40 rounded-full bg-slate-900/90 px-5 py-3 text-sm font-semibold text-lime-300 shadow-lg ring-1 ring-lime-500/30 backdrop-blur transition hover:ring-lime-500/60"
         onClick={() => setOpen(true)}
       >
         {t("createMatch.fab")}
