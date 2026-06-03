@@ -89,6 +89,7 @@ Hover state (only on interactive cards): border becomes `border-lime-500/40`.
   - `TimeField` is a two-column popover (hours 00–23, minutes 00–55 in 5-min steps), auto-scrolls active item.
   - `SelectField` is a themed dropdown popover with optional scrolling and a Check icon next to the active option.
   - All three close on outside-click and preserve `required` form validation via a hidden input.
+  - Popover surface is the **opaque `.solid-panel`** (`#0F172A` + lime-tinted border) — *not* glass — so content underneath never bleeds through when a popover stacks over a modal. The `react-day-picker` lime theme (chevrons, today) lives in **unlayered** CSS so it beats the library stylesheet.
 
 ### 3.6 Status pill
 - `rounded-full px-3 py-1 text-xs`.
@@ -105,13 +106,13 @@ Hover state (only on interactive cards): border becomes `border-lime-500/40`.
 - Active tab: `bg-lime-500 text-slate-950 rounded-full py-2 flex-1`.
 - Inactive tab: `text-slate-300 py-2 flex-1`.
 
-### 3.8 Floating action button (FAB)
-- `fixed bottom-24 right-6 rounded-full bg-lime-500 px-5 py-3 text-sm font-semibold text-slate-950 shadow-lg shadow-lime-500/20`.
-- Hover: glow `shadow-[0_0_24px_rgba(163,230,53,0.45)]`.
-- **`bottom-24`** so it clears the bottom mobile nav.
+### 3.8 Floating action buttons (FABs — two, stacked)
+- **"+ Tạo nhóm mới"** (filled lime) sits lower; **"+ Tạo lịch"** (dark glass, lime text + lime ring; admins only) stacks above it.
+- Offsets are **safe-area aware**: `bottom-[calc(6rem+env(safe-area-inset-bottom))]` and `...(10rem+...)` `right-6` — they ride up with the home-indicator inset so they never crowd the nav.
+- Hover: glow `shadow-[0_0_24px_rgba(163,230,53,0.45)]` (lime FAB) / brighter ring (dark FAB).
 
 ### 3.9 Bottom mobile nav (shipped)
-- Fixed glass bar, `h-16`, `bg-slate-950/80 backdrop-blur-xl` with a top border `border-white/10` and a faint top-glow shadow.
+- Fixed glass bar, `bg-slate-950/80 backdrop-blur-xl` with a top border `border-white/10` and a faint top-glow shadow. Height = content + `pt-2` + `pb-[calc(0.5rem+env(safe-area-inset-bottom))]` (**no fixed `h-16`** — the safe-area is *added* below the labels so they never overlap the home indicator).
 - Four items: **Trang chủ** (`Home` → `/dashboard`), **Công nợ** (`Wallet` → `/dashboard/debts`), **Bạn bè** (`Users` → `/dashboard/friends`), **Tài khoản** (`User` → `/dashboard/profile`).
 - Active item: lime icon + lime label on a `bg-lime-500/10` rounded pill. Inactive: `text-slate-400`.
 - Active-route detection via `usePathname`. `/dashboard/groups/*` is treated as "Trang chủ".
@@ -128,15 +129,17 @@ Hover state (only on interactive cards): border becomes `border-lime-500/40`.
 ## 4. Routes (current implementation)
 
 ```
-/                                              Landing / Auth (username|email + password)
-/dashboard                                     List of my groups + personalized greeting
-/dashboard/groups/[id]                         Group detail (tabs: Matches, Members, Cài đặt)
-/dashboard/groups/[id]/matches/[matchId]       Match detail (RSVP + expense + Maps link)
+/                                              Landing / Auth (username|email + password + Google)
+/dashboard                                     Hub: groups WITH their matches nested under each + quick-RSVP + debts card
+/dashboard/groups/[id]                         Group detail (tabs: Thành viên, Cài đặt — matches tab REMOVED)
+/dashboard/groups/[id]/matches/[matchId]       Match detail (RSVP + costs/payment + add-attendee + Maps link)
 /dashboard/friends                             Friends (add by username#tag, requests, list)
-/dashboard/notifications                       Notifications list (new match, added to group)
-/dashboard/profile                             Handle/tag / avatar / login / bank / QR / password / language / sign-out
-/dashboard/debts                               Công nợ detail — "Tôi nợ" + "Chờ thu" (TO DESIGN, §5.7)
+/dashboard/notifications                       Notifications list (match, group, friends, payment, attendance)
+/dashboard/profile                             Handle/tag / avatar / login / bank / QR / password / language / push / sign-out
+/dashboard/debts                               Công nợ detail — "Tôi nợ" + "Chờ thu" (shipped, §5.7)
 ```
+
+The app is also an **installable PWA**: web manifest (standalone, opens at `/dashboard`, dark theme `#020617`), generated lime "BS" icons, translucent status bar with safe-area padding, an in-app "Đã có bản mới — Cập nhật" update banner, and opt-in **web push** (see §5.5).
 
 Stitch should design **mobile portrait** as primary and provide a wider desktop layout as a secondary deliverable per screen.
 
@@ -193,37 +196,43 @@ Stitch should design **mobile portrait** as primary and provide a wider desktop 
 - Big greeting (28px semibold): **"Chào bạn, {username}"** with the username highlighted lime. Fallback **"Chào bạn, lông thủ"** while loading.
 - Subhead (slate-300): **"Sẵn sàng cho các trận đấu hôm nay?"**
 
+**Tag reminder banner (shipped, shown until the user sets a tag):**
+- Lime-tinted glass row right under the greeting: `Hash` icon box + **"Đặt tag định danh của bạn"** / **"Tạo tag như @tên#0000 để bạn bè tìm & thêm bạn."** + a lime **"Đặt tag"** chip → links to `/dashboard/profile#tag` (anchor scrolls to the tag block). Disappears once the tag is set.
+
 **Công nợ của tôi (shipped, shown when you owe or are owed):**
 - Section heading **"Công nợ của tôi"** + an `Info` icon linking to the detail. A glass card with up to two rows: **Cần đóng** (rose `Wallet`, total you owe + "{n} sân đang chờ") and **Chờ thu** (emerald `Banknote`, total owed to you + "Từ {group}"). Full-width lime **"Thanh toán ngay"** button → `/dashboard/debts` (§5.7). Sourced from `get_debt_overview`.
 
 **Pending group invites (shipped, shown only when you have any):**
 - Section **"Lời mời vào nhóm"**; each invite is a lime-tinted glass row: **"{inviter} mời bạn vào nhóm {group}"** + **"Tham gia"** (accept → joins + the row disappears) and **"Từ chối"** (decline). Group membership now requires this acceptance — admins can't force-add.
 
-**Body:**
+**Body — groups WITH their matches nested (shipped redesign):**
 - Section header row: **"Danh sách nhóm"** on left, count chip on right (`{n} nhóm`).
-- Grid of group cards (2 columns desktop, 1 column mobile, gap 16px). Each card:
-  - Top row: rounded lime-tinted icon box (currently `Users` from Lucide) on the left, **"ADMIN"** / **"MEMBER"** uppercase pill on the right.
-  - Group name (20px semibold).
-  - `Users` icon + `{n} thành viên`.
-  - Bottom row separated by `border-t border-white/10 pt-4`: admin initial-avatar + name (label "ADMIN") on the left, hover-shifting `ChevronRight` on the right.
-  - Whole card is a tappable link; hover lights the border lime.
-  - Soft lime corner glow that intensifies on hover.
+- **Single-column vertical list** (not a grid). Each group is a block:
+  - **Compact group row** (glass, one line, tappable → group page): lime `Users` icon box (40px) · group name (16px semibold) + **"ADMIN"/"MEMBER"** mini-pill inline · a small slate caption `{n} thành viên · {admin name}` · `ChevronRight` on the right. (The old big bento card with the avatar footer was retired.)
+  - **Nested match list** below the row, indented with a left border (`ml-3 border-l border-white/10 pl-4`):
+    - **Upcoming open matches** — each a `solid`/glass row: `CalendarClock` + **"{Thứ} {dd/MM} · {HH:mm} - {HH:mm}"** (time range) and `MapPin` + location. The row body links to the match.
+      - **Answered:** a small status pill on the right — **"Sẽ tham gia"** (emerald) / **"Không tham gia"** (slate).
+      - **Unanswered (quick-RSVP, shipped):** lime border highlight + a bottom strip: lime text **"Có lịch mới — bạn tham gia chứ?"** + inline **"Tham gia"** (lime) and **"Nghỉ"** (outline) buttons that RSVP in place (optimistic), no navigation.
+    - **"Lịch đã chốt ({n})" collapsible** — a caps toggle line with `ChevronDown/Up`; expanded rows are dimmed (`opacity-70`, full on hover) with date · time-range · location, and an **admin-only rose `Trash2` delete** button (confirm dialog; cascades).
+  - The whole list updates **live** (realtime on `matches`).
 - Empty state: a single glass card with: **"Bạn chưa tham gia nhóm nào. Hãy tạo nhóm mới để bắt đầu."**
 - Loading state: 2 skeleton cards using `animate-pulse`.
 
-**FAB (always visible):**
-- **"+ Tạo nhóm mới"** — opens a bottom-sheet on mobile, centered modal on desktop. Positioned `bottom-24 right-6` to clear the bottom nav.
+**FABs (see §3.8):**
+- **"+ Tạo nhóm mới"** — create-group modal.
+- **"+ Tạo lịch"** (admins only) — create-match modal: **"Ngày"** (DateField), **"Giờ bắt đầu" + "Giờ kết thúc"** (two TimeFields; end must be after start), **"Sân / Địa điểm"**, optional **"Link Google Maps (tùy chọn)"**; a **"Nhóm"** `SelectField` appears first when the user admins 2+ groups. Footer: **"Hủy"** + **"Tạo lịch"**.
 
 **Create-group modal:**
 - Glass panel, title **"Tạo nhóm mới"**, close button labeled **"Đóng"**.
 - One input: label **"Tên nhóm"**, placeholder **"Ví dụ: Thứ 3 vui vẻ"**.
 - Footer: secondary **"Hủy"** + primary **"Tạo nhóm"** (loading: **"Đang tạo..."**).
 
+**Update banner (PWA, shipped):** when a newer deploy exists, a floating pill above the nav: **"Đã có bản mới của ứng dụng."** + lime **"Cập nhật"** button (`RefreshCw`) that reloads.
+
 **Bottom nav:** mounted at the bottom of every dashboard route (see §3.9).
 
 **(Planned, not yet built):**
-- Below the group grid, an optional **"Công nợ của tôi"** widget summarizing unpaid shares across all groups (rose number "Cần đóng" + emerald "Chờ thu" + lime CTA "Thanh toán ngay").
-- Use the user's `avatar_url` (now uploadable on the profile page) for the admin avatar on each group card instead of the initial fallback.
+- Use the user's `avatar_url` (now uploadable on the profile page) for the admin avatar on each group row instead of the initial fallback.
 
 ---
 
@@ -234,23 +243,9 @@ Stitch should design **mobile portrait** as primary and provide a wider desktop 
 - Group name (24px semibold).
 - Role pill on the right.
 
-**Tab bar:** three tabs — **"Lịch đánh"** (Matches), **"Thành viên"** (Members), **"Cài đặt"** (Settings, **admin-only — hidden for members**). Pill style from §3.7.
+**Tab bar:** **two** tabs — **"Thành viên"** (Members, default) and **"Cài đặt"** (Settings, **admin-only — hidden for members**). Pill style from §3.7.
 
-#### 5.3.1 Matches tab
-
-- Section row: **"Lịch đánh"** + primary button **"+ Tạo lịch"** (admin only, with `Plus` icon).
-- Grid of match cards (3 cols desktop, 2 cols md, 1 col mobile). Each card is a tappable link:
-  - Top row: caps line **`{date}`** (lime if open, slate otherwise) above the big time text. Status pill on the right (`Đang mở` / `Đã chốt`).
-  - Two icon rows below: `MapPin` + location (line-clamped to 1), `Users` + `{n} người tham gia`.
-  - Footer separated by `border-t border-white/10 pt-3`: caps lime **"Chi tiết"** + `ChevronRight` (translate-x on hover).
-- Empty state: **"Chưa có lịch nào. Bấm Tạo lịch để bắt đầu."**
-
-**Create-match modal:**
-- Title **"Tạo lịch đánh"**.
-- Two-column grid: **"Ngày"** (DateField popover from §3.5), **"Giờ"** (TimeField popover).
-- Full-width input: **"Sân / Địa điểm"** with placeholder **"Ví dụ: Sân Phú Mỹ Hưng - Sân 3"**.
-- Optional **"Link Google Maps (tùy chọn)"** field with placeholder `https://maps.app.goo.gl/...`. Validated to start with `http(s)://`.
-- Footer: **"Hủy"** + **"Tạo lịch"** (loading: **"Đang tạo..."**).
+> **The "Lịch đánh" (Matches) tab was removed.** Matches are now browsed/created/deleted on the **dashboard** (§5.2) — nested under each group, with the "+ Tạo lịch" FAB and the collapsible "Lịch đã chốt" list. There is no match UI on the group page anymore.
 
 #### 5.3.2 Members tab
 
@@ -289,14 +284,17 @@ Two glass cards stacked:
 The most important screen. Mobile-first, vertical scroll. Two visual states: **Open** and **Closed**. **Live:** the attendee lists, status pill, and receipt update in real time (Supabase Realtime) when anyone RSVPs or the admin settles/reopens — no refresh.
 
 **Header (both states):**
-- Small lime back-link with `ChevronLeft`: **"← QUAY LẠI NHÓM"**.
+- Small lime back-button with `ChevronLeft`: **"← QUAY LẠI"** — uses **browser history** (`router.back()`), so it returns to wherever the user came from (dashboard or group page); falls back to the group page on a direct URL open.
 - Title **"Chi tiết trận đấu"** (28px semibold).
 - Below title: `MapPin` icon + location text. If the match has a `location_url`, append a small lime pill link **"↗ MỞ GOOGLE MAPS"** (with `ExternalLink` icon, opens in new tab).
 - Status pill on the right: **"Đang mở"** (emerald) or **"Đã chốt"** (slate).
 
 **Hero info card (under header):**
 - Lime-tinted rounded icon box with `Calendar` icon.
-- Caps label **"THỜI GIAN"** above the prominent date+time line: **"Thứ 3, 03/06/2026 · 20:00"**.
+- Caps label **"THỜI GIAN"** above the prominent date + **time range** line: **"Thứ 3, 03/06/2026 · 20:00 - 22:00"** (end time shown when set).
+
+**Attendance-confirm banner (shipped — shown only to a member an admin added, rsvp `pending`):**
+- Lime-bordered glass card above the RSVP card: `UserPlus` + **"Bạn có chơi buổi này không?"** / **"Admin đã thêm bạn vào trận này. Xác nhận để được tính chia tiền."** + two buttons **"Có tham gia"** (lime) / **"Không tham gia"** (outline). Confirming "yes" **auto-recomputes the split** and notifies the payee.
 
 #### 5.4.1 Open state
 
@@ -315,7 +313,7 @@ The most important screen. Mobile-first, vertical scroll. Two visual states: **O
 
 3. **Admin settle panel** (admin only, glass card):
    - Heading **"Chốt chi phí"** (when match is open) — see closed state for the alternate heading.
-   - Three number inputs in a row: **"Tiền sân"**, **"Tiền cầu"**, **"Tiền nước"** (placeholder `0`, step 1000).
+   - Fee inputs are **in thousands**: a full-width **"Tiền sân (VND)"** then **"Tiền cầu"** + **"Tiền nước"** side by side. Each has a small slate **"nghìn"** suffix inside the field and a live lime preview underneath: typing `300` shows **"= 300.000 ₫"** (×1000 on submit; ÷1000 when loading saved fees). Placeholders `400` / `150` / `50`.
    - Helper line: **"Hệ thống sẽ chia cho {n} người tham gia."**
    - Primary CTA (full-width): **"Chốt và chia tiền"** (loading: **"Đang lưu..."**).
    - Success message in lime: **"Đã chốt: {n} người · {amount} ₫ / người"**.
@@ -326,24 +324,25 @@ All elements above remain visible (for transparency), but:
 
 1. **Your RSVP card** shows a slate-400 helper: **"Lịch đã đóng. Không thể đổi RSVP."** (Buttons disabled or hidden.)
 
-2. **Receipt card** (new — glass panel, styled like a paper receipt with subtle dashed bottom edge):
-   - Heading **"Chi phí"**.
-   - Two-column key/value rows: **"Tiền sân"** / amount, **"Tiền cầu"** / amount, **"Tiền nước"** / amount.
-   - Subtotal row with top border: **"Tổng"** / total in semibold.
-   - Highlighted callout box in lime (`bg-lime-500/10 text-lime-200`): **"Mỗi người trả {amount} ₫"**.
+2. **Merged Chi phí + Thanh toán card** (shipped — ONE glass panel, in this order):
+   - Heading **"Chi phí"** (`ReceiptText`), then key/value rows: **"Tiền sân" / "Tiền cầu" / "Tiền nước"** + a **"Tổng"** subtotal row with top border.
+   - Highlighted lime callout (`bg-lime-500/10`): **"Mỗi người trả {amount} ₫"** — a **single** bar (no duplicate).
+   - Below a divider, the **"Thanh toán"** block (`QrCode` heading) — payee bank/QR details (see §5.4.3).
    - Format all amounts in VND with no decimals: `670.000 ₫`.
 
 3. **Admin settle panel** swaps to:
-   - Heading **"Cập nhật chi phí"**.
-   - Top-right small secondary button **"Mở lại lịch"**.
-   - Same three fee inputs, pre-filled with stored values.
-   - Primary CTA: **"Cập nhật chi phí"**.
+   - Heading **"Cập nhật chi phí"** — same thousands inputs, pre-filled (÷1000) with stored values; primary CTA **"Cập nhật chi phí"**. **There is no "Mở lại lịch" button anymore** — late changes go through "Thêm người tham gia" instead.
+
+4. **"Thêm người tham gia" card** (admin only, shipped):
+   - `UserPlus` heading + helper **"Chọn thành viên đã chơi buổi này. Họ cần xác nhận trước khi được tính tiền; chia tiền sẽ tự cập nhật."**
+   - A `SelectField` of group members not already in/awaiting + a lime **"Thêm"** button.
+   - Below: pending people listed with an amber **"Chờ xác nhận"** pill. The added member gets a notification (+push) and the confirm banner (§5.4 header note); on "Có tham gia" the split re-computes automatically.
 
 #### 5.4.3 Payment section (shipped)
 
-When the match is closed, **below the receipt card**, a **"Thanh toán"** card renders the **group creator's** payment info: their **uploaded QR only if they added one** (we deliberately do **not** auto-generate a VietQR), plus bank name / account number / holder / memo as **copyable** text, and the per-person amount. Empty state if no bank info: **"Quản trị viên chưa thiết lập thông tin thanh toán."**
+When the match is closed, the **"Thanh toán"** block (inside the merged card, §5.4.2) renders the **group creator's** payment info: their **uploaded QR only if they added one** (we deliberately do **not** auto-generate a VietQR), plus bank name / account number / holder / memo as **copyable** text. Empty state if no bank info: **"Quản trị viên chưa thiết lập thông tin thanh toán."**
 
-Below it, a **"Trạng thái thanh toán"** list (shipped) shows each attendee with a status pill — **Chưa đóng** (slate) / **Chờ duyệt** (amber) / **Đã thanh toán** (emerald) — and the amount. The viewer's own unpaid row has a lime **"Tôi đã CK"** button; an admin sees **"Xác nhận"** on pending rows (and **"Hủy"** to undo). Updates live via Realtime. Source detail:
+Below it, a **"Trạng thái thanh toán"** list (shipped) shows each attendee with a status pill — **Chưa đóng** (slate) / **Chờ duyệt** (amber) / **Đã thanh toán** (emerald) — and the amount. **The payee (group creator) is special-cased:** their row shows a lime **"Người thu"** pill and no buttons — they are auto-confirmed on settle and never self-confirm. The viewer's own unpaid row has a lime **"Tôi đã CK"** button; an admin sees **"Xác nhận"** on other members' pending rows (and **"Hủy"** to undo). Updates live via Realtime. Source detail:
 
 **Payment info source:** the **group creator's** profile. If `users.bank_qr_url` is set, render that uploaded QR image inside the card with a **"Quét mã QR để chuyển khoản"** caption. **No dynamic VietQR is generated** — we don't call `img.vietqr.io`. Always show the bank name / account number / holder / memo as text, with **copy** buttons on the account number and the transfer memo (`Cau long {match-date}`). The memo is plain text built client-side.
 
@@ -353,10 +352,9 @@ Per-attendee status (the "Trạng thái thanh toán" list above): each "Yes" att
 
 ### 5.5 Profile (`/dashboard/profile`) — shipped
 
-**Header:**
-- Lime back-link **"← DASHBOARD"** with `ChevronLeft`.
+**Header:** (no back-link — this is a bottom-nav page)
 - Lime caps label **"TÀI KHOẢN"**.
-- Title (28px semibold): **"Hồ sơ & cài đặt"**.
+- Title (28px semibold): **"Hồ sơ & cài đặt"** + notification bell top-right.
 
 **Section 1 — Thông tin cá nhân** (glass card):
 - Heading: `UserCog` icon + **"Thông tin cá nhân"**.
@@ -391,7 +389,13 @@ Per-attendee status (the "Trạng thái thanh toán" list above): each "Yes" att
 - Body: **"Chọn ngôn ngữ hiển thị của ứng dụng."**
 - A themed `SelectField` with two options: **"Tiếng Việt"** and **"English"**. Selecting one switches the entire UI instantly and persists to `localStorage` (`bs.lang`). Default is Tiếng Việt.
 
-**Section 5 — Sign out:**
+**Section 5 — Thông báo đẩy / Push (glass card, shipped):**
+- `Bell` icon box + **"Thông báo đẩy"** / **"Nhận thông báo ngay cả khi không mở app."** + a lime **"Bật"** button (flips to an outline **"Tắt"** once enabled).
+- Helper line: **"iPhone: cần thêm app vào màn hình chính rồi mở từ đó (iOS 16.4 trở lên)."**
+- Unsupported devices show `BellOff` + **"Thiết bị/trình duyệt này không hỗ trợ thông báo đẩy."**; a blocked permission shows **"Bạn đã chặn quyền thông báo..."** in rose.
+- Enabling registers the service worker, asks browser permission, and stores the device's push subscription; per-device opt-in.
+
+**Section 6 — Sign out:**
 - Full-width rose-tinted button **"Đăng xuất"** with `LogOut` icon.
 
 ---
@@ -400,9 +404,8 @@ Per-attendee status (the "Trạng thái thanh toán" list above): each "Yes" att
 
 **Purpose:** add people by their `username#tag` (Riot-style), manage requests, and reuse the list to quick-invite into groups.
 
-**Header:**
-- Lime back-link **"← DASHBOARD"**.
-- Title **"Bạn bè"** (28px semibold) + subtitle **"Kết bạn để mời vào nhóm nhanh hơn."**
+**Header:** (no back-link — this is a bottom-nav page)
+- Title **"Bạn bè"** (28px semibold) + subtitle **"Kết bạn để mời vào nhóm nhanh hơn."** + notification bell top-right.
 
 **Add card (glass panel):**
 - Label **"Thêm bạn (tên đăng nhập#tag hoặc email)"**, input (placeholder `nguyenvana#0421`) + lime **"Gửi lời mời"** button with `UserPlus` icon (loading: **"Đang gửi..."**).
@@ -430,7 +433,7 @@ Per-attendee status (the "Trạng thái thanh toán" list above): each "Yes" att
 - Unread rows carry a faint lime border; opening the page marks everything read (the header badge clears live).
 - Empty state: **"Chưa có thông báo."**
 
-**Sources (DB triggers):** a new match notifies all group members except the creator; being added to a group notifies the added user. Designed to extend (friend requests, match settled, …).
+**Sources (DB triggers + RPCs):** new match (all group members except the creator); added to a group; group invite / invite accepted; friend request / accepted; payment confirmed; **attendance request** ("Bạn được thêm vào trận {group}... Xác nhận có tham gia?") and **attendance confirmed/declined** (to the payee). Every insert also fans out as a **web push** to that user's subscribed devices (opt-in, §5.5 Section 5) — the actor never gets their own push.
 
 ---
 
@@ -440,7 +443,7 @@ Per-attendee status (the "Trạng thái thanh toán" list above): each "Yes" att
 
 **How it's reached:** the **Công nợ** bottom-nav tab (`Wallet`), and the **"Thanh toán ngay"** button / `Info` icon on the dashboard "Công nợ của tôi" card (§5.2).
 
-**Header:** lime back-link **"← DASHBOARD"** + title **"Công nợ"** + the notification bell top-right (same as other nav pages).
+**Header:** title **"Công nợ"** + the notification bell top-right (no back-link — this is a bottom-nav page).
 
 **Tab bar (pill, §3.7):** **"Tôi nợ"** and **"Chờ thu"**. The **"Chờ thu"** tab is shown **only to users who are a group admin/creator** (others see just "Tôi nợ", no tab bar needed).
 
@@ -506,9 +509,9 @@ When porting Stitch output back to code, override these recurring drifts:
 ## 8. Out of scope (do not design)
 
 - Light mode.
-- Notifications inbox.
-- Onboarding tutorial / coachmarks.
+- Onboarding tutorial / coachmarks (the tag-reminder banner in §5.2 is the only onboarding nudge).
 - Multi-account switcher.
+- Offline mode (the service worker is push-only by design).
 
 ---
 
@@ -535,3 +538,10 @@ When porting Stitch output back to code, override these recurring drifts:
 - **Payment surface shipped** (§5.4.3): closed match shows the group creator's uploaded QR (if any) + copyable bank details + per-person amount. No dynamic VietQR.
 - **Payment tracking shipped** (§5.4.3): per-attendee status (Tôi đã CK → admin Xác nhận), live; plus a **"Công nợ của tôi"** widget on the dashboard (§5.2).
 - **Công nợ / Debts shipped** (§5.7, route `/dashboard/debts`): "Tôi nợ" + "Chờ thu" tabs. Dashboard "Công nợ của tôi" card redesigned (Cần đóng rose + Chờ thu emerald + "Thanh toán ngay" → debts page). **Bottom nav is now 4 items** — added **Công nợ** (`Wallet`).
+- **Dashboard-centric matches** (§5.2): matches moved out of the group page (its "Lịch đánh" tab removed, §5.3) and now nest under each group on the dashboard — compact group rows, upcoming matches with status pills, a collapsible **"Lịch đã chốt"** list with admin delete, and a second **"+ Tạo lịch"** FAB (with group picker + **start/end time range**).
+- **Quick-RSVP inline** (§5.2): unanswered match rows show "Có lịch mới — bạn tham gia chứ?" + Tham gia/Nghỉ buttons that RSVP in place.
+- **Tag-reminder banner** (§5.2) for users without a tag → `/dashboard/profile#tag`.
+- **Match detail reshaped** (§5.4): back button uses history ("← QUAY LẠI"); hero shows the **time range**; Chi phí + Thanh toán merged into one card (single "Mỗi người trả" bar above the payment info); settle fees entered **in thousands** with a live ₫ preview; **"Mở lại lịch" removed**, replaced by **"Thêm người tham gia"** (admin adds a member → they confirm via a banner → split auto-recomputes); payee row shows a **"Người thu"** pill (auto-confirmed, no self-confirm).
+- **Picker popovers opaque** (§3.5): `.solid-panel` surface + unlayered lime calendar theme (was translucent/blue).
+- **PWA shipped** (§4): installable manifest (standalone, dark), generated "BS" icons, safe-area-aware bottom nav + FABs (§3.8/§3.9), and an in-app **"Đã có bản mới — Cập nhật"** update banner (§5.2).
+- **Web push shipped** (§5.5 Section 5 + §5.6c): per-device opt-in toggle on the profile; every notification also lands as a system push (Android verified; iOS needs the installed PWA). Sign-out is now Section 6.

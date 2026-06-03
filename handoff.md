@@ -10,18 +10,25 @@
 - **Phase 2.9:** Group invites now require the invitee's approval (admin invite → pending `group_invites` row + notification → invitee accepts/declines on the dashboard; no force-add). Payment surface on a closed match — shows the group creator's uploaded QR if they added one, otherwise the bank name / account / holder / memo as copyable text (no auto-generated QR), plus the per-person amount.
 - **Phase 2.10:** Payment tracking — settling a match seeds `payments` rows (unpaid) for attendees; a member taps "Tôi đã CK" (→submitted), an admin confirms (→confirmed, notifies the member). Live status list on the match detail; a "Công nợ của tôi" widget on the dashboard. Notifications bell now sits on all 3 nav pages; friend request/accept generate notifications too (no forced popup).
 - **Phase 2.11:** Debts detail — dashboard "Công nợ của tôi" card redesigned (Cần đóng + Chờ thu + "Thanh toán ngay") and links to a new `/dashboard/debts` page with "Tôi nợ" (pay) + "Chờ thu" (admin/creator confirms) tabs; **Công nợ added as a 4th bottom-nav tab**. Payment QR card no longer auto-generates VietQR (uploaded QR or text only).
+- **Phase 2.12:** Dashboard-centric matches — the group page's "Lịch đánh" tab was **removed**; matches now live on the dashboard nested under each (compact) group card: upcoming open matches, a collapsible "Lịch đã chốt (N)" list with admin-only delete, and a "+ Tạo lịch" FAB (group picker when admin of 2+ groups). Matches gained a **time range** (`match_end_time`). The match-detail back button follows browser history.
+- **Phase 2.13:** Money polish — settle inputs are in **thousands** (type 300 → 300.000 ₫ live preview); the expense + payment cards merged into one (costs → per-person bar → payee bank/QR); the **group creator (payee) is auto-confirmed** and shown as "Người thu" (never self-confirms).
+- **Phase 2.14:** Add-attendee flow — admin adds a group member to a (closed) match → the member confirms via a banner + notification (`pending` rsvp) → on "yes" the split **auto-recomputes** (`recompute_split`). Replaces the old "Mở lại lịch" reopen button.
+- **Phase 2.15:** Installable **PWA** — `manifest.ts` (standalone, start `/dashboard`), code-generated icons, apple meta, safe-area handling; an **auto-update prompt** (deploy SHA via `/api/version` + `UpdatePrompt` banner — no reinstall needed); a dashboard **tag-reminder banner** for users without a tag.
+- **Phase 2.16:** **Web push notifications** — `public/sw.js`, `push_subscriptions` table, opt-in `PushToggle` on the profile, `/api/push/notify` (web-push + VAPID on Vercel) fed by a Supabase **Database Webhook** on `notifications` inserts. Verified end-to-end on Android (FCM).
+- **Phase 2.17:** Inline **quick-RSVP** — unanswered upcoming matches on the dashboard show "Có lịch mới — bạn tham gia chứ?" with Tham gia/Nghỉ buttons (optimistic, in place).
 
 ## Key files
 
 ### Routes
 - `src/app/page.tsx` — Auth landing. Username + email field on sign-in; one unified "Tên đăng nhập" field on sign-up.
-- `src/app/dashboard/page.tsx` — Group list with personalized greeting + bento group cards.
-- `src/app/dashboard/CreateGroupPanel.tsx` — Create-group FAB modal (sits at `bottom-24` to clear the bottom nav).
-- `src/app/dashboard/groups/[id]/page.tsx` — Group detail with three tabs: Lịch đánh, Thành viên, **Cài đặt** (admin-only).
-- `src/app/dashboard/groups/[id]/MatchesPanel.tsx` — List + create. Card design has date/time/location/attendees + "Chi tiết →" footer.
+- `src/app/dashboard/page.tsx` — Dashboard hub: greeting, tag-reminder banner, debts card, pending group invites, and the group list with each group's matches **nested beneath it** (upcoming open matches with inline quick-RSVP; collapsible closed matches with admin delete). Live via a `matches` realtime channel.
+- `src/app/dashboard/CreateGroupPanel.tsx` — Create-group FAB modal (safe-area-aware offset above the bottom nav).
+- `src/app/dashboard/CreateMatchPanel.tsx` — "+ Tạo lịch" FAB (admins only): date + start/end time + location + maps link; group `SelectField` appears when admin of 2+ groups.
+- `src/app/dashboard/groups/[id]/page.tsx` — Group detail with **two** tabs: Thành viên (default) + **Cài đặt** (admin-only). The matches tab was removed — matches live on the dashboard.
+- `src/app/dashboard/groups/[id]/MatchesPanel.tsx` — **dead code** (no longer imported); kept for reference after the matches-tab removal.
 - `src/app/dashboard/groups/[id]/MembersPanel.tsx` — List + invite by email + role toggle + remove.
 - `src/app/dashboard/groups/[id]/GroupSettingsPanel.tsx` — Admin-only: rename group + danger-zone delete.
-- `src/app/dashboard/groups/[id]/matches/[matchId]/page.tsx` — Hero info card, big RSVP buttons, expense receipt, admin settle/reopen.
+- `src/app/dashboard/groups/[id]/matches/[matchId]/page.tsx` — Hero info (time range), big RSVP buttons, attendance-confirm banner (when admin-added), merged expense+payment card (costs → per-person bar → payee bank/QR), payment status list ("Người thu" badge for the payee), admin settle / update-costs (fees in thousands) + "Thêm người tham gia". Back button uses browser history.
 - `src/app/dashboard/groups/[id]/MembersPanel.tsx` — also has an admin-only "Mời từ bạn bè" quick-invite that lists accepted friends not yet in the group.
 - `src/app/dashboard/friends/page.tsx` — Friends: add by `username#tag`/email, incoming requests (accept/decline), outgoing (cancel), friends list (remove).
 - `src/app/dashboard/notifications/page.tsx` — Notifications list; renders text from `type`+`data` via i18n; marks all read on view. Bell entry point is `src/components/NotificationBell.tsx` (in every nav-page header, live unread badge via Realtime).
@@ -35,13 +42,25 @@
 - `TimeField.tsx` — Two-column hour/minute popover (00-23, 00-55 in 5-min steps; column labels via `t()`). Returns `HH:mm`. Auto-scrolls active item.
 - `SelectField.tsx` — Themed dropdown popover, replaces native `<select>` (used for bank selector).
 - `ImageUpload.tsx` — Reusable circle/square uploader with hover overlay, 5MB cap, Remove button. Uploads to `{userId}/{prefix}-{ts}.{ext}` in a Supabase Storage bucket and returns the public URL.
+- `UpdatePrompt.tsx` — polls `/api/version` (mount / focus / every 60s) and shows an "update available → reload" banner when the live deploy SHA differs from the bundle's baked `NEXT_PUBLIC_APP_VERSION`.
+- `PushToggle.tsx` — profile section to opt in/out of web push: registers `/sw.js`, subscribes with the VAPID public key, persists to `push_subscriptions`.
+- Picker popovers (`DateField`/`TimeField`/`SelectField`) use the **opaque `.solid-panel`** utility (globals.css) — the translucent `glass-panel` was unreadable when stacked. The react-day-picker lime theme is intentionally **unlayered** CSS so it beats the library's own stylesheet (layered styles lose to unlayered).
+
+### PWA & push infrastructure
+- `src/app/manifest.ts` — standalone display, `start_url: /dashboard`, dark theme; icons point at the generated `/icon`.
+- `src/app/icon.tsx` / `src/app/apple-icon.tsx` — `ImageResponse`-generated lime "BS" icons (512 / 180); no binary assets.
+- `src/app/layout.tsx` — `appleWebApp` metadata + `viewport` export (theme color, `viewport-fit: cover`, locked zoom); safe-area padding via `globals.css` (standalone mode) + the bottom nav.
+- `next.config.ts` — bakes `VERCEL_GIT_COMMIT_SHA` into `NEXT_PUBLIC_APP_VERSION` for the update check.
+- `src/app/api/version/route.ts` — no-store; returns the live deploy's commit SHA.
+- `public/sw.js` — service worker for push + notificationclick only (no offline caching, so no stale-bundle risk).
+- `src/app/api/push/notify/route.ts` — Node runtime; validates `x-webhook-secret`, reads the target user's `push_subscriptions` via the **service role**, fans out web-push (VI copy per notification type), prunes dead (404/410) subs.
 
 ### Libs
 - `src/lib/supabaseClient.ts` — Browser Supabase client (singleton on `globalThis.__supabase`).
 - `src/lib/userProfile.ts` — `ensureUserProfile`: insert `public.users` on first sign-in, deriving `username` from metadata or email; retries with random suffix on `23505` unique-violation. (Its one rare fallback error reads `localStorage["bs.lang"]` directly to pick VI/EN, since it can't use the React hook.)
 
 ### i18n (src/lib/i18n/)
-- `translations.ts` — `vi` (source of truth) + `en` dictionaries, ~180 keys in 13 namespaces (`common`, `auth`, `dashboard`, `createGroup`, `group`, `matches`, `members`, `settings`, `match`, `profile`, `nav`, `upload`, `fields`). `en` is typed `typeof vi`, so a missing/renamed key is a **compile error**. Also exports `Lang`, `LANGS`, `DEFAULT_LANG` (`vi`).
+- `translations.ts` — `vi` (source of truth) + `en` dictionaries, ~300 keys in 19 namespaces (`common`, `auth`, `dashboard`, `createGroup`, `createMatch`, `group`, `matches`, `members`, `settings`, `match`, `profile`, `nav`, `update`, `push`, `upload`, `fields`, `friends`, `notifications`, `debts`). `en` is typed `typeof vi`, so a missing/renamed key is a **compile error**. Also exports `Lang`, `LANGS`, `DEFAULT_LANG` (`vi`).
 - `index.tsx` — `I18nProvider` (mounted in `app/layout.tsx`) + `useI18n()` hook returning:
   - `t(key, vars?)` — dot-path lookup with `{token}` interpolation, e.g. `t("matches.attendees", { count })`. Missing keys return the key string so they're obvious in dev.
   - `lang`, `setLang` — persisted to `localStorage["bs.lang"]`; also sets `document.documentElement.lang`.
@@ -61,16 +80,23 @@
 11. `supabase/realtime.sql` — adds `rsvps`/`matches`/`expenses` to the `supabase_realtime` publication + `replica identity full`. Enables live match-detail updates.
 12. `supabase/notifications.sql` — `notifications` table + RLS (own select/update/delete; no client insert) + triggers `notify_match_created` (after insert on `matches`) and `notify_added_to_group` (after insert on `group_members`, skips self) + adds `notifications` to the realtime publication.
 13. `supabase/group-invites.sql` — **run after `friends.sql` + `notifications.sql`.** `group_invites` table + RLS; **rewrites `invite_user_by_identifier`** to create a pending invite + notification (returns `invited | already_invited | already_member | not_friend | user_not_found`) instead of adding directly; `respond_group_invite(id, accept)` (invitee only → joins group + notifies inviter, or declines); `get_group_invites()` enriched list. Supersedes the direct-add behaviour in `invite-username.sql`.
-14. `supabase/payments.sql` — **run after `phase2.sql` + `notifications.sql`.** `payments` table (`(match_id,user_id)`, amount, status unpaid/submitted/confirmed) + RLS (group members read; RPC-only writes) + realtime. **Redefines `settle_match`** to also seed payment rows. RPCs: `submit_payment`, `confirm_payment` (+ `payment_confirmed` notification), `get_payment_summary`.
+14. `supabase/payments.sql` — **run after `phase2.sql` + `notifications.sql`.** `payments` table (`(match_id,user_id)`, amount, status unpaid/submitted/confirmed) + RLS (group members read; RPC-only writes) + realtime. **Redefines `settle_match`** to also seed payment rows. RPCs: `submit_payment`, `confirm_payment` (+ `payment_confirmed` notification), `get_payment_summary`. The latest version also **auto-confirms the payee's (group creator's) own row** on settle + a one-time backfill — re-run this file if you ran an older copy.
 15. `supabase/debts.sql` — **run after `payments.sql`.** Read-only RPCs for the debt views: `get_debt_overview` (dashboard card), `get_my_debts` ("Tôi nợ"), `get_owed_to_me` ("Chờ thu" = unconfirmed payments by others in groups you created).
+16. `supabase/match-end-time.sql` — nullable `match_end_time time` on `matches` (time ranges). Also folded into `schema.sql`.
+17. `supabase/match-attendees.sql` — **run after `payments.sql` + `notifications.sql`.** Adds `'pending'` to the rsvps status CHECK; `recompute_split` (re-splits from the saved totals + current yes-attendees, preserves paid statuses, payee stays confirmed); `admin_add_attendee` (pending rsvp + `attendance_request` notification); `confirm_attendance` (pending → yes/no, auto-recompute on yes, notifies the payee via `attendance_confirmed`).
+18. `supabase/push.sql` — `push_subscriptions` table + RLS (own rows only). Pair with the Database Webhook (see Setup).
+
+> Status check (2026-06-03): all of the above are confirmed applied on the live project (probed columns/tables/RPCs via the service role).
 
 ## Setup requirements
 1. `.env.local` from `.env.example`:
    - `NEXT_PUBLIC_SUPABASE_URL` (base project URL, no `/rest/v1` suffix)
    - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
-2. Supabase Auth: enable Google provider; add redirect URL `http://localhost:3000/dashboard` (and the prod URL).
-3. Run the SQL migrations above in the Supabase SQL editor. All are idempotent.
-4. `npm run dev` — restart whenever `.env.local` changes (the Supabase client is cached on `globalThis`).
+2. Supabase Auth: enable the Google provider (client ID/secret from Google Cloud; the authorized redirect URI there is `https://<project-ref>.supabase.co/auth/v1/callback`).
+3. Supabase **URL Configuration**: Site URL = the Vercel domain (`https://badminton-scheduler-gilt.vercel.app`); Redirect URLs include `https://<app>/**` **and** `http://localhost:3000/**` — otherwise `redirectTo` is ignored and OAuth falls back to the Site URL.
+4. Run the SQL migrations above in the Supabase SQL editor. All are idempotent.
+5. **Web push** (live and verified): five extra env vars in Vercel (+ `.env.local`) — `NEXT_PUBLIC_VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT`, `PUSH_WEBHOOK_SECRET`, `SUPABASE_SERVICE_ROLE_KEY` (see `.env.example`); run `supabase/push.sql`; create a Supabase **Database Webhook**: `notifications` INSERT → POST `https://<app>/api/push/notify` with headers `Content-type: application/json` + `x-webhook-secret: <PUSH_WEBHOOK_SECRET>`. ⚠️ `NEXT_PUBLIC_*` vars are baked at **build** time — redeploy after changing them.
+6. `npm run dev` — restart whenever `.env.local` changes (the Supabase client is cached on `globalThis`).
 
 ## How key flows work
 
@@ -84,9 +110,14 @@
 - **Quick-invite friends to a group:** Members tab (admin) calls `get_friends()`, filters out current members, and invites a chosen friend via `invite_user_by_identifier` using their username.
 - **Live match detail:** on mount the match page opens a Supabase Realtime channel (`match-{id}`) listening to `postgres_changes` on `rsvps`/`matches`/`expenses` filtered to the match, and refetches on any event. RLS still gates delivery (only group members receive events). Channel is removed on unmount.
 - **Notifications:** rows are written by DB triggers (new match → group members minus creator; added to group → the added user) and by RPCs (`group_invite`/`group_invite_accepted` from the invite RPCs; `friend_request`/`friend_accepted` from the friend RPCs). `NotificationBell` shows the unread count and subscribes to Realtime (per-mount unique channel; RLS scopes to the owner so no filter needed). It's mounted in the header of **all three nav pages** (dashboard, friends, profile). The notifications page renders each row from `type`+`data` (structured, not localized), marks all unread read on view, and links each type to its target (match / group / dashboard for pending group invites / `/dashboard/friends` for friend types). No forced popup — the badge is the only nudge.
-- **RSVP:** any group member upserts into `rsvps` with `yes`/`no`. Disabled when match is `closed`.
-- **Settle match:** admin enters fees → `settle_match` RPC counts current `yes` RSVPs, computes per-person split, upserts `expenses`, flips match to `closed`. Returns `{attendees, total, fee_per_person}`.
-- **Reopen match:** admin can flip back to `open`. Saved expense is preserved.
+- **RSVP:** any group member upserts into `rsvps` with `yes`/`no`. Disabled when match is `closed`. On the dashboard, unanswered upcoming matches show inline **Tham gia/Nghỉ** quick-RSVP (optimistic upsert, rolls back on error); the row body still links to the match.
+- **Create match (dashboard FAB):** admins only; date + **start/end time** (end must be after start) + location + maps link; a group picker appears when admin of 2+ groups. Inserting fires the `match_created` trigger → bell + push for other members, and the match appears under its group live.
+- **Settle match:** admin enters fees **in thousands** (300 → 300.000 ₫; ×1000 on submit, ÷1000 on load) → `settle_match` RPC counts current `yes` RSVPs, computes per-person split, upserts `expenses`, flips match to `closed`, seeds `payments` (payee auto-confirmed). Returns `{attendees, total, fee_per_person}`.
+- **Update costs (closed match):** "Cập nhật chi phí" re-runs `settle_match` — amounts refresh, payment statuses are preserved. The old reopen button was removed.
+- **Add attendee (closed match):** admin picks a member in "Thêm người tham gia" → `admin_add_attendee` writes a `pending` rsvp + `attendance_request` notification (+push) → the member confirms via the banner on the match page → `confirm_attendance(yes)` flips them to `yes` and `recompute_split` re-splits and reseeds payments automatically; the payee gets `attendance_confirmed`.
+- **Delete match:** admins can delete a **closed** match from its row on the dashboard (confirm dialog; FK cascade wipes rsvps/expenses/payments/notifications).
+- **PWA & updates:** installable via the manifest (standalone, opens at `/dashboard`). `UpdatePrompt` compares the baked deploy SHA against `/api/version` and offers a one-tap reload — users never reinstall for new versions (reinstall only if the manifest/icons change).
+- **Web push:** opt-in per device on the profile (`PushToggle`). A Database Webhook fires on every `notifications` INSERT → `/api/push/notify` fans out via web-push/VAPID to that user's subscriptions. Android works even in the browser; iOS needs the installed PWA (16.4+). The actor never gets their own push (triggers skip self).
 - **Rename group:** admin types new name in Settings tab. Direct `update` on `public.groups`; parent page updates the header without reload.
 - **Delete group:** admin clicks "Xóa nhóm" → modal asks to type the exact group name → `delete` cascades through `matches`/`rsvps`/`expenses` via FK on delete cascade.
 - **Avatar upload:** profile page round area → file picker → uploads to `avatars/{userId}/avatar-{ts}.{ext}` → public URL saved to `users.avatar_url`. Path-with-timestamp avoids browser cache surprises.
@@ -104,6 +135,10 @@
 - Invite / friends / tag features throwing "function ... does not exist" or "column tag does not exist" → run the new migrations (`invite-username.sql`, `profile-tag.sql`, `friends.sql`).
 - Live updates / notifications not arriving → run `realtime.sql` + `notifications.sql`. Realtime only delivers rows the subscriber can SELECT under RLS, so a non-member won't see a match's events (by design). Notifications need the triggers installed — they fire on `matches` / `group_members` inserts.
 - **Tag lock is client-side only:** a user could still PATCH their own `users.tag` directly (RLS allows updating own row). If the set-once lock must be enforced, move tag-setting into a `set_tag` RPC that rejects a second write.
+- **Push toggle says "không hỗ trợ" on Android** → the deployed build predates the `NEXT_PUBLIC_VAPID_PUBLIC_KEY` env var (it's baked at build) — redeploy, then close/reopen the app (stale JS).
+- **No pushes arriving** → check, in order: `push_subscriptions` has rows (each device must opt in via the profile toggle); the Database Webhook exists with the exact `x-webhook-secret`; and remember the **actor never gets their own push**. `curl -X POST /api/push/notify` with the secret + a dummy record returns `{"sent":N}` and is a quick server-side health check.
+- **iOS push/PWA:** push only works from the installed home-screen PWA (iOS 16.4+), opened from its icon.
+- **Tailwind v4 layering:** custom rules inside `@layer` lose to unlayered library CSS (this bit the react-day-picker theme). Keep third-party overrides unlayered, after the `@import`.
 
 ## Run / verify
 - `npm install`
@@ -117,18 +152,18 @@
 
 1. **Custom SMTP** in Supabase (Authentication → Emails → SMTP) with a provider (Resend / SES / Postmark). The built-in mailer is rate-limited to a few/hour — it tripped us during testing.
 2. **Re-enable "Confirm email"** (turned off during dev to dodge that rate limit) so addresses are verified, and confirm the **password-reset** flow works (it relies on email and currently can't send reliably).
-3. Lock down Supabase **URL config** for prod (Site URL + redirect allow-list already set to the Vercel domain — re-verify) and Google OAuth redirect URIs.
+3. ~~Lock down Supabase URL config~~ ✅ done 2026-06-03 (Site URL → Vercel domain, `/**` wildcards for prod + localhost).
 
-This is mostly Supabase dashboard + a provider account; little app code. A good quick win to pair with it: **notify the payee when a member submits a payment** (first item below) so collectors don't have to watch the match page.
+This is mostly Supabase dashboard + a provider account; little app code. A good quick win to pair with it: **notify the payee when a member submits a payment** (first item below) — it would ride the existing push pipeline for free.
 
 After that, pick from the candidates below.
 
 ## Next steps (Phase 3 candidates)
-- Notify the admin/payee when a member submits a payment (currently they only see it on the match page / debts page / realtime).
+- Notify the admin/payee when a member submits a payment (a `payment_submitted` notification insert in `submit_payment` would automatically reach the bell **and** push).
 - Let the settling admin (not just the group creator) be the payee.
-- Production readiness: custom SMTP (password reset + re-enable email confirmation); RSVP cutoff + match reminders.
-- Email notifications via a Supabase Edge Function + provider (Resend), reusing the `notifications` rows / triggers as the source.
-- More notification types (friend request received/accepted, match settled); fold friend requests into the bell.
+- Production readiness: custom SMTP (password reset + re-enable email confirmation); RSVP cutoff + match reminders (reminders could be a Supabase cron → `notifications` insert → push).
+- More notification types (match settled); fold friend requests into the bell.
 - Enforce the tag set-once lock server-side (`set_tag` RPC), and/or let users change it; show `@username#tag` in more places (dashboard greeting, member rows, RSVP rows).
-- i18n polish: persist language in `public.users` (per-account, not just per-device); add a 3rd language by dropping in a new dictionary + extending `LANGS`/`Lang`.
+- i18n polish: persist language in `public.users` (per-account, not just per-device) — would also let `/api/push/notify` localize push copy (currently VI-only); add a 3rd language by dropping in a new dictionary + extending `LANGS`/`Lang`.
 - Wire the avatar (`users.avatar_url`) into the dashboard greeting + group cards + member list + RSVP list.
+- Delete `MatchesPanel.tsx` (dead code) once you're sure the dashboard-centric match flow sticks.
