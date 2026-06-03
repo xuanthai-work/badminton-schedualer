@@ -125,6 +125,24 @@ export default function NotificationsPage() {
         group: String(n.data.group_name ?? ""),
       });
     }
+    if (n.type === "attendance_request") {
+      return t("notifications.attendanceRequest", {
+        group: String(n.data.group_name ?? ""),
+        date: formatDate(String(n.data.match_date ?? "")),
+        time: String(n.data.match_time ?? "").slice(0, 5),
+      });
+    }
+    if (n.type === "attendance_confirmed") {
+      return t(
+        n.data.attended
+          ? "notifications.attendanceConfirmed"
+          : "notifications.attendanceDeclined",
+        {
+          name: String(n.data.name ?? ""),
+          group: String(n.data.group_name ?? ""),
+        }
+      );
+    }
     return n.type;
   };
 
@@ -139,6 +157,14 @@ export default function NotificationsPage() {
       return "/dashboard/friends";
     }
     if (n.type === "payment_confirmed" && n.groupId && n.matchId) {
+      return `/dashboard/groups/${n.groupId}/matches/${n.matchId}`;
+    }
+    if (
+      (n.type === "attendance_request" ||
+        n.type === "attendance_confirmed") &&
+      n.groupId &&
+      n.matchId
+    ) {
       return `/dashboard/groups/${n.groupId}/matches/${n.matchId}`;
     }
     if (n.groupId) return `/dashboard/groups/${n.groupId}`;

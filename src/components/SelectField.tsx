@@ -78,7 +78,7 @@ export default function SelectField({
       />
 
       {open && (
-        <div className="glass-panel absolute left-0 right-0 top-full z-50 mt-2 max-h-72 overflow-y-auto rounded-2xl p-2 shadow-2xl">
+        <div className="solid-panel absolute left-0 right-0 top-full z-50 mt-2 max-h-72 overflow-y-auto rounded-2xl p-2 shadow-2xl">
           <ul className="space-y-1">
             {options.map((option) => {
               const active = option.value === value;

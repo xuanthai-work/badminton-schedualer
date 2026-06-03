@@ -94,7 +94,7 @@ export default function TimeField({ value, onChange, required }: Props) {
       />
 
       {open && (
-        <div className="glass-panel absolute left-0 top-full z-50 mt-2 grid grid-cols-2 gap-2 rounded-2xl p-2 shadow-2xl">
+        <div className="solid-panel absolute left-0 top-full z-50 mt-2 grid grid-cols-2 gap-2 rounded-2xl p-2 shadow-2xl">
           <Column
             innerRef={hourListRef}
             label={t("fields.hour")}

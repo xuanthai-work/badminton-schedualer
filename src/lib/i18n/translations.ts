@@ -213,6 +213,7 @@ const vi = {
     updateTitle: "Cập nhật chi phí",
     reopen: "Mở lại lịch",
     courtFeeLabel: "Tiền sân (VND)",
+    feeThousands: "nghìn",
     splitNote: "Hệ thống sẽ chia cho {count} người tham gia.",
     saving: "Đang lưu...",
     settleAndSplit: "Chốt và chia tiền",
@@ -247,6 +248,20 @@ const vi = {
     errNegativeFee: "Chi phí không được âm.",
     errSettle: "Lỗi chốt chi phí.",
     errReopen: "Lỗi mở lại lịch.",
+    addAttendeeTitle: "Thêm người tham gia",
+    addAttendeeHint:
+      "Chọn thành viên đã chơi buổi này. Họ cần xác nhận trước khi được tính tiền; chia tiền sẽ tự cập nhật.",
+    addAttendeePick: "Chọn thành viên",
+    addAttendeeBtn: "Thêm",
+    addAttendeeEmpty: "Mọi thành viên đã tham gia hoặc đang chờ xác nhận.",
+    attendeePending: "Chờ xác nhận",
+    confirmAttendTitle: "Bạn có chơi buổi này không?",
+    confirmAttendBody:
+      "Admin đã thêm bạn vào trận này. Xác nhận để được tính chia tiền.",
+    confirmAttendYes: "Có tham gia",
+    confirmAttendNo: "Không tham gia",
+    errAddAttendee: "Lỗi thêm người tham gia.",
+    errConfirmAttend: "Lỗi xác nhận tham gia.",
   },
   profile: {
     account: "Tài khoản",
@@ -359,6 +374,10 @@ const vi = {
     friendRequest: "{name} đã gửi lời mời kết bạn",
     friendAccepted: "{name} đã chấp nhận lời mời kết bạn",
     paymentConfirmed: "Đã xác nhận thanh toán {amount} cho nhóm {group}",
+    attendanceRequest:
+      "Bạn được thêm vào trận {group} ({date} {time}). Xác nhận có tham gia?",
+    attendanceConfirmed: "{name} xác nhận có tham gia trận ở {group}",
+    attendanceDeclined: "{name} báo không tham gia trận ở {group}",
   },
   nav: {
     home: "Trang chủ",
@@ -589,6 +608,7 @@ const en: typeof vi = {
     updateTitle: "Update costs",
     reopen: "Reopen match",
     courtFeeLabel: "Court (VND)",
+    feeThousands: "k",
     splitNote: "Will be split among {count} attendees.",
     saving: "Saving...",
     settleAndSplit: "Settle and split",
@@ -623,6 +643,20 @@ const en: typeof vi = {
     errNegativeFee: "Costs can't be negative.",
     errSettle: "Failed to settle costs.",
     errReopen: "Failed to reopen match.",
+    addAttendeeTitle: "Add attendee",
+    addAttendeeHint:
+      "Pick a member who played this session. They must confirm before being charged; the split updates automatically.",
+    addAttendeePick: "Select member",
+    addAttendeeBtn: "Add",
+    addAttendeeEmpty: "Everyone has joined or is awaiting confirmation.",
+    attendeePending: "Awaiting",
+    confirmAttendTitle: "Did you play this session?",
+    confirmAttendBody:
+      "An admin added you to this match. Confirm to be included in the split.",
+    confirmAttendYes: "I played",
+    confirmAttendNo: "I didn't",
+    errAddAttendee: "Failed to add attendee.",
+    errConfirmAttend: "Failed to confirm attendance.",
   },
   profile: {
     account: "Account",
@@ -736,6 +770,10 @@ const en: typeof vi = {
     friendRequest: "{name} sent you a friend request",
     friendAccepted: "{name} accepted your friend request",
     paymentConfirmed: "Your {amount} payment for {group} was confirmed",
+    attendanceRequest:
+      "You were added to the {group} match ({date} {time}). Confirm you played?",
+    attendanceConfirmed: "{name} confirmed playing the {group} match",
+    attendanceDeclined: "{name} declined the {group} match",
   },
   nav: {
     home: "Home",

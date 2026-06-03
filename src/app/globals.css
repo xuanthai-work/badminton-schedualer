@@ -38,8 +38,16 @@
     border: 1px solid rgba(255, 255, 255, 0.08);
   }
 
-  /* react-day-picker dark + lime theme */
-  .rdp-root {
+  /* Opaque variant for popovers/modals where translucency hurts legibility. */
+  .solid-panel {
+    background: #0f172a;
+    border: 1px solid rgba(163, 230, 53, 0.18);
+  }
+}
+
+/* react-day-picker dark + lime theme — kept UNLAYERED on purpose so it wins
+   over the library's own default stylesheet (a @layer would lose to it). */
+.rdp-root {
     --rdp-accent-color: #a3e635;
     --rdp-accent-background-color: rgba(163, 230, 53, 0.15);
     --rdp-today-color: #a3e635;
@@ -90,8 +98,12 @@
   }
   .rdp-root .rdp-today:not(.rdp-selected) .rdp-day_button {
     border: 1px solid rgba(163, 230, 53, 0.5);
+    color: #a3e635;
   }
   .rdp-root .rdp-outside .rdp-day_button {
     color: #475569;
   }
-}
+  /* Nav arrows are an SVG: tint via fill, not color. */
+  .rdp-root .rdp-chevron {
+    fill: #a3e635;
+  }

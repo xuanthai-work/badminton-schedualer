@@ -59,7 +59,7 @@ alter table public.matches add column if not exists match_end_time time;
 create table if not exists public.rsvps (
   match_id uuid not null references public.matches(id) on delete cascade,
   user_id uuid not null references public.users(id) on delete cascade,
-  status text not null check (status in ('yes', 'no')),
+  status text not null check (status in ('yes', 'no', 'pending')),
   responded_at timestamptz not null default now(),
   primary key (match_id, user_id)
 );

@@ -13,16 +13,23 @@ import {
   MapPin,
   QrCode,
   ReceiptText,
+  UserPlus,
   XCircle,
 } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { useI18n } from "@/lib/i18n";
 import { bankByCode } from "@/lib/banks";
 import BottomNav from "@/components/BottomNav";
+import SelectField from "@/components/SelectField";
 
 type Rsvp = {
   userId: string;
-  status: "yes" | "no";
+  status: "yes" | "no" | "pending";
+  name: string;
+};
+
+type Member = {
+  userId: string;
   name: string;
 };
 
@@ -74,6 +81,10 @@ export default function MatchDetailPage() {
   const [isAdmin, setIsAdmin] = useState(false);
   const [match, setMatch] = useState<Match | null>(null);
   const [rsvps, setRsvps] = useState<Rsvp[]>([]);
+  const [members, setMembers] = useState<Member[]>([]);
+  const [addUserId, setAddUserId] = useState("");
+  const [addBusy, setAddBusy] = useState(false);
+  const [attendBusy, setAttendBusy] = useState(false);
   const [expense, setExpense] = useState<Expense | null>(null);
   const [payee, setPayee] = useState<Payee | null>(null);
   const [payeeId, setPayeeId] = useState<string | null>(null);
@@ -137,13 +148,33 @@ export default function MatchDetailPage() {
       const mapped: Rsvp[] =
         rsvpRows?.map((row) => {
           const user = Array.isArray(row.users) ? row.users[0] : row.users;
+          const status: Rsvp["status"] =
+            row.status === "yes"
+              ? "yes"
+              : row.status === "pending"
+                ? "pending"
+                : "no";
           return {
             userId: row.user_id,
-            status: row.status === "yes" ? "yes" : "no",
+            status,
             name: user?.name ?? t("match.unknownUser"),
           };
         }) ?? [];
       setRsvps(mapped);
+
+      const { data: memberRows } = await supabase
+        .from("group_members")
+        .select("user_id, users ( name )")
+        .eq("group_id", groupId);
+      setMembers(
+        (memberRows ?? []).map((row) => {
+          const user = Array.isArray(row.users) ? row.users[0] : row.users;
+          return {
+            userId: row.user_id as string,
+            name: user?.name ?? t("match.unknownUser"),
+          };
+        })
+      );
 
       const { data: expenseRow, error: expenseError } = await supabase
         .from("expenses")
@@ -160,9 +191,14 @@ export default function MatchDetailPage() {
           totalAmount: Number(expenseRow.total_amount),
           feePerPerson: Number(expenseRow.fee_per_person),
         });
-        setCourtFee(String(expenseRow.court_fee));
-        setShuttleFee(String(expenseRow.shuttle_fee));
-        setWaterFee(String(expenseRow.water_fee));
+        // Fee inputs are in thousands (type 300 → 300,000), so divide on load.
+        const toThousands = (n: unknown) => {
+          const v = Number(n) || 0;
+          return v ? String(v / 1000) : "";
+        };
+        setCourtFee(toThousands(expenseRow.court_fee));
+        setShuttleFee(toThousands(expenseRow.shuttle_fee));
+        setWaterFee(toThousands(expenseRow.water_fee));
       } else {
         setExpense(null);
       }
@@ -267,6 +303,13 @@ export default function MatchDetailPage() {
   const myRsvp = userId ? rsvps.find((r) => r.userId === userId) : undefined;
   const yesList = rsvps.filter((r) => r.status === "yes");
   const noList = rsvps.filter((r) => r.status === "no");
+  const pendingList = rsvps.filter((r) => r.status === "pending");
+  const blockedIds = new Set(
+    rsvps
+      .filter((r) => r.status === "yes" || r.status === "pending")
+      .map((r) => r.userId)
+  );
+  const addableMembers = members.filter((m) => !blockedIds.has(m.userId));
 
   const handleRsvp = async (status: "yes" | "no") => {
     if (!userId || !matchId || !match) return;
@@ -298,9 +341,10 @@ export default function MatchDetailPage() {
     setSettleMsg("");
     setError("");
     try {
-      const court = Number(courtFee) || 0;
-      const shuttle = Number(shuttleFee) || 0;
-      const water = Number(waterFee) || 0;
+      // Inputs are in thousands (300 → 300,000).
+      const court = (Number(courtFee) || 0) * 1000;
+      const shuttle = (Number(shuttleFee) || 0) * 1000;
+      const water = (Number(waterFee) || 0) * 1000;
       if (court < 0 || shuttle < 0 || water < 0) {
         throw new Error(t("match.errNegativeFee"));
       }
@@ -335,21 +379,41 @@ export default function MatchDetailPage() {
     }
   };
 
-  const handleReopen = async () => {
-    if (!matchId || !userId) return;
-    if (!confirm(t("match.confirmReopen"))) return;
-    setSettleBusy(true);
+  const handleAddAttendee = async (targetUserId: string) => {
+    if (!matchId || !userId || !targetUserId) return;
+    setAddBusy(true);
+    setError("");
     try {
-      const { error: updateError } = await supabase
-        .from("matches")
-        .update({ status: "open" })
-        .eq("id", matchId);
-      if (updateError) throw new Error(updateError.message);
+      const { error: rpcError } = await supabase.rpc("admin_add_attendee", {
+        target_match_id: matchId,
+        target_user_id: targetUserId,
+      });
+      if (rpcError) throw new Error(rpcError.message);
       await load(userId);
     } catch (err) {
-      setError(err instanceof Error ? err.message : t("match.errReopen"));
+      setError(err instanceof Error ? err.message : t("match.errAddAttendee"));
     } finally {
-      setSettleBusy(false);
+      setAddBusy(false);
+    }
+  };
+
+  const handleConfirmAttendance = async (attended: boolean) => {
+    if (!matchId || !userId) return;
+    setAttendBusy(true);
+    setError("");
+    try {
+      const { error: rpcError } = await supabase.rpc("confirm_attendance", {
+        target_match_id: matchId,
+        attended,
+      });
+      if (rpcError) throw new Error(rpcError.message);
+      await load(userId);
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : t("match.errConfirmAttend")
+      );
+    } finally {
+      setAttendBusy(false);
     }
   };
 
@@ -485,6 +549,42 @@ export default function MatchDetailPage() {
               </div>
             </section>
 
+            {myRsvp?.status === "pending" && (
+              <section className="glass-panel rounded-2xl border-lime-500/40 bg-lime-500/5 p-5">
+                <div className="mb-1 flex items-center gap-2">
+                  <UserPlus
+                    size={18}
+                    strokeWidth={1.75}
+                    className="text-lime-400"
+                  />
+                  <h2 className="text-base font-semibold">
+                    {t("match.confirmAttendTitle")}
+                  </h2>
+                </div>
+                <p className="mb-4 text-sm text-slate-300">
+                  {t("match.confirmAttendBody")}
+                </p>
+                <div className="grid grid-cols-2 gap-3">
+                  <button
+                    type="button"
+                    disabled={attendBusy}
+                    onClick={() => handleConfirmAttendance(true)}
+                    className="rounded-xl bg-lime-500 py-3 text-sm font-semibold text-slate-950 transition hover:scale-[1.01] active:scale-95 disabled:opacity-60"
+                  >
+                    {t("match.confirmAttendYes")}
+                  </button>
+                  <button
+                    type="button"
+                    disabled={attendBusy}
+                    onClick={() => handleConfirmAttendance(false)}
+                    className="rounded-xl border border-slate-700 py-3 text-sm font-semibold text-slate-200 transition hover:border-slate-500 active:scale-95 disabled:opacity-60"
+                  >
+                    {t("match.confirmAttendNo")}
+                  </button>
+                </div>
+              </section>
+            )}
+
             <section className="glass-panel rounded-2xl p-5">
               <h2 className="text-center text-lg font-semibold">
                 {t("match.rsvpQuestion")}
@@ -531,45 +631,51 @@ export default function MatchDetailPage() {
             </section>
 
             {expense && (
-              <section className="glass-panel rounded-2xl p-5">
-                <div className="mb-3 flex items-center gap-2">
-                  <ReceiptText
-                    size={18}
-                    strokeWidth={1.75}
-                    className="text-lime-400"
-                  />
-                  <h2 className="text-base font-semibold">
-                    {t("match.expenses")}
-                  </h2>
+              <section className="glass-panel space-y-4 rounded-2xl p-5">
+                <div>
+                  <div className="mb-3 flex items-center gap-2">
+                    <ReceiptText
+                      size={18}
+                      strokeWidth={1.75}
+                      className="text-lime-400"
+                    />
+                    <h2 className="text-base font-semibold">
+                      {t("match.expenses")}
+                    </h2>
+                  </div>
+                  <dl className="grid grid-cols-2 gap-y-1 text-sm text-slate-300">
+                    <dt>{t("match.courtFee")}</dt>
+                    <dd className="text-right">{formatVnd(expense.courtFee)}</dd>
+                    <dt>{t("match.shuttleFee")}</dt>
+                    <dd className="text-right">
+                      {formatVnd(expense.shuttleFee)}
+                    </dd>
+                    <dt>{t("match.waterFee")}</dt>
+                    <dd className="text-right">{formatVnd(expense.waterFee)}</dd>
+                    <dt className="mt-1 border-t border-white/10 pt-2 font-semibold text-slate-200">
+                      {t("match.total")}
+                    </dt>
+                    <dd className="mt-1 border-t border-white/10 pt-2 text-right font-semibold text-slate-100">
+                      {formatVnd(expense.totalAmount)}
+                    </dd>
+                  </dl>
                 </div>
-                <dl className="grid grid-cols-2 gap-y-1 text-sm text-slate-300">
-                  <dt>{t("match.courtFee")}</dt>
-                  <dd className="text-right">{formatVnd(expense.courtFee)}</dd>
-                  <dt>{t("match.shuttleFee")}</dt>
-                  <dd className="text-right">{formatVnd(expense.shuttleFee)}</dd>
-                  <dt>{t("match.waterFee")}</dt>
-                  <dd className="text-right">{formatVnd(expense.waterFee)}</dd>
-                  <dt className="mt-1 border-t border-white/10 pt-2 font-semibold text-slate-200">
-                    {t("match.total")}
-                  </dt>
-                  <dd className="mt-1 border-t border-white/10 pt-2 text-right font-semibold text-slate-100">
-                    {formatVnd(expense.totalAmount)}
-                  </dd>
-                </dl>
-                <p className="mt-3 rounded-xl bg-lime-500/10 px-3 py-2 text-center text-sm font-medium text-lime-200">
+
+                <p className="rounded-xl bg-lime-500/10 px-3 py-2 text-center text-sm font-semibold text-lime-200">
                   {t("match.perPerson", {
                     amount: formatVnd(expense.feePerPerson),
                   })}
                 </p>
-              </section>
-            )}
 
-            {match.status === "closed" && expense && (
-              <PaymentCard
-                payee={payee}
-                amount={expense.feePerPerson}
-                memo={`Cau long ${match.date}`}
-              />
+                {match.status === "closed" && (
+                  <div className="border-t border-white/10 pt-4">
+                    <PaymentDetails
+                      payee={payee}
+                      memo={`Cau long ${match.date}`}
+                    />
+                  </div>
+                )}
+              </section>
             )}
 
             {match.status === "closed" && payments.length > 0 && (
@@ -586,49 +692,37 @@ export default function MatchDetailPage() {
 
             {isAdmin && (
               <section className="glass-panel rounded-2xl border-lime-500/20 bg-lime-500/5 p-5">
-                <div className="mb-4 flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <ReceiptText
-                      size={18}
-                      strokeWidth={1.75}
-                      className="text-lime-400"
-                    />
-                    <h2 className="text-base font-semibold">
-                      {match.status === "open"
-                        ? t("match.settleTitle")
-                        : t("match.updateTitle")}
-                    </h2>
-                  </div>
-                  {match.status === "closed" && (
-                    <button
-                      type="button"
-                      onClick={handleReopen}
-                      disabled={settleBusy}
-                      className="rounded-lg border border-slate-700 px-3 py-1 text-xs text-slate-200 transition hover:border-slate-500 disabled:opacity-60"
-                    >
-                      {t("match.reopen")}
-                    </button>
-                  )}
+                <div className="mb-4 flex items-center gap-2">
+                  <ReceiptText
+                    size={18}
+                    strokeWidth={1.75}
+                    className="text-lime-400"
+                  />
+                  <h2 className="text-base font-semibold">
+                    {match.status === "open"
+                      ? t("match.settleTitle")
+                      : t("match.updateTitle")}
+                  </h2>
                 </div>
                 <form onSubmit={handleSettle} className="space-y-3">
                   <FeeInput
                     label={t("match.courtFeeLabel")}
                     value={courtFee}
                     onChange={setCourtFee}
-                    placeholder="400.000"
+                    placeholder="400"
                   />
                   <div className="grid grid-cols-2 gap-3">
                     <FeeInput
                       label={t("match.shuttleFee")}
                       value={shuttleFee}
                       onChange={setShuttleFee}
-                      placeholder="150.000"
+                      placeholder="150"
                     />
                     <FeeInput
                       label={t("match.waterFee")}
                       value={waterFee}
                       onChange={setWaterFee}
-                      placeholder="50.000"
+                      placeholder="50"
                     />
                   </div>
                   <p className="text-xs text-slate-400">
@@ -646,6 +740,72 @@ export default function MatchDetailPage() {
                         : t("match.updateCosts")}
                   </button>
                 </form>
+              </section>
+            )}
+
+            {isAdmin && (
+              <section className="glass-panel rounded-2xl p-5">
+                <div className="mb-2 flex items-center gap-2">
+                  <UserPlus
+                    size={18}
+                    strokeWidth={1.75}
+                    className="text-lime-400"
+                  />
+                  <h2 className="text-base font-semibold">
+                    {t("match.addAttendeeTitle")}
+                  </h2>
+                </div>
+                <p className="mb-3 text-xs text-slate-400">
+                  {t("match.addAttendeeHint")}
+                </p>
+
+                <div className="flex items-end gap-2">
+                  <div className="min-w-0 flex-1">
+                    <SelectField
+                      value={addUserId}
+                      onChange={setAddUserId}
+                      placeholder={t("match.addAttendeePick")}
+                      options={addableMembers.map((m) => ({
+                        value: m.userId,
+                        label: m.name,
+                      }))}
+                    />
+                  </div>
+                  <button
+                    type="button"
+                    disabled={addBusy || !addUserId}
+                    onClick={async () => {
+                      await handleAddAttendee(addUserId);
+                      setAddUserId("");
+                    }}
+                    className="shrink-0 rounded-xl bg-lime-500 px-4 py-2.5 text-sm font-semibold text-slate-950 transition hover:scale-[1.02] active:scale-95 disabled:opacity-50"
+                  >
+                    {t("match.addAttendeeBtn")}
+                  </button>
+                </div>
+                {addableMembers.length === 0 && (
+                  <p className="mt-2 text-xs text-slate-500">
+                    {t("match.addAttendeeEmpty")}
+                  </p>
+                )}
+
+                {pendingList.length > 0 && (
+                  <ul className="mt-4 space-y-2 border-t border-white/10 pt-3">
+                    {pendingList.map((p) => (
+                      <li
+                        key={p.userId}
+                        className="flex items-center justify-between gap-3 text-sm"
+                      >
+                        <span className="truncate text-slate-200">
+                          {p.name}
+                        </span>
+                        <span className="shrink-0 rounded-full bg-amber-500/20 px-2.5 py-0.5 text-[11px] font-semibold text-amber-300">
+                          {t("match.attendeePending")}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
               </section>
             )}
           </>
@@ -793,16 +953,14 @@ function CopyButton({
   );
 }
 
-function PaymentCard({
+function PaymentDetails({
   payee,
-  amount,
   memo,
 }: {
   payee: Payee | null;
-  amount: number;
   memo: string;
 }) {
-  const { t, formatVnd } = useI18n();
+  const { t } = useI18n();
   const [copied, setCopied] = useState<string | null>(null);
 
   const copy = async (key: string, value: string) => {
@@ -819,25 +977,26 @@ function PaymentCard({
   const qrSrc = payee?.bankQrUrl ?? null;
   const hasBank = Boolean(bank && payee?.bankAccount);
 
+  const header = (
+    <div className="mb-3 flex items-center gap-2">
+      <QrCode size={18} strokeWidth={1.75} className="text-lime-400" />
+      <h2 className="text-base font-semibold">{t("match.payTitle")}</h2>
+    </div>
+  );
+
   // Only an admin-uploaded QR is shown; otherwise just the text details.
   if (!payee || (!qrSrc && !hasBank)) {
     return (
-      <section className="glass-panel rounded-2xl p-5">
-        <div className="mb-3 flex items-center gap-2">
-          <QrCode size={18} strokeWidth={1.75} className="text-lime-400" />
-          <h2 className="text-base font-semibold">{t("match.payTitle")}</h2>
-        </div>
+      <div>
+        {header}
         <p className="text-sm text-slate-400">{t("match.payNone")}</p>
-      </section>
+      </div>
     );
   }
 
   return (
-    <section className="glass-panel rounded-2xl p-5">
-      <div className="mb-4 flex items-center gap-2">
-        <QrCode size={18} strokeWidth={1.75} className="text-lime-400" />
-        <h2 className="text-base font-semibold">{t("match.payTitle")}</h2>
-      </div>
+    <div>
+      {header}
 
       {qrSrc && (
         <div className="flex flex-col items-center gap-2">
@@ -898,11 +1057,7 @@ function PaymentCard({
           </dd>
         </div>
       </dl>
-
-      <p className="mt-4 rounded-xl bg-lime-500/10 px-3 py-2 text-center text-sm font-semibold text-lime-200">
-        {t("match.perPerson", { amount: formatVnd(amount) })}
-      </p>
-    </section>
+    </div>
   );
 }
 
@@ -1009,20 +1164,31 @@ function FeeInput({
   onChange: (next: string) => void;
   placeholder?: string;
 }) {
+  const { t, formatVnd } = useI18n();
+  const thousands = Number(value) || 0;
   return (
     <div className="space-y-1 text-sm">
       <label className="ml-1 text-[10px] font-semibold uppercase tracking-[0.2em] text-slate-400">
         {label}
       </label>
-      <input
-        type="number"
-        min={0}
-        step="1000"
-        className="w-full rounded-xl border border-slate-800 bg-slate-950/60 px-4 py-3 text-slate-100 placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-lime-500/70"
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-        placeholder={placeholder ?? "0"}
-      />
+      <div className="relative">
+        <input
+          type="number"
+          min={0}
+          step="1"
+          inputMode="numeric"
+          className="w-full rounded-xl border border-slate-800 bg-slate-950/60 px-4 py-3 pr-16 text-slate-100 placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-lime-500/70"
+          value={value}
+          onChange={(event) => onChange(event.target.value)}
+          placeholder={placeholder ?? "0"}
+        />
+        <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs font-semibold text-slate-500">
+          {t("match.feeThousands")}
+        </span>
+      </div>
+      <p className="ml-1 text-[11px] text-lime-300/80">
+        {thousands > 0 ? `= ${formatVnd(thousands * 1000)}` : " "}
+      </p>
     </div>
   );
 }

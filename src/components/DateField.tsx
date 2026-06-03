@@ -69,7 +69,7 @@ export default function DateField({
       />
 
       {open && (
-        <div className="glass-panel absolute left-0 top-full z-50 mt-2 rounded-2xl p-2 shadow-2xl">
+        <div className="solid-panel absolute left-0 top-full z-50 mt-2 rounded-2xl p-2 shadow-2xl">
           <DayPicker
             mode="single"
             selected={selected}
