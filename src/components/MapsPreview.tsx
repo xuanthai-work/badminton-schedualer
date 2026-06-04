@@ -2,20 +2,18 @@
 
 import { useEffect, useState } from "react";
 import Image from "next/image";
-import { ExternalLink, MapPin } from "lucide-react";
+import { ExternalLink } from "lucide-react";
 import { useI18n } from "@/lib/i18n";
 
 type Props = {
   url: string;
-  name: string;
-  sub?: string;
 };
 
-// The location block when a Maps link exists: one clickable card with a
-// static-map thumbnail (resolved via /api/link-preview), the venue name and
-// an optional badge (court number). A pin placeholder shows until/unless
-// the thumbnail loads.
-export default function MapsPreview({ url, name, sub }: Props) {
+// Map block for a match's Google Maps link: a full-width static-map
+// thumbnail (resolved via /api/link-preview) that opens the link, with a
+// small "open maps" tag overlaid. Falls back to a plain link row while the
+// thumbnail is loading or unavailable.
+export default function MapsPreview({ url }: Props) {
   const { t } = useI18n();
   const [image, setImage] = useState<string | null>(null);
 
@@ -40,44 +38,38 @@ export default function MapsPreview({ url, name, sub }: Props) {
     };
   }, [url]);
 
+  if (!image) {
+    return (
+      <a
+        href={url}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="inline-flex items-center gap-1.5 rounded-full border border-lime-500/30 bg-lime-500/10 px-3 py-1.5 text-xs font-semibold text-lime-300 transition hover:bg-lime-500/20"
+      >
+        <ExternalLink size={12} strokeWidth={2} />
+        {t("match.openMaps")}
+      </a>
+    );
+  }
+
   return (
     <a
       href={url}
       target="_blank"
       rel="noopener noreferrer"
-      className="flex w-full items-stretch overflow-hidden rounded-xl border border-white/10 bg-slate-900/60 transition hover:border-lime-500/40"
+      className="relative block h-28 w-full overflow-hidden rounded-xl border border-white/10 transition hover:border-lime-500/40"
     >
-      <span className="relative h-20 w-24 shrink-0">
-        {image ? (
-          <Image
-            src={image}
-            alt=""
-            fill
-            unoptimized
-            sizes="96px"
-            style={{ objectFit: "cover" }}
-          />
-        ) : (
-          <span className="flex h-full w-full items-center justify-center bg-slate-800/60 text-lime-400/60">
-            <MapPin size={24} strokeWidth={1.5} />
-          </span>
-        )}
-      </span>
-      <span className="flex min-w-0 flex-1 flex-col justify-center gap-1 px-4 py-2.5">
-        <span className="flex min-w-0 items-center gap-2">
-          <span className="truncate text-sm font-semibold text-slate-100">
-            {name}
-          </span>
-          {sub && (
-            <span className="shrink-0 rounded-full bg-lime-500/15 px-2 py-0.5 text-[11px] font-semibold text-lime-300">
-              {sub}
-            </span>
-          )}
-        </span>
-        <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-lime-300">
-          <ExternalLink size={11} strokeWidth={2} />
-          {t("match.openMaps")}
-        </span>
+      <Image
+        src={image}
+        alt=""
+        fill
+        unoptimized
+        sizes="(max-width: 768px) 100vw, 640px"
+        style={{ objectFit: "cover" }}
+      />
+      <span className="absolute bottom-2 right-2 inline-flex items-center gap-1 rounded-full bg-slate-950/80 px-2.5 py-1 text-[11px] font-semibold text-lime-300 backdrop-blur-sm">
+        <ExternalLink size={11} strokeWidth={2} />
+        {t("match.openMaps")}
       </span>
     </a>
   );

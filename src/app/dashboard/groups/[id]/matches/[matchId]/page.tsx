@@ -303,6 +303,34 @@ export default function MatchDetailPage() {
     };
   }, [userId, matchId, load]);
 
+  // "Hôm nay" / "Ngày mai" / "Chủ Nhật tuần này" / "Thứ Bảy tuần sau" —
+  // relative to today (Monday-based weeks); plain weekday otherwise.
+  const relativeDayLabel = (dateStr: string) => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const target = new Date(`${dateStr}T00:00:00`);
+    if (Number.isNaN(target.getTime())) return "";
+
+    const dayDiff = Math.round(
+      (target.getTime() - today.getTime()) / 86_400_000
+    );
+    if (dayDiff === 0) return t("match.today");
+    if (dayDiff === 1) return t("match.tomorrow");
+
+    const monday = (d: Date) => {
+      const x = new Date(d);
+      x.setDate(x.getDate() - ((x.getDay() + 6) % 7));
+      return x;
+    };
+    const weekDiff = Math.round(
+      (monday(target).getTime() - monday(today).getTime()) / (7 * 86_400_000)
+    );
+    const weekday = formatDate(dateStr, { weekday: "long" });
+    if (weekDiff === 0) return t("match.thisWeek", { day: weekday });
+    if (weekDiff === 1) return t("match.nextWeek", { day: weekday });
+    return weekday;
+  };
+
   const myRsvp = userId ? rsvps.find((r) => r.userId === userId) : undefined;
   const yesList = rsvps.filter((r) => r.status === "yes");
   const noList = rsvps.filter((r) => r.status === "no");
@@ -519,51 +547,46 @@ export default function MatchDetailPage() {
             {error && <p className="text-sm text-rose-400">{error}</p>}
 
             <section className="glass-panel rounded-2xl p-5">
-              <div className="min-w-0">
-                <p className="text-lg font-semibold capitalize leading-tight">
-                  {formatDate(match.date, {
-                    weekday: "long",
-                    day: "2-digit",
-                    month: "2-digit",
-                    year: "numeric",
-                  })}
-                </p>
-                <span className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-lime-500/10 px-2.5 py-1 text-xs font-semibold text-lime-300">
-                  <Clock size={12} strokeWidth={2} />
-                  {match.time.slice(0, 5)}
-                  {match.endTime ? ` – ${match.endTime.slice(0, 5)}` : ""}
-                </span>
-              </div>
-
-              <div className="mt-4 border-t border-white/10 pt-4">
-                {match.locationUrl ? (
-                  <MapsPreview
-                    url={match.locationUrl}
-                    name={match.location}
-                    sub={
-                      match.courtNo != null
-                        ? t("matches.courtShort", { n: match.courtNo })
-                        : undefined
-                    }
-                  />
-                ) : (
-                  <div className="flex flex-wrap items-center gap-2">
+              <div className="flex items-start justify-between gap-4">
+                <div className="shrink-0">
+                  <p className="text-xl font-semibold leading-tight">
+                    {relativeDayLabel(match.date)}
+                  </p>
+                  <p className="mt-1 text-[15px] text-slate-400">
+                    {formatDate(match.date, {
+                      day: "2-digit",
+                      month: "2-digit",
+                      year: "numeric",
+                    })}
+                  </p>
+                </div>
+                <div className="min-w-0 text-right">
+                  <p className="inline-flex items-center gap-1.5 text-xl font-semibold leading-tight text-lime-300">
+                    <Clock size={18} strokeWidth={2} />
+                    {match.time.slice(0, 5)}
+                    {match.endTime ? ` – ${match.endTime.slice(0, 5)}` : ""}
+                  </p>
+                  <p className="mt-1 flex items-center justify-end gap-1.5 text-base font-medium text-slate-100">
                     <MapPin
-                      size={16}
+                      size={15}
                       strokeWidth={1.75}
                       className="shrink-0 text-lime-400"
                     />
-                    <span className="min-w-0 flex-1 truncate text-sm font-medium text-slate-100">
-                      {match.location}
-                    </span>
+                    <span className="min-w-0 truncate">{match.location}</span>
                     {match.courtNo != null && (
-                      <span className="shrink-0 rounded-full bg-lime-500/15 px-2.5 py-1 text-xs font-semibold text-lime-300">
+                      <span className="shrink-0 rounded-full bg-lime-500/15 px-2 py-0.5 text-xs font-semibold text-lime-300">
                         {t("matches.courtShort", { n: match.courtNo })}
                       </span>
                     )}
-                  </div>
-                )}
+                  </p>
+                </div>
               </div>
+
+              {match.locationUrl && (
+                <div className="mt-4">
+                  <MapsPreview url={match.locationUrl} />
+                </div>
+              )}
             </section>
 
             {myRsvp?.status === "pending" && (
