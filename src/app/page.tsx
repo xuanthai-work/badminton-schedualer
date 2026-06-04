@@ -16,6 +16,7 @@ export default function HomePage() {
   const router = useRouter();
   const { t } = useI18n();
   const [mode, setMode] = useState<Mode>("login");
+  const [forgotOpen, setForgotOpen] = useState(false);
   const [username, setUsername] = useState("");
   const [identifier, setIdentifier] = useState("");
   const [email, setEmail] = useState("");
@@ -35,6 +36,40 @@ export default function HomePage() {
 
     void checkSession();
   }, [router]);
+
+  // Resolve the login identifier (email or username) to an email, then ask
+  // Supabase for a recovery link landing on /reset-password.
+  const handleForgot = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setError("");
+    setInfo("");
+    setLoading(true);
+    try {
+      let email = identifier.trim();
+      if (!isEmail(email)) {
+        const { data: resolved, error: resolveError } = await supabase.rpc(
+          "email_for_username",
+          { target_username: email }
+        );
+        if (resolveError) throw new Error(resolveError.message);
+        if (typeof resolved !== "string" || !resolved) {
+          throw new Error(t("auth.errUsernameNotFound"));
+        }
+        email = resolved;
+      }
+
+      const { error: resetError } = await supabase.auth.resetPasswordForEmail(
+        email,
+        { redirectTo: `${window.location.origin}/reset-password` }
+      );
+      if (resetError) throw resetError;
+      setInfo(t("auth.forgotSent"));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t("auth.errAuthFailed"));
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -147,6 +182,53 @@ export default function HomePage() {
       </section>
 
       <section className="glass-panel relative z-10 mt-10 w-full max-w-[440px] rounded-2xl p-6 shadow-2xl">
+        {forgotOpen ? (
+          <form onSubmit={handleForgot} className="space-y-4">
+            <div>
+              <h2 className="text-lg font-semibold">
+                {t("auth.forgotTitle")}
+              </h2>
+              <p className="mt-1 text-sm text-slate-400">
+                {t("auth.forgotHint")}
+              </p>
+            </div>
+            <div className="space-y-1 text-sm">
+              <label className="ml-1 text-xs text-slate-400">
+                {t("auth.identifier")}
+              </label>
+              <input
+                className="w-full rounded-xl border border-slate-800 bg-slate-950/60 px-4 py-3 text-slate-100 placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-lime-500/70"
+                placeholder={t("auth.identifierPlaceholder")}
+                value={identifier}
+                onChange={(event) => setIdentifier(event.target.value)}
+                autoComplete="username"
+                required
+              />
+            </div>
+
+            {info && <p className="text-xs text-lime-300">{info}</p>}
+            {error && <p className="text-xs text-rose-400">{error}</p>}
+
+            <button
+              className="w-full rounded-xl bg-lime-500 py-3 text-sm font-semibold text-slate-950 shadow-[0_0_20px_rgba(163,230,53,0.4)] transition hover:scale-[1.02] active:scale-95 disabled:opacity-60 disabled:hover:scale-100"
+              disabled={loading}
+            >
+              {loading ? t("auth.processing") : t("auth.forgotSend")}
+            </button>
+            <button
+              type="button"
+              className="w-full text-center text-sm text-slate-400 transition hover:text-lime-300"
+              onClick={() => {
+                setForgotOpen(false);
+                setError("");
+                setInfo("");
+              }}
+            >
+              {t("auth.backToLogin")}
+            </button>
+          </form>
+        ) : (
+          <>
         <div className="mb-6 flex rounded-full bg-slate-900/70 p-1 text-sm">
           <button
             type="button"
@@ -241,6 +323,22 @@ export default function HomePage() {
             />
           </div>
 
+          {mode === "login" && (
+            <div className="text-right">
+              <button
+                type="button"
+                className="text-xs text-slate-400 transition hover:text-lime-300"
+                onClick={() => {
+                  setForgotOpen(true);
+                  setError("");
+                  setInfo("");
+                }}
+              >
+                {t("auth.forgotPassword")}
+              </button>
+            </div>
+          )}
+
           {info && <p className="text-xs text-amber-300">{info}</p>}
           {error && <p className="text-xs text-rose-400">{error}</p>}
 
@@ -255,6 +353,8 @@ export default function HomePage() {
                 : t("auth.createAccount")}
           </button>
         </form>
+          </>
+        )}
       </section>
     </main>
   );

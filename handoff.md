@@ -22,7 +22,8 @@
 ## Key files
 
 ### Routes
-- `src/app/page.tsx` — Auth landing. Username + email field on sign-in; one unified "Tên đăng nhập" field on sign-up.
+- `src/app/page.tsx` — Auth landing. Username + email field on sign-in; one unified "Tên đăng nhập" field on sign-up; "Quên mật khẩu?" swaps the card to a send-reset-link form (email or username).
+- `src/app/reset-password/page.tsx` — recovery-link landing: waits for the Supabase session from the URL hash (`detectSessionInUrl`), shows invalid/expired state, new-password + confirm form → `auth.updateUser` → dashboard.
 - `src/app/dashboard/page.tsx` — Dashboard hub: greeting, tag-reminder banner, debts card, pending group invites, and the group list with each group's matches **nested beneath it** (upcoming open matches with inline quick-RSVP; collapsible closed matches with admin delete). Live via a `matches` realtime channel.
 - `src/app/dashboard/CreateGroupPanel.tsx` — Create-group FAB modal (safe-area-aware offset above the bottom nav).
 - `src/app/dashboard/CreateMatchPanel.tsx` — "+ Tạo lịch" FAB (admins only): date + start/end time + location + optional court number (free number input, 1-99) + maps link; group `SelectField` appears when admin of 2+ groups.
@@ -157,8 +158,9 @@
 **Production readiness — custom SMTP.** The core product loop (schedule → RSVP → split → track payment → debts) is feature-complete, so the highest-value next move is making it safe for real users:
 
 1. **Custom SMTP** in Supabase (Authentication → Emails → SMTP) with a provider (Resend / SES / Postmark). The built-in mailer is rate-limited to a few/hour — it tripped us during testing.
-2. **Re-enable "Confirm email"** (turned off during dev to dodge that rate limit) so addresses are verified, and confirm the **password-reset** flow works (it relies on email and currently can't send reliably).
-3. ~~Lock down Supabase URL config~~ ✅ done 2026-06-03 (Site URL → Vercel domain, `/**` wildcards for prod + localhost).
+2. **Re-enable "Confirm email"** (turned off during dev to dodge that rate limit) so addresses are verified.
+3. ~~Password-reset flow~~ ✅ shipped 2026-06-04: "Quên mật khẩu?" on the sign-in card (accepts email **or** username via `email_for_username`) → `resetPasswordForEmail` with `redirectTo` → `/reset-password` page (waits for `detectSessionInUrl` to process the recovery hash, handles `#error=` expired links, then `auth.updateUser({password})` → dashboard). ⚠️ Delivery still rides the rate-limited built-in mailer until SMTP is set up.
+4. ~~Lock down Supabase URL config~~ ✅ done 2026-06-03 (Site URL → Vercel domain, `/**` wildcards for prod + localhost — also what allows the `/reset-password` redirect).
 
 This is mostly Supabase dashboard + a provider account; little app code. A good quick win to pair with it: **notify the payee when a member submits a payment** (first item below) — it would ride the existing push pipeline for free.
 
@@ -167,7 +169,7 @@ After that, pick from the candidates below.
 ## Next steps (Phase 3 candidates)
 - Notify the admin/payee when a member submits a payment (a `payment_submitted` notification insert in `submit_payment` would automatically reach the bell **and** push).
 - Let the settling admin (not just the group creator) be the payee.
-- Production readiness: custom SMTP (password reset + re-enable email confirmation); RSVP cutoff + match reminders (reminders could be a Supabase cron → `notifications` insert → push).
+- Production readiness: custom SMTP (reliable reset/confirmation delivery + re-enable email confirmation); RSVP cutoff + match reminders (reminders could be a Supabase cron → `notifications` insert → push).
 - More notification types (match settled); fold friend requests into the bell.
 - Enforce the tag set-once lock server-side (`set_tag` RPC), and/or let users change it; show `@username#tag` in more places (dashboard greeting, member rows, RSVP rows).
 - i18n polish: persist language in `public.users` (per-account, not just per-device) — would also let `/api/push/notify` localize push copy (currently VI-only); add a 3rd language by dropping in a new dictionary + extending `LANGS`/`Lang`.
