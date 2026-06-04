@@ -19,7 +19,7 @@ const vi = {
   },
   auth: {
     brand: "Badminton Scheduler",
-    heroTitle: "Chơi cầu lông không lo chia tiền.",
+    heroTitle: "Cầu lông đi mà ^^",
     heroSubtitle:
       "Lên lịch, điểm danh realtime và chia chi phí cho cả nhóm trong vài phút.",
     login: "Đăng nhập",
@@ -163,6 +163,14 @@ const vi = {
     errRemove: "Lỗi xóa thành viên.",
     inviteFriends: "Mời từ bạn bè",
     inviteFriendsEmpty: "Tất cả bạn bè đã ở trong nhóm.",
+    joinedLabel: "Tham gia nhóm",
+    addFriend: "Kết bạn",
+    friendBadge: "Đã là bạn bè",
+    friendRequestPending: "Đã gửi lời mời kết bạn, đang chờ phản hồi.",
+    acceptFriend: "Chấp nhận kết bạn",
+    friendRequestSent: "Đã gửi lời mời kết bạn.",
+    friendAccepted: "Hai bạn đã trở thành bạn bè.",
+    errFriend: "Lỗi gửi lời mời kết bạn.",
   },
   settings: {
     nameTitle: "Tên nhóm",
@@ -444,7 +452,7 @@ const en: typeof vi = {
   },
   auth: {
     brand: "Badminton Scheduler",
-    heroTitle: "Play badminton, skip the money math.",
+    heroTitle: "Badminton, pleeease ^^",
     heroSubtitle:
       "Schedule, RSVP in real time, and split the bill for the whole group in minutes.",
     login: "Sign in",
@@ -589,6 +597,14 @@ const en: typeof vi = {
     errRemove: "Failed to remove member.",
     inviteFriends: "Invite from friends",
     inviteFriendsEmpty: "All your friends are already in this group.",
+    joinedLabel: "Joined",
+    addFriend: "Add friend",
+    friendBadge: "Friends",
+    friendRequestPending: "Friend request sent, waiting for a response.",
+    acceptFriend: "Accept friend request",
+    friendRequestSent: "Friend request sent.",
+    friendAccepted: "You are now friends.",
+    errFriend: "Could not send friend request.",
   },
   settings: {
     nameTitle: "Group name",

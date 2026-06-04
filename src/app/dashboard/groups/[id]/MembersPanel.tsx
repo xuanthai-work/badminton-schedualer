@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import Image from "next/image";
 import { UserPlus } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { useI18n } from "@/lib/i18n";
@@ -9,9 +10,16 @@ type Member = {
   userId: string;
   name: string;
   email: string;
+  username: string;
+  tag: string | null;
+  avatarUrl: string | null;
   role: "admin" | "member";
   joinedAt: string;
 };
+
+type Relation = "friend" | "incoming" | "outgoing";
+
+type RelationInfo = { relation: Relation; friendshipId: string };
 
 type FriendLite = {
   userId: string;
@@ -43,12 +51,20 @@ export default function MembersPanel({
   const [actionBusy, setActionBusy] = useState<string | null>(null);
   const [friends, setFriends] = useState<FriendLite[]>([]);
   const [invitedIds, setInvitedIds] = useState<Set<string>>(new Set());
+  const [relations, setRelations] = useState<Map<string, RelationInfo>>(
+    new Map()
+  );
+  const [profileMember, setProfileMember] = useState<Member | null>(null);
+  const [friendBusy, setFriendBusy] = useState(false);
+  const [friendMsg, setFriendMsg] = useState("");
 
   const load = useCallback(async () => {
     try {
       const { data, error: queryError } = await supabase
         .from("group_members")
-        .select("user_id, role, joined_at, users ( name, email )")
+        .select(
+          "user_id, role, joined_at, users ( name, email, username, tag, avatar_url )"
+        )
         .eq("group_id", groupId)
         .order("joined_at", { ascending: true });
 
@@ -63,6 +79,9 @@ export default function MembersPanel({
             userId: row.user_id,
             name: user?.name ?? t("members.unknownUser"),
             email: user?.email ?? "",
+            username: user?.username ?? "",
+            tag: user?.tag ?? null,
+            avatarUrl: user?.avatar_url ?? null,
             role: row.role === "admin" ? "admin" : "member",
             joinedAt: row.joined_at,
           };
@@ -76,12 +95,20 @@ export default function MembersPanel({
   }, [groupId, t]);
 
   const loadFriends = useCallback(async () => {
-    if (!isAdmin) return;
-    const [{ data: friendData }, { data: pendingData }] = await Promise.all([
-      supabase.rpc("get_friends"),
-      supabase.rpc("get_group_pending_invites", { target_group_id: groupId }),
-    ]);
+    const { data: friendData } = await supabase.rpc("get_friends");
     const rows = (friendData as Array<Record<string, unknown>> | null) ?? [];
+    // Relation per user (friend / incoming / outgoing) drives the profile modal.
+    setRelations(
+      new Map(
+        rows.map((r) => [
+          r.user_id as string,
+          {
+            relation: r.relation as Relation,
+            friendshipId: r.friendship_id as string,
+          },
+        ])
+      )
+    );
     setFriends(
       rows
         .filter((r) => r.relation === "friend")
@@ -92,7 +119,12 @@ export default function MembersPanel({
           tag: (r.tag as string | null) ?? null,
         }))
     );
+    if (!isAdmin) return;
     // Seed the "Đã mời" state from invites already pending for this group.
+    const { data: pendingData } = await supabase.rpc(
+      "get_group_pending_invites",
+      { target_group_id: groupId }
+    );
     const pending = (pendingData as Array<{ invitee: string }> | null) ?? [];
     setInvitedIds(new Set(pending.map((p) => p.invitee)));
   }, [isAdmin, groupId]);
@@ -189,6 +221,68 @@ export default function MembersPanel({
   const invitableFriends = friends.filter(
     (f) => !members.some((m) => m.userId === f.userId)
   );
+
+  const openProfile = (member: Member) => {
+    setFriendMsg("");
+    // Tapping the same member again collapses the summary.
+    setProfileMember((prev) =>
+      prev?.userId === member.userId ? null : member
+    );
+  };
+
+  const closeProfile = () => {
+    setProfileMember(null);
+    setFriendMsg("");
+  };
+
+  const handleSendFriendRequest = async (member: Member) => {
+    setFriendBusy(true);
+    setFriendMsg("");
+    try {
+      // username#tag is the most precise identifier; fall back to email.
+      const identifier = member.username
+        ? member.tag
+          ? `${member.username}#${member.tag}`
+          : member.username
+        : member.email;
+      const { data, error: rpcError } = await supabase.rpc(
+        "send_friend_request",
+        { target_identifier: identifier }
+      );
+      if (rpcError) throw new Error(rpcError.message);
+      const status = (data as { status?: string } | null)?.status;
+      if (status === "sent" || status === "already_sent") {
+        setFriendMsg(t("members.friendRequestSent"));
+      } else if (status === "accepted" || status === "already_friends") {
+        setFriendMsg(t("members.friendAccepted"));
+      } else {
+        setFriendMsg(t("members.errFriend"));
+      }
+      await loadFriends();
+    } catch (err) {
+      setFriendMsg(err instanceof Error ? err.message : t("members.errFriend"));
+    } finally {
+      setFriendBusy(false);
+    }
+  };
+
+  const handleAcceptFriend = async (info: RelationInfo) => {
+    setFriendBusy(true);
+    setFriendMsg("");
+    try {
+      const { error: rpcError } = await supabase.rpc("respond_friend_request", {
+        request_id: info.friendshipId,
+        accept: true,
+      });
+      if (rpcError) throw new Error(rpcError.message);
+      setFriendMsg(t("members.friendAccepted"));
+      await loadFriends();
+    } catch (err) {
+      setFriendMsg(err instanceof Error ? err.message : t("members.errFriend"));
+    } finally {
+      setFriendBusy(false);
+    }
+  };
 
   const handleToggleRole = async (member: Member) => {
     if (member.userId === createdBy) {
@@ -334,22 +428,36 @@ export default function MembersPanel({
           {members.map((member) => {
             const isCreator = member.userId === createdBy;
             const isSelf = member.userId === currentUserId;
+            const isOpen = profileMember?.userId === member.userId;
             return (
               <li
                 key={member.userId}
-                className="glass-panel flex flex-wrap items-center justify-between gap-3 rounded-2xl p-4"
+                // z-10 lifts the open row's stacking context (glass-panel
+                // backdrop-filter) above later siblings so the popover wins.
+                className={`glass-panel relative flex flex-wrap items-center justify-between gap-3 rounded-2xl p-4 ${
+                  isOpen ? "z-10" : ""
+                }`}
               >
-                <div>
-                  <p className="font-medium">
-                    {member.name}
-                    {isSelf && (
-                      <span className="ml-2 text-xs text-slate-400">
-                        {t("members.you")}
-                      </span>
-                    )}
-                  </p>
-                  <p className="text-xs text-slate-400">{member.email}</p>
-                </div>
+                <button
+                  type="button"
+                  className="flex min-w-0 items-center gap-3 text-left"
+                  onClick={() => openProfile(member)}
+                >
+                  <MemberAvatar name={member.name} url={member.avatarUrl} />
+                  <span className="min-w-0">
+                    <span className="block truncate font-medium">
+                      {member.name}
+                      {isSelf && (
+                        <span className="ml-2 text-xs text-slate-400">
+                          {t("members.you")}
+                        </span>
+                      )}
+                    </span>
+                    <span className="block truncate text-xs text-slate-400">
+                      {member.email}
+                    </span>
+                  </span>
+                </button>
                 <div className="flex items-center gap-2">
                   <span
                     className={`rounded-full px-3 py-1 text-xs ${
@@ -386,11 +494,140 @@ export default function MembersPanel({
                     </>
                   )}
                 </div>
+
+                {isOpen && (
+                  <>
+                    {/* Invisible backdrop: tap anywhere outside to close. */}
+                    <button
+                      type="button"
+                      aria-label={t("common.close")}
+                      className="fixed inset-0 z-10 cursor-default"
+                      onClick={closeProfile}
+                    />
+                    <div className="solid-panel absolute left-4 top-full z-20 mt-1 w-72 max-w-[calc(100%-2rem)] rounded-xl p-4 shadow-2xl">
+                      <div className="flex items-center gap-3">
+                        <MemberAvatar name={member.name} url={member.avatarUrl} />
+                        <div className="min-w-0">
+                          <p className="truncate text-sm font-semibold text-slate-50">
+                            {member.name}
+                          </p>
+                          {member.username && (
+                            <p className="truncate text-xs text-slate-400">
+                              @{member.username}
+                              {member.tag && (
+                                <span className="text-lime-400">
+                                  #{member.tag}
+                                </span>
+                              )}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+
+                      <p className="mt-3 text-xs text-slate-400">
+                        {t("members.joinedLabel")}:{" "}
+                        <span className="text-slate-200">
+                          {new Date(member.joinedAt).toLocaleDateString()}
+                        </span>
+                      </p>
+
+                      {!isSelf && (
+                        <div className="mt-3 border-t border-slate-800 pt-3">
+                          {(() => {
+                            const rel = relations.get(member.userId);
+                            if (rel?.relation === "friend") {
+                              return (
+                                <p className="text-center text-xs text-lime-300">
+                                  ✓ {t("members.friendBadge")}
+                                </p>
+                              );
+                            }
+                            if (rel?.relation === "outgoing") {
+                              return (
+                                <p className="text-center text-xs text-slate-400">
+                                  {t("members.friendRequestPending")}
+                                </p>
+                              );
+                            }
+                            if (rel?.relation === "incoming") {
+                              return (
+                                <button
+                                  type="button"
+                                  className="w-full rounded-lg bg-lime-500 py-2 text-xs font-semibold text-slate-950 transition hover:scale-[1.02] active:scale-95 disabled:opacity-60"
+                                  disabled={friendBusy}
+                                  onClick={() => handleAcceptFriend(rel)}
+                                >
+                                  {friendBusy
+                                    ? t("auth.processing")
+                                    : t("members.acceptFriend")}
+                                </button>
+                              );
+                            }
+                            return (
+                              <button
+                                type="button"
+                                className="w-full rounded-lg bg-lime-500 py-2 text-xs font-semibold text-slate-950 transition hover:scale-[1.02] active:scale-95 disabled:opacity-60"
+                                disabled={friendBusy}
+                                onClick={() => handleSendFriendRequest(member)}
+                              >
+                                {friendBusy
+                                  ? t("auth.processing")
+                                  : t("members.addFriend")}
+                              </button>
+                            );
+                          })()}
+                          {friendMsg && (
+                            <p className="mt-2 text-center text-xs text-slate-300">
+                              {friendMsg}
+                            </p>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  </>
+                )}
               </li>
             );
           })}
         </ul>
       )}
+
     </section>
+  );
+}
+
+function MemberAvatar({
+  name,
+  url,
+  size = "sm",
+}: {
+  name: string;
+  url: string | null;
+  size?: "sm" | "lg";
+}) {
+  const cls = size === "lg" ? "h-16 w-16 text-xl" : "h-9 w-9 text-sm";
+  if (url) {
+    return (
+      <span
+        className={`relative shrink-0 overflow-hidden rounded-full border border-white/10 ${cls}`}
+      >
+        <Image
+          src={url}
+          alt=""
+          fill
+          unoptimized
+          sizes={size === "lg" ? "64px" : "36px"}
+          style={{ objectFit: "cover" }}
+        />
+      </span>
+    );
+  }
+  const initial = (name || "?").trim().charAt(0).toUpperCase() || "?";
+  return (
+    <span
+      className={`flex shrink-0 items-center justify-center rounded-full border border-white/10 bg-slate-800/80 font-semibold text-lime-300 ${cls}`}
+    >
+      {initial}
+    </span>
   );
 }
