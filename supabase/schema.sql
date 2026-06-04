@@ -55,6 +55,8 @@ create table if not exists public.matches (
 
 alter table public.matches add column if not exists location_url text;
 alter table public.matches add column if not exists match_end_time time;
+alter table public.matches add column if not exists court_no smallint
+  check (court_no is null or court_no between 1 and 99);
 
 create table if not exists public.rsvps (
   match_id uuid not null references public.matches(id) on delete cascade,

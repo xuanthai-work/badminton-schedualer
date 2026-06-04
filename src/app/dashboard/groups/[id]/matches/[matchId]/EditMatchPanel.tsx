@@ -1,26 +1,30 @@
 "use client";
 
 import { useState } from "react";
+import { Pencil } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { useI18n } from "@/lib/i18n";
 import DateField from "@/components/DateField";
 import TimeField from "@/components/TimeField";
-import SelectField from "@/components/SelectField";
 
-export type AdminGroup = {
+type EditableMatch = {
   id: string;
-  name: string;
+  date: string;
+  time: string;
+  endTime: string | null;
+  location: string;
+  locationUrl: string | null;
+  courtNo: number | null;
 };
 
 type Props = {
-  groups: AdminGroup[];
-  onCreated: () => void;
+  match: EditableMatch;
+  onSaved: () => void;
 };
 
-export default function CreateMatchPanel({ groups, onCreated }: Props) {
+export default function EditMatchPanel({ match, onSaved }: Props) {
   const { t } = useI18n();
   const [open, setOpen] = useState(false);
-  const [groupId, setGroupId] = useState("");
   const [date, setDate] = useState("");
   const [time, setTime] = useState("");
   const [endTime, setEndTime] = useState("");
@@ -30,35 +34,24 @@ export default function CreateMatchPanel({ groups, onCreated }: Props) {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
 
-  if (groups.length === 0) return null;
-
-  // Single-group admins skip the picker; multi-group admins choose explicitly.
-  const effectiveGroupId = groups.length === 1 ? groups[0].id : groupId;
-
-  const reset = () => {
-    setGroupId("");
-    setDate("");
-    setTime("");
-    setEndTime("");
-    setLocation("");
-    setLocationUrl("");
-    setCourtNo("");
+  // Prefill from the latest match on every open (realtime may have changed it).
+  const openModal = () => {
+    setDate(match.date);
+    setTime(match.time.slice(0, 5));
+    setEndTime(match.endTime ? match.endTime.slice(0, 5) : "");
+    setLocation(match.location);
+    setLocationUrl(match.locationUrl ?? "");
+    setCourtNo(match.courtNo != null ? String(match.courtNo) : "");
     setError("");
+    setOpen(true);
   };
 
-  const close = () => {
-    setOpen(false);
-    reset();
-  };
+  const close = () => setOpen(false);
 
-  const handleCreate = async (event: React.FormEvent<HTMLFormElement>) => {
+  const handleSave = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setError("");
 
-    if (!effectiveGroupId) {
-      setError(t("createMatch.errNoGroup"));
-      return;
-    }
     if (!date || !time || !endTime || !location.trim()) {
       setError(t("matches.errRequired"));
       return;
@@ -67,7 +60,6 @@ export default function CreateMatchPanel({ groups, onCreated }: Props) {
       setError(t("matches.errEndTime"));
       return;
     }
-
     const trimmedUrl = locationUrl.trim();
     if (trimmedUrl && !/^https?:\/\//i.test(trimmedUrl)) {
       setError(t("matches.errMapsUrl"));
@@ -76,27 +68,26 @@ export default function CreateMatchPanel({ groups, onCreated }: Props) {
 
     setSubmitting(true);
     try {
-      const { data: userData } = await supabase.auth.getUser();
-      const uid = userData.user?.id;
-      const { error: insertError } = await supabase.from("matches").insert({
-        group_id: effectiveGroupId,
-        match_date: date,
-        match_time: time,
-        match_end_time: endTime,
-        location: location.trim(),
-        location_url: trimmedUrl || null,
-        court_no: courtNo ? Number(courtNo) : null,
-        created_by: uid,
-      });
+      const { error: updateError } = await supabase
+        .from("matches")
+        .update({
+          match_date: date,
+          match_time: time,
+          match_end_time: endTime,
+          location: location.trim(),
+          location_url: trimmedUrl || null,
+          court_no: courtNo ? Number(courtNo) : null,
+        })
+        .eq("id", match.id);
 
-      if (insertError) {
-        throw new Error(insertError.message);
+      if (updateError) {
+        throw new Error(updateError.message);
       }
 
       close();
-      onCreated();
+      onSaved();
     } catch (err) {
-      setError(err instanceof Error ? err.message : t("matches.errCreate"));
+      setError(err instanceof Error ? err.message : t("match.errUpdate"));
     } finally {
       setSubmitting(false);
     }
@@ -106,10 +97,12 @@ export default function CreateMatchPanel({ groups, onCreated }: Props) {
     <>
       <button
         type="button"
-        className="fixed bottom-[calc(10rem+env(safe-area-inset-bottom))] right-6 z-40 rounded-full bg-slate-900/90 px-5 py-3 text-sm font-semibold text-lime-300 shadow-lg ring-1 ring-lime-500/30 backdrop-blur transition hover:ring-lime-500/60"
-        onClick={() => setOpen(true)}
+        aria-label={t("match.editBtn")}
+        className="inline-flex items-center gap-1.5 rounded-lg border border-slate-700 px-2.5 py-1 text-xs font-semibold text-slate-200 transition hover:border-lime-500/50 hover:text-lime-300 active:scale-95"
+        onClick={openModal}
       >
-        {t("createMatch.fab")}
+        <Pencil size={12} strokeWidth={2} />
+        {t("match.editBtn")}
       </button>
 
       {open && (
@@ -123,9 +116,7 @@ export default function CreateMatchPanel({ groups, onCreated }: Props) {
         >
           <div className="glass-panel w-full max-w-lg rounded-2xl p-6 shadow-2xl">
             <div className="mb-4 flex items-center justify-between">
-              <h2 className="text-lg font-semibold">
-                {t("matches.modalTitle")}
-              </h2>
+              <h2 className="text-lg font-semibold">{t("match.editTitle")}</h2>
               <button
                 type="button"
                 className="text-sm text-slate-400 hover:text-slate-200"
@@ -135,25 +126,7 @@ export default function CreateMatchPanel({ groups, onCreated }: Props) {
               </button>
             </div>
 
-            <form onSubmit={handleCreate} className="space-y-4">
-              {groups.length > 1 && (
-                <div className="space-y-1 text-sm">
-                  <label className="text-slate-300">
-                    {t("createMatch.groupLabel")}
-                  </label>
-                  <SelectField
-                    value={groupId}
-                    onChange={setGroupId}
-                    placeholder={t("createMatch.groupPlaceholder")}
-                    options={groups.map((g) => ({
-                      value: g.id,
-                      label: g.name,
-                    }))}
-                    required
-                  />
-                </div>
-              )}
-
+            <form onSubmit={handleSave} className="space-y-4">
               <div className="space-y-1 text-sm">
                 <label className="text-slate-300">{t("matches.date")}</label>
                 <DateField value={date} onChange={setDate} required />
@@ -234,7 +207,7 @@ export default function CreateMatchPanel({ groups, onCreated }: Props) {
                   className="rounded-xl bg-lime-500 px-4 py-2 text-sm font-semibold text-slate-950 disabled:opacity-60"
                   disabled={submitting}
                 >
-                  {submitting ? t("matches.creating") : t("matches.create")}
+                  {submitting ? t("match.saving") : t("match.editSave")}
                 </button>
               </div>
             </form>

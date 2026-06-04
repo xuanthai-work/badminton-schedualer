@@ -4,12 +4,11 @@ import { useCallback, useEffect, useState } from "react";
 import Image from "next/image";
 import { useParams, useRouter } from "next/navigation";
 import {
-  Calendar,
   Check,
+  Clock,
   CheckCircle2,
   ChevronLeft,
   Copy,
-  ExternalLink,
   MapPin,
   QrCode,
   ReceiptText,
@@ -20,7 +19,9 @@ import { supabase } from "@/lib/supabaseClient";
 import { useI18n } from "@/lib/i18n";
 import { bankByCode } from "@/lib/banks";
 import BottomNav from "@/components/BottomNav";
+import MapsPreview from "@/components/MapsPreview";
 import SelectField from "@/components/SelectField";
+import EditMatchPanel from "./EditMatchPanel";
 
 type Rsvp = {
   userId: string;
@@ -41,6 +42,7 @@ type Match = {
   endTime: string | null;
   location: string;
   locationUrl: string | null;
+  courtNo: number | null;
   status: "open" | "closed";
 };
 
@@ -108,7 +110,7 @@ export default function MatchDetailPage() {
       const { data: matchRow, error: matchError } = await supabase
         .from("matches")
         .select(
-          "id, group_id, match_date, match_time, match_end_time, location, location_url, status"
+          "id, group_id, match_date, match_time, match_end_time, location, location_url, court_no, status"
         )
         .eq("id", matchId)
         .maybeSingle();
@@ -127,6 +129,7 @@ export default function MatchDetailPage() {
         endTime: matchRow.match_end_time ?? null,
         location: matchRow.location,
         locationUrl: matchRow.location_url ?? null,
+        courtNo: matchRow.court_no ?? null,
         status: matchRow.status === "closed" ? "closed" : "open",
       });
 
@@ -479,41 +482,30 @@ export default function MatchDetailPage() {
 
           {match && (
             <div className="flex flex-wrap items-end justify-between gap-3">
-              <div className="space-y-1">
-                <h1 className="text-[28px] font-semibold leading-tight">
-                  {t("match.title")}
-                </h1>
-                <div className="flex flex-wrap items-center gap-2 text-sm text-slate-300">
-                  <MapPin
-                    size={16}
-                    strokeWidth={1.75}
-                    className="text-slate-400"
+              <h1 className="text-[28px] font-semibold leading-tight">
+                {t("match.title")}
+              </h1>
+              <div className="flex items-center gap-2">
+                {isAdmin && (
+                  <EditMatchPanel
+                    match={match}
+                    onSaved={() => {
+                      if (userId) void load(userId);
+                    }}
                   />
-                  <span>{match.location}</span>
-                  {match.locationUrl && (
-                    <a
-                      href={match.locationUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1 rounded-lg border border-lime-500/30 bg-lime-500/10 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-[0.15em] text-lime-300 transition hover:bg-lime-500/20"
-                    >
-                      <ExternalLink size={12} strokeWidth={2} />
-                      {t("match.openMaps")}
-                    </a>
-                  )}
-                </div>
+                )}
+                <span
+                  className={`rounded-full border px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] ${
+                    match.status === "open"
+                      ? "border-emerald-500/30 bg-emerald-500/20 text-emerald-300"
+                      : "border-white/10 bg-slate-800 text-slate-400"
+                  }`}
+                >
+                  {match.status === "open"
+                    ? t("match.statusOpen")
+                    : t("match.statusClosed")}
+                </span>
               </div>
-              <span
-                className={`rounded-full border px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] ${
-                  match.status === "open"
-                    ? "border-emerald-500/30 bg-emerald-500/20 text-emerald-300"
-                    : "border-white/10 bg-slate-800 text-slate-400"
-                }`}
-              >
-                {match.status === "open"
-                  ? t("match.statusOpen")
-                  : t("match.statusClosed")}
-              </span>
             </div>
           )}
         </header>
@@ -527,25 +519,50 @@ export default function MatchDetailPage() {
             {error && <p className="text-sm text-rose-400">{error}</p>}
 
             <section className="glass-panel rounded-2xl p-5">
-              <div className="flex items-center gap-4">
-                <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-lime-500/10 text-lime-400">
-                  <Calendar size={24} strokeWidth={1.75} />
-                </div>
-                <div>
-                  <p className="text-[10px] font-semibold uppercase tracking-[0.25em] text-slate-400">
-                    {t("match.time")}
-                  </p>
-                  <p className="mt-0.5 text-lg font-semibold leading-tight">
-                    {formatDate(match.date, {
-                      weekday: "long",
-                      day: "2-digit",
-                      month: "2-digit",
-                      year: "numeric",
-                    })}{" "}
-                    · {match.time.slice(0, 5)}
-                    {match.endTime ? ` - ${match.endTime.slice(0, 5)}` : ""}
-                  </p>
-                </div>
+              <div className="min-w-0">
+                <p className="text-lg font-semibold capitalize leading-tight">
+                  {formatDate(match.date, {
+                    weekday: "long",
+                    day: "2-digit",
+                    month: "2-digit",
+                    year: "numeric",
+                  })}
+                </p>
+                <span className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-lime-500/10 px-2.5 py-1 text-xs font-semibold text-lime-300">
+                  <Clock size={12} strokeWidth={2} />
+                  {match.time.slice(0, 5)}
+                  {match.endTime ? ` – ${match.endTime.slice(0, 5)}` : ""}
+                </span>
+              </div>
+
+              <div className="mt-4 border-t border-white/10 pt-4">
+                {match.locationUrl ? (
+                  <MapsPreview
+                    url={match.locationUrl}
+                    name={match.location}
+                    sub={
+                      match.courtNo != null
+                        ? t("matches.courtShort", { n: match.courtNo })
+                        : undefined
+                    }
+                  />
+                ) : (
+                  <div className="flex flex-wrap items-center gap-2">
+                    <MapPin
+                      size={16}
+                      strokeWidth={1.75}
+                      className="shrink-0 text-lime-400"
+                    />
+                    <span className="min-w-0 flex-1 truncate text-sm font-medium text-slate-100">
+                      {match.location}
+                    </span>
+                    {match.courtNo != null && (
+                      <span className="shrink-0 rounded-full bg-lime-500/15 px-2.5 py-1 text-xs font-semibold text-lime-300">
+                        {t("matches.courtShort", { n: match.courtNo })}
+                      </span>
+                    )}
+                  </div>
+                )}
               </div>
             </section>
 
