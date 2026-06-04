@@ -61,6 +61,7 @@ const vi = {
   dashboard: {
     eyebrow: "Dashboard",
     myGroups: "Nhóm của tôi",
+    matchGone: "Lịch đánh này đã bị xóa.",
     greeting: "Chào bạn,",
     defaultName: "lông thủ",
     readyToday: "Sẵn sàng cho các trận đấu hôm nay?",
@@ -408,6 +409,8 @@ const vi = {
     friendRequest: "{name} đã gửi lời mời kết bạn",
     friendAccepted: "{name} đã chấp nhận lời mời kết bạn",
     paymentConfirmed: "Đã xác nhận thanh toán {amount} cho nhóm {group}",
+    paymentSubmitted:
+      "{name} đã chuyển {amount} cho nhóm {group} — chờ bạn xác nhận",
     attendanceRequest:
       "Bạn được thêm vào trận {group} ({date} {time}). Xác nhận có tham gia?",
     attendanceConfirmed: "{name} xác nhận có tham gia trận ở {group}",
@@ -521,6 +524,7 @@ const en: typeof vi = {
   dashboard: {
     eyebrow: "Dashboard",
     myGroups: "My groups",
+    matchGone: "That match has been deleted.",
     greeting: "Hi there,",
     defaultName: "shuttler",
     readyToday: "Ready for today's matches?",
@@ -869,6 +873,8 @@ const en: typeof vi = {
     friendRequest: "{name} sent you a friend request",
     friendAccepted: "{name} accepted your friend request",
     paymentConfirmed: "Your {amount} payment for {group} was confirmed",
+    paymentSubmitted:
+      "{name} sent {amount} for {group} — waiting for your confirmation",
     attendanceRequest:
       "You were added to the {group} match ({date} {time}). Confirm you played?",
     attendanceConfirmed: "{name} confirmed playing the {group} match",

@@ -28,7 +28,6 @@
 - `src/app/dashboard/CreateGroupPanel.tsx` — Create-group FAB modal (safe-area-aware offset above the bottom nav).
 - `src/app/dashboard/CreateMatchPanel.tsx` — "+ Tạo lịch" FAB (admins only): date + start/end time + location + optional court number (free number input, 1-99) + maps link; group `SelectField` appears when admin of 2+ groups.
 - `src/app/dashboard/groups/[id]/page.tsx` — Group detail with **two** tabs: Thành viên (default) + **Cài đặt** (admin-only). The matches tab was removed — matches live on the dashboard.
-- `src/app/dashboard/groups/[id]/MatchesPanel.tsx` — **dead code** (no longer imported); kept for reference after the matches-tab removal.
 - `src/app/dashboard/groups/[id]/MembersPanel.tsx` — List + invite by email + role toggle + remove. Tapping a member opens an **anchored profile popover** (avatar, `@username#tag`, joined date) with a relation-aware friend action (Kết bạn / pending / accept); the open row gets `z-10` so the `solid-panel` popover isn't painted under later glass-panel siblings.
 - `src/app/dashboard/groups/[id]/GroupSettingsPanel.tsx` — Admin-only: rename group + danger-zone delete.
 - `src/app/dashboard/groups/[id]/matches/[matchId]/page.tsx` — Info card with a two-column header (relative day label "Hôm nay / Ngày mai / {thứ} tuần này / tuần sau" + full date left; lime time range + venue/court badge right) above a full-width `MapsPreview`; big RSVP buttons, attendance-confirm banner (when admin-added), merged expense+payment card (costs → per-person bar → payee bank/QR), payment status list ("Người thu" badge for the payee), admin settle / update-costs (fees in thousands) + "Thêm người tham gia". Back button uses browser history.
@@ -92,6 +91,7 @@
 17. `supabase/match-attendees.sql` — **run after `payments.sql` + `notifications.sql`.** Adds `'pending'` to the rsvps status CHECK; `recompute_split` (re-splits from the saved totals + current yes-attendees, preserves paid statuses, payee stays confirmed); `admin_add_attendee` (pending rsvp + `attendance_request` notification); `confirm_attendance` (pending → yes/no, auto-recompute on yes, notifies the payee via `attendance_confirmed`).
 18. `supabase/push.sql` — `push_subscriptions` table + RLS (own rows only). Pair with the Database Webhook (see Setup).
 19. `supabase/court-number.sql` — nullable `court_no smallint` (CHECK 1-99) on `matches`. Also folded into `schema.sql`. ⚠️ The match pages select this column — run it **before** deploying Phase 2.19.
+20. `supabase/payment-submitted.sql` — redefines `submit_payment` to also insert a `payment_submitted` notification for the payee (group creator) — reaches the bell **and** push automatically. Also folded into `payments.sql`.
 
 > Status check (2026-06-03): 1-18 confirmed applied on the live project (probed columns/tables/RPCs via the service role). #19 added 2026-06-04 — verify it has been run.
 
@@ -167,11 +167,11 @@ This is mostly Supabase dashboard + a provider account; little app code. A good 
 After that, pick from the candidates below.
 
 ## Next steps (Phase 3 candidates)
-- Notify the admin/payee when a member submits a payment (a `payment_submitted` notification insert in `submit_payment` would automatically reach the bell **and** push).
+- ~~Notify the admin/payee when a member submits a payment~~ ✅ done 2026-06-04 (`payment-submitted.sql`, migration #20).
 - Let the settling admin (not just the group creator) be the payee.
 - Production readiness: custom SMTP (reliable reset/confirmation delivery + re-enable email confirmation); RSVP cutoff + match reminders (reminders could be a Supabase cron → `notifications` insert → push).
 - More notification types (match settled); fold friend requests into the bell.
 - Enforce the tag set-once lock server-side (`set_tag` RPC), and/or let users change it; show `@username#tag` in more places (dashboard greeting, member rows, RSVP rows).
 - i18n polish: persist language in `public.users` (per-account, not just per-device) — would also let `/api/push/notify` localize push copy (currently VI-only); add a 3rd language by dropping in a new dictionary + extending `LANGS`/`Lang`.
 - Wire the avatar (`users.avatar_url`) into the dashboard greeting + group cards + member list + RSVP list.
-- Delete `MatchesPanel.tsx` (dead code) once you're sure the dashboard-centric match flow sticks.
+- ~~Delete `MatchesPanel.tsx` (dead code)~~ ✅ done 2026-06-04. Also done: bell clicks now verify a match still exists before navigating (deleted match → dashboard `?notice=match-gone` toast).

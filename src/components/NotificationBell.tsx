@@ -138,6 +138,13 @@ export default function NotificationBell() {
         group: String(n.data.group_name ?? ""),
       });
     }
+    if (n.type === "payment_submitted") {
+      return t("notifications.paymentSubmitted", {
+        name: String(n.data.name ?? ""),
+        amount: formatVnd(Number(n.data.amount ?? 0)),
+        group: String(n.data.group_name ?? ""),
+      });
+    }
     if (n.type === "attendance_request") {
       return t("notifications.attendanceRequest", {
         group: String(n.data.group_name ?? ""),
@@ -169,7 +176,11 @@ export default function NotificationBell() {
     if (n.type === "friend_request" || n.type === "friend_accepted") {
       return "/dashboard/friends";
     }
-    if (n.type === "payment_confirmed" && n.groupId && n.matchId) {
+    if (
+      (n.type === "payment_confirmed" || n.type === "payment_submitted") &&
+      n.groupId &&
+      n.matchId
+    ) {
       return `/dashboard/groups/${n.groupId}/matches/${n.matchId}`;
     }
     if (
@@ -195,14 +206,30 @@ export default function NotificationBell() {
     });
   };
 
-  const go = (n: NotificationRow) => {
+  const go = async (n: NotificationRow) => {
     setOpen(false);
-    router.push(hrefFor(n));
+    const href = hrefFor(n);
+    // Old notifications can point at a match the admin has since deleted —
+    // verify it still exists and fall back to a dashboard toast if not.
+    if (n.matchId && href.includes("/matches/")) {
+      const { data } = await supabase
+        .from("matches")
+        .select("id")
+        .eq("id", n.matchId)
+        .maybeSingle();
+      if (!data) {
+        router.push("/dashboard?notice=match-gone");
+        return;
+      }
+    }
+    router.push(href);
   };
 
   const iconFor = (type: string) => {
     if (type === "match_created") return Calendar;
-    if (type === "payment_confirmed") return ReceiptText;
+    if (type === "payment_confirmed" || type === "payment_submitted") {
+      return ReceiptText;
+    }
     return UserPlus;
   };
 

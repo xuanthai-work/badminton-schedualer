@@ -72,6 +72,12 @@ function render(rec: NotificationRecord): { title: string; body: string; url: st
         body: `Khoản ${fmtAmount(d.amount)} cho nhóm ${g} đã được xác nhận`,
         url: matchUrl,
       };
+    case "payment_submitted":
+      return {
+        title: "Chờ xác nhận thanh toán",
+        body: `${d.name ?? ""} đã chuyển ${fmtAmount(d.amount)} cho nhóm ${g} — xác nhận nhé`,
+        url: matchUrl,
+      };
     case "attendance_request":
       return {
         title: "Xác nhận tham gia",

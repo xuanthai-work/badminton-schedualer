@@ -74,6 +74,24 @@ export default function DashboardPage() {
   }>({ owe: 0, oweMatches: 0, collect: 0, collectMatches: 0, collectGroup: null });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
+
+  // One-shot toast driven by ?notice=... (e.g. the bell redirects here when
+  // a notification points at a deleted match). Cleans the URL immediately.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("notice") !== "match-gone") return;
+    window.history.replaceState(null, "", "/dashboard");
+    const show = window.setTimeout(
+      () => setNotice(t("dashboard.matchGone")),
+      0
+    );
+    const hide = window.setTimeout(() => setNotice(""), 5000);
+    return () => {
+      window.clearTimeout(show);
+      window.clearTimeout(hide);
+    };
+  }, [t]);
 
   const loadInvites = useCallback(async () => {
     const { data } = await supabase.rpc("get_group_invites");
@@ -601,6 +619,11 @@ export default function DashboardPage() {
           }
         />
       ) : null}
+      {notice && (
+        <div className="solid-panel fixed bottom-[calc(6rem+env(safe-area-inset-bottom))] left-1/2 z-50 -translate-x-1/2 rounded-xl px-4 py-2.5 text-sm text-slate-100 shadow-2xl">
+          {notice}
+        </div>
+      )}
       {userId ? <OnboardingPrompts /> : null}
       <BottomNav />
     </main>
