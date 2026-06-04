@@ -21,6 +21,7 @@ import { ensureUserProfile } from "@/lib/userProfile";
 import { useI18n } from "@/lib/i18n";
 import BottomNav from "@/components/BottomNav";
 import NotificationBell from "@/components/NotificationBell";
+import OnboardingPrompts from "@/components/OnboardingPrompts";
 import CreateGroupPanel from "./CreateGroupPanel";
 import CreateMatchPanel from "./CreateMatchPanel";
 
@@ -600,6 +601,7 @@ export default function DashboardPage() {
           }
         />
       ) : null}
+      {userId ? <OnboardingPrompts /> : null}
       <BottomNav />
     </main>
   );

@@ -485,7 +485,8 @@ export default function ProfilePage() {
               </div>
             </section>
 
-            <section className="glass-panel rounded-2xl p-5">
+            {/* relative z-10 — same stacking-context fix for the bank dropdown. */}
+            <section className="glass-panel relative z-10 rounded-2xl p-5">
               <div className="mb-4 flex items-center gap-2">
                 <Landmark
                   size={18}
@@ -637,7 +638,10 @@ export default function ProfilePage() {
               )}
             </section>
 
-            <section className="glass-panel rounded-2xl p-5">
+            {/* relative z-10: glass-panel's backdrop-filter creates a stacking
+                context, so without this the next card paints over the open
+                language dropdown. */}
+            <section className="glass-panel relative z-10 rounded-2xl p-5">
               <div className="mb-4 flex items-center gap-2">
                 <Globe size={18} strokeWidth={1.75} className="text-lime-400" />
                 <h2 className="text-base font-semibold">

@@ -393,6 +393,20 @@ const vi = {
     available: "Đã có bản mới của ứng dụng.",
     action: "Cập nhật",
   },
+  onboard: {
+    installTitle: "Đưa app vào màn hình chính?",
+    installBody:
+      "Cài như một app thật: mở nhanh từ icon, chạy toàn màn hình, không thanh trình duyệt.",
+    installAction: "Cài đặt",
+    iosBody:
+      "Trên iPhone: bấm nút Chia sẻ (Share) trong Safari rồi chọn \"Thêm vào MH chính\" (Add to Home Screen).",
+    iosOk: "Đã hiểu",
+    pushTitle: "Bật thông báo đẩy?",
+    pushBody:
+      "Nhận báo lịch mới và thanh toán ngay cả khi không mở app. Bạn có thể tắt bất cứ lúc nào trong Tài khoản.",
+    pushAction: "Bật thông báo",
+    later: "Để sau",
+  },
   push: {
     title: "Thông báo đẩy",
     body: "Nhận thông báo ngay cả khi không mở app.",
@@ -810,6 +824,20 @@ const en: typeof vi = {
   update: {
     available: "A new version is available.",
     action: "Update",
+  },
+  onboard: {
+    installTitle: "Add the app to your home screen?",
+    installBody:
+      "Install it like a real app: launches from an icon, full screen, no browser bar.",
+    installAction: "Install",
+    iosBody:
+      "On iPhone: tap the Share button in Safari, then choose \"Add to Home Screen\".",
+    iosOk: "Got it",
+    pushTitle: "Enable push notifications?",
+    pushBody:
+      "Get new-match and payment alerts even when the app is closed. You can turn this off anytime in Account.",
+    pushAction: "Enable",
+    later: "Later",
   },
   push: {
     title: "Push notifications",

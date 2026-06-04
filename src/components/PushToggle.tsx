@@ -2,19 +2,13 @@
 
 import { useEffect, useState } from "react";
 import { Bell, BellOff } from "lucide-react";
-import { supabase } from "@/lib/supabaseClient";
 import { useI18n } from "@/lib/i18n";
-
-const VAPID_PUBLIC = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY ?? "";
-
-function urlBase64ToUint8Array(base64String: string) {
-  const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
-  const base64 = (base64String + padding).replace(/-/g, "+").replace(/_/g, "/");
-  const raw = atob(base64);
-  const arr = new Uint8Array(raw.length);
-  for (let i = 0; i < raw.length; i += 1) arr[i] = raw.charCodeAt(i);
-  return arr;
-}
+import {
+  disablePush,
+  enablePush,
+  getPushSubscription,
+  isPushSupported,
+} from "@/lib/push";
 
 export default function PushToggle() {
   const { t } = useI18n();
@@ -24,26 +18,14 @@ export default function PushToggle() {
   const [msg, setMsg] = useState<{ text: string; ok: boolean } | null>(null);
 
   useEffect(() => {
-    const ok =
-      typeof window !== "undefined" &&
-      "serviceWorker" in navigator &&
-      "PushManager" in window &&
-      "Notification" in window &&
-      Boolean(VAPID_PUBLIC);
-    if (!ok) return; // unsupported: leave state at its defaults
+    if (!isPushSupported()) return; // unsupported: leave state at its defaults
 
     let active = true;
     (async () => {
-      try {
-        await navigator.serviceWorker.register("/sw.js");
-        const reg = await navigator.serviceWorker.ready;
-        const sub = await reg.pushManager.getSubscription();
-        if (!active) return;
-        setSupported(true);
-        setEnabled(Boolean(sub));
-      } catch {
-        if (active) setSupported(true); // supported, but registration retryable
-      }
+      const sub = await getPushSubscription();
+      if (!active) return;
+      setSupported(true);
+      setEnabled(Boolean(sub));
     })();
     return () => {
       active = false;
@@ -53,61 +35,29 @@ export default function PushToggle() {
   const enable = async () => {
     setBusy(true);
     setMsg(null);
-    try {
-      const permission = await Notification.requestPermission();
-      if (permission !== "granted") {
-        setMsg({ text: t("push.denied"), ok: false });
-        return;
-      }
-      const reg = await navigator.serviceWorker.ready;
-      const sub = await reg.pushManager.subscribe({
-        userVisibleOnly: true,
-        applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC),
-      });
-      const json = sub.toJSON();
-      const { data: userData } = await supabase.auth.getUser();
-      const uid = userData.user?.id;
-      if (!uid) throw new Error("no session");
-
-      const { error } = await supabase.from("push_subscriptions").upsert(
-        {
-          user_id: uid,
-          endpoint: sub.endpoint,
-          p256dh: json.keys?.p256dh ?? "",
-          auth: json.keys?.auth ?? "",
-        },
-        { onConflict: "endpoint" }
-      );
-      if (error) throw new Error(error.message);
+    const result = await enablePush();
+    if (result === "ok") {
       setEnabled(true);
       setMsg({ text: t("push.enabledMsg"), ok: true });
-    } catch {
+    } else if (result === "denied") {
+      setMsg({ text: t("push.denied"), ok: false });
+    } else {
       setMsg({ text: t("push.error"), ok: false });
-    } finally {
-      setBusy(false);
     }
+    setBusy(false);
   };
 
   const disable = async () => {
     setBusy(true);
     setMsg(null);
-    try {
-      const reg = await navigator.serviceWorker.ready;
-      const sub = await reg.pushManager.getSubscription();
-      if (sub) {
-        await supabase
-          .from("push_subscriptions")
-          .delete()
-          .eq("endpoint", sub.endpoint);
-        await sub.unsubscribe();
-      }
+    const ok = await disablePush();
+    if (ok) {
       setEnabled(false);
       setMsg({ text: t("push.disabledMsg"), ok: true });
-    } catch {
+    } else {
       setMsg({ text: t("push.error"), ok: false });
-    } finally {
-      setBusy(false);
     }
+    setBusy(false);
   };
 
   if (!supported) {
