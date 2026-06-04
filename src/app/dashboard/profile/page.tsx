@@ -52,7 +52,6 @@ export default function ProfilePage() {
 
   const [userId, setUserId] = useState<string>("");
   const [authEmail, setAuthEmail] = useState<string>("");
-  const [providers, setProviders] = useState<string[]>([]);
 
   const [profile, setProfile] = useState<ProfileRow | null>(null);
 
@@ -93,8 +92,6 @@ export default function ProfilePage() {
         const u = data.session.user;
         setUserId(u.id);
         setAuthEmail(u.email ?? "");
-        const list = (u.app_metadata?.providers as string[] | undefined) ?? [];
-        setProviders(list);
 
         const { data: row, error: queryError } = await supabase
           .from("users")
@@ -133,7 +130,6 @@ export default function ProfilePage() {
     void init();
   }, [router, t]);
 
-  const canChangePassword = providers.includes("email");
 
   const handleSaveName = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -589,13 +585,9 @@ export default function ProfilePage() {
                 </h2>
               </div>
 
-              {!canChangePassword ? (
-                <p className="text-sm text-slate-400">
-                  {t("profile.oauthNoPasswordPrefix")}
-                  {providers[0] === "google" ? "Google" : "OAuth"}
-                  {t("profile.oauthNoPasswordSuffix")}
-                </p>
-              ) : (
+              {/* Password is the only sign-in method now (Google OAuth removed),
+                  so every account — incl. legacy Google ones — can set one. */}
+              {(
                 <form onSubmit={handleChangePassword} className="space-y-4">
                   <div className="space-y-1">
                     <label className="ml-1 text-[10px] font-semibold uppercase tracking-[0.2em] text-slate-400">

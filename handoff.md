@@ -1,7 +1,7 @@
 # Handoff
 
 ## Summary
-- **Phase 1:** Auth (email/password + Google OAuth) and group creation/listing on the dashboard.
+- **Phase 1:** Auth (email/password; Google OAuth later removed — see Phase 2.18) and group creation/listing on the dashboard.
 - **Phase 2:** Group detail with Matches & Members tabs; match detail with RSVP + expense entry + auto-split + reopen.
 - **Phase 2.5:** Stitch design port across all screens; bottom mobile nav; profile page (display name + bank + password + avatar + payment QR); group settings tab (rename + delete with type-to-confirm); Google Maps URL on matches; username-or-email sign-in.
 - **Phase 2.6:** Internationalization — Vietnamese (default) + English via a client Context + `localStorage`. Every screen and shared component reads from `t()`. Language switcher on the profile page. Committed `74d7af5`.
@@ -15,7 +15,8 @@
 - **Phase 2.14:** Add-attendee flow — admin adds a group member to a (closed) match → the member confirms via a banner + notification (`pending` rsvp) → on "yes" the split **auto-recomputes** (`recompute_split`). Replaces the old "Mở lại lịch" reopen button.
 - **Phase 2.15:** Installable **PWA** — `manifest.ts` (standalone, start `/dashboard`), code-generated icons, apple meta, safe-area handling; an **auto-update prompt** (deploy SHA via `/api/version` + `UpdatePrompt` banner — no reinstall needed); a dashboard **tag-reminder banner** for users without a tag.
 - **Phase 2.16:** **Web push notifications** — `public/sw.js`, `push_subscriptions` table, opt-in `PushToggle` on the profile, `/api/push/notify` (web-push + VAPID on Vercel) fed by a Supabase **Database Webhook** on `notifications` inserts. Verified end-to-end on Android (FCM).
-- **Phase 2.17:** Inline **quick-RSVP** — unanswered upcoming matches on the dashboard show "Có lịch mới — bạn tham gia chứ?" with Tham gia/Nghỉ buttons (optimistic, in place).
+- **Phase 2.17:** Inline **quick-RSVP** — unanswered upcoming matches on the dashboard show "Có lịch mới — bạn tham gia chứ?" with Tham gia/Nghỉ buttons (optimistic, in place). Plus first-visit onboarding prompts (install PWA + enable push) and the profile dropdown z-order fix.
+- **Phase 2.18:** **Google sign-in removed** — the unverified OAuth consent screen showed users a "this app doesn't comply with Google policies" warning. Auth is email/password only (username-or-email sign-in unchanged). Legacy Google-only accounts need an admin-set password (Auth admin API); also disable the Google provider in the Supabase dashboard.
 
 ## Key files
 
@@ -92,7 +93,7 @@
 1. `.env.local` from `.env.example`:
    - `NEXT_PUBLIC_SUPABASE_URL` (base project URL, no `/rest/v1` suffix)
    - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
-2. Supabase Auth: enable the Google provider (client ID/secret from Google Cloud; the authorized redirect URI there is `https://<project-ref>.supabase.co/auth/v1/callback`).
+2. ~~Supabase Auth: Google provider~~ — **removed** (Phase 2.18). Disable the Google provider in the dashboard; no Google Cloud setup needed anymore.
 3. Supabase **URL Configuration**: Site URL = the Vercel domain (`https://badminton-scheduler-gilt.vercel.app`); Redirect URLs include `https://<app>/**` **and** `http://localhost:3000/**` — otherwise `redirectTo` is ignored and OAuth falls back to the Site URL.
 4. Run the SQL migrations above in the Supabase SQL editor. All are idempotent.
 5. **Web push** (live and verified): five extra env vars in Vercel (+ `.env.local`) — `NEXT_PUBLIC_VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT`, `PUSH_WEBHOOK_SECRET`, `SUPABASE_SERVICE_ROLE_KEY` (see `.env.example`); run `supabase/push.sql`; create a Supabase **Database Webhook**: `notifications` INSERT → POST `https://<app>/api/push/notify` with headers `Content-type: application/json` + `x-webhook-secret: <PUSH_WEBHOOK_SECRET>`. ⚠️ `NEXT_PUBLIC_*` vars are baked at **build** time — redeploy after changing them.

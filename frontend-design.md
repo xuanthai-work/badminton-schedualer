@@ -10,7 +10,7 @@
 
 ## 1. Product summary (context for Stitch)
 
-A mobile-first web app for Vietnamese amateur badminton clubs to schedule matches, collect RSVPs, and split the post-match bill (court + shuttlecocks + water) among attendees. Members typically use it on a phone, courtside, with bright gym lighting. The app is built with Next.js 16 (App Router) + Tailwind + Supabase. Authentication is via Google OAuth or email/password. The same app handles three roles: visitor, group member, and group admin.
+A mobile-first web app for Vietnamese amateur badminton clubs to schedule matches, collect RSVPs, and split the post-match bill (court + shuttlecocks + water) among attendees. Members typically use it on a phone, courtside, with bright gym lighting. The app is built with Next.js 16 (App Router) + Tailwind + Supabase. Authentication is via email/password (sign in with username or email). **Google OAuth was removed** — the unverified-app consent warning scared users; see §9. The same app handles three roles: visitor, group member, and group admin.
 
 ---
 
@@ -129,7 +129,7 @@ Hover state (only on interactive cards): border becomes `border-lime-500/40`.
 ## 4. Routes (current implementation)
 
 ```
-/                                              Landing / Auth (username|email + password + Google)
+/                                              Landing / Auth (username|email + password)
 /dashboard                                     Hub: groups WITH their matches nested under each + quick-RSVP + debts card
 /dashboard/groups/[id]                         Group detail (tabs: Thành viên, Cài đặt — matches tab REMOVED)
 /dashboard/groups/[id]/matches/[matchId]       Match detail (RSVP + costs/payment + add-attendee + Maps link)
@@ -155,13 +155,10 @@ Stitch should design **mobile portrait** as primary and provide a wider desktop 
 - Top: small lime-tracking label `BADMINTON SCHEDULER`.
 - Large headline (32–40px): **"Chơi cầu lông không lo chia tiền."**
 - Subhead (16px, slate-300): **"Lên lịch, điểm danh realtime và chia chi phí cho cả nhóm trong vài phút."**
-- Small slate info card: **"Đăng nhập bằng Google để sử dụng nhanh, hoặc dùng email/mật khẩu để đăng ký nội bộ."**
 - Below: a single glass card form.
 
 **Form card (glass panel, 16px radius):**
 - Segmented control pill at top: two tabs **"Đăng nhập" / "Đăng ký"**. Active tab has lime background.
-- Full-width OAuth button (slate glass with lime hover glow + inline Google "G" SVG): **"Đăng nhập với Google"**.
-- Divider with caps text: **"HOẶC DÙNG TÀI KHOẢN"** (Sign-in) or **"HOẶC TẠO TÀI KHOẢN"** (Sign-up).
 - **Sign-in form:**
   - Single field labeled **"Tên đăng nhập hoặc email"** — placeholder `nguyenvana hoặc email@vi-du.com`. Branches on `@`.
   - **"Mật khẩu"** field.
@@ -382,7 +379,7 @@ Per-attendee status (the "Trạng thái thanh toán" list above): each "Yes" att
 **Section 3 — Đổi mật khẩu** (glass card):
 - Heading: `KeyRound` icon + **"Đổi mật khẩu"**.
 - If the user signed up with email/password (i.e. `email` provider): two password inputs (`Mật khẩu mới`, `Xác nhận mật khẩu`) with min 8 chars + match validation. Primary CTA **"Cập nhật mật khẩu"**.
-- If OAuth-only: replace the form with the line **"Tài khoản đăng nhập bằng Google. Không thể đổi mật khẩu tại đây."**
+- If OAuth-only (legacy Google accounts): replace the form with the line **"Tài khoản đăng nhập bằng Google. Không thể đổi mật khẩu tại đây."**
 
 **Section 4 — Ngôn ngữ / Language** (glass card, shipped):
 - Heading: `Globe` icon + **"Ngôn ngữ"**.
@@ -544,4 +541,5 @@ When porting Stitch output back to code, override these recurring drifts:
 - **Match detail reshaped** (§5.4): back button uses history ("← QUAY LẠI"); hero shows the **time range**; Chi phí + Thanh toán merged into one card (single "Mỗi người trả" bar above the payment info); settle fees entered **in thousands** with a live ₫ preview; **"Mở lại lịch" removed**, replaced by **"Thêm người tham gia"** (admin adds a member → they confirm via a banner → split auto-recomputes); payee row shows a **"Người thu"** pill (auto-confirmed, no self-confirm).
 - **Picker popovers opaque** (§3.5): `.solid-panel` surface + unlayered lime calendar theme (was translucent/blue).
 - **PWA shipped** (§4): installable manifest (standalone, dark), generated "BS" icons, safe-area-aware bottom nav + FABs (§3.8/§3.9), and an in-app **"Đã có bản mới — Cập nhật"** update banner (§5.2).
+- **Google sign-in removed** (§5.1): the OAuth consent screen showed Google's unverified-app policy warning to users, so auth is now email/password only (username-or-email sign-in unchanged). Legacy Google-only accounts get an admin-set password.
 - **Web push shipped** (§5.5 Section 5 + §5.6c): per-device opt-in toggle on the profile; every notification also lands as a system push (Android verified; iOS needs the installed PWA). Sign-out is now Section 6.
