@@ -200,6 +200,12 @@ export default function NotificationBell() {
     router.push(hrefFor(n));
   };
 
+  const iconFor = (type: string) => {
+    if (type === "match_created") return Calendar;
+    if (type === "payment_confirmed") return ReceiptText;
+    return UserPlus;
+  };
+
   return (
     // z-30 lifts the bell's subtree above sibling glass-panel sections
     // (backdrop-filter stacking contexts) so the popover paints on top.
@@ -241,12 +247,7 @@ export default function NotificationBell() {
               ) : (
                 <ul className="space-y-1">
                   {items.map((n) => {
-                    const Icon =
-                      n.type === "match_created"
-                        ? Calendar
-                        : n.type === "payment_confirmed"
-                          ? ReceiptText
-                          : UserPlus;
+                    const Icon = iconFor(n.type);
                     return (
                       <li key={n.id}>
                         <button

@@ -533,49 +533,18 @@ export default function MembersPanel({
 
                       {!isSelf && (
                         <div className="mt-3 border-t border-slate-800 pt-3">
-                          {(() => {
-                            const rel = relations.get(member.userId);
-                            if (rel?.relation === "friend") {
-                              return (
-                                <p className="text-center text-xs text-lime-300">
-                                  ✓ {t("members.friendBadge")}
-                                </p>
-                              );
-                            }
-                            if (rel?.relation === "outgoing") {
-                              return (
-                                <p className="text-center text-xs text-slate-400">
-                                  {t("members.friendRequestPending")}
-                                </p>
-                              );
-                            }
-                            if (rel?.relation === "incoming") {
-                              return (
-                                <button
-                                  type="button"
-                                  className="w-full rounded-lg bg-lime-500 py-2 text-xs font-semibold text-slate-950 transition hover:scale-[1.02] active:scale-95 disabled:opacity-60"
-                                  disabled={friendBusy}
-                                  onClick={() => handleAcceptFriend(rel)}
-                                >
-                                  {friendBusy
-                                    ? t("auth.processing")
-                                    : t("members.acceptFriend")}
-                                </button>
-                              );
-                            }
-                            return (
-                              <button
-                                type="button"
-                                className="w-full rounded-lg bg-lime-500 py-2 text-xs font-semibold text-slate-950 transition hover:scale-[1.02] active:scale-95 disabled:opacity-60"
-                                disabled={friendBusy}
-                                onClick={() => handleSendFriendRequest(member)}
-                              >
-                                {friendBusy
-                                  ? t("auth.processing")
-                                  : t("members.addFriend")}
-                              </button>
-                            );
-                          })()}
+                          <FriendAction
+                            relation={relations.get(member.userId)?.relation}
+                            busy={friendBusy}
+                            // friend / outgoing render static text; incoming and
+                            // none share the same lime button, differing only in
+                            // label + handler.
+                            onAdd={() => handleSendFriendRequest(member)}
+                            onAccept={() => {
+                              const rel = relations.get(member.userId);
+                              if (rel) void handleAcceptFriend(rel);
+                            }}
+                          />
                           {friendMsg && (
                             <p className="mt-2 text-center text-xs text-slate-300">
                               {friendMsg}
@@ -593,6 +562,54 @@ export default function MembersPanel({
       )}
 
     </section>
+  );
+}
+
+// The friend-action area of a member popover: static text for an existing
+// friendship or an outgoing request, otherwise a lime button that either
+// accepts an incoming request or sends a new one.
+function FriendAction({
+  relation,
+  busy,
+  onAdd,
+  onAccept,
+}: {
+  relation: Relation | undefined;
+  busy: boolean;
+  onAdd: () => void;
+  onAccept: () => void;
+}) {
+  const { t } = useI18n();
+
+  if (relation === "friend") {
+    return (
+      <p className="text-center text-xs text-lime-300">
+        ✓ {t("members.friendBadge")}
+      </p>
+    );
+  }
+  if (relation === "outgoing") {
+    return (
+      <p className="text-center text-xs text-slate-400">
+        {t("members.friendRequestPending")}
+      </p>
+    );
+  }
+
+  const isIncoming = relation === "incoming";
+  return (
+    <button
+      type="button"
+      className="w-full rounded-lg bg-lime-500 py-2 text-xs font-semibold text-slate-950 transition hover:scale-[1.02] active:scale-95 disabled:opacity-60"
+      disabled={busy}
+      onClick={isIncoming ? onAccept : onAdd}
+    >
+      {busy
+        ? t("auth.processing")
+        : isIncoming
+          ? t("members.acceptFriend")
+          : t("members.addFriend")}
+    </button>
   );
 }
 

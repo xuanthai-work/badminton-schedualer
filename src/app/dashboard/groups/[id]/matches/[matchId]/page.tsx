@@ -152,11 +152,9 @@ export default function MatchDetailPage() {
         rsvpRows?.map((row) => {
           const user = Array.isArray(row.users) ? row.users[0] : row.users;
           const status: Rsvp["status"] =
-            row.status === "yes"
-              ? "yes"
-              : row.status === "pending"
-                ? "pending"
-                : "no";
+            row.status === "yes" || row.status === "pending"
+              ? row.status
+              : "no";
           return {
             userId: row.user_id,
             status,
