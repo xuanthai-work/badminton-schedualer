@@ -134,7 +134,7 @@ Hover state (only on interactive cards): border becomes `border-lime-500/40`.
 /dashboard/groups/[id]                         Group detail (tabs: Thành viên, Cài đặt — matches tab REMOVED)
 /dashboard/groups/[id]/matches/[matchId]       Match detail (RSVP + costs/payment + add-attendee + Maps link)
 /dashboard/friends                             Friends (add by username#tag, requests, list)
-/dashboard/notifications                       Notifications list (match, group, friends, payment, attendance)
+(notifications: bell popover on every nav page — the standalone route was removed)
 /dashboard/profile                             Handle/tag / avatar / login / bank / QR / password / language / push / sign-out
 /dashboard/debts                               Công nợ detail — "Tôi nợ" + "Chờ thu" (shipped, §5.7)
 ```
@@ -153,7 +153,7 @@ Stitch should design **mobile portrait** as primary and provide a wider desktop 
 
 **Layout (mobile):**
 - Top: small lime-tracking label `BADMINTON SCHEDULER`.
-- Large headline (32–40px): **"Chơi cầu lông không lo chia tiền."**
+- Large headline (32–40px): **"Cầu lông đi mà ^^"** (EN: "Badminton, pleeease ^^").
 - Subhead (16px, slate-300): **"Lên lịch, điểm danh realtime và chia chi phí cho cả nhóm trong vài phút."**
 - Below: a single glass card form.
 
@@ -186,7 +186,7 @@ Stitch should design **mobile portrait** as primary and provide a wider desktop 
 **Header:**
 - Lime tracking label: **"DASHBOARD"**.
 - Page title (24px semibold, lime text): **"Nhóm của tôi"**.
-- **Notification bell** top-right (`Bell`, 40px rounded glass button) with a lime unread badge (count, "9+" cap) that updates live via Realtime; links to `/dashboard/notifications`. The same bell sits top-right on the **Friends** and **Tài khoản** headers too, so it's reachable from every nav page. (No forced popup — the badge is the nudge.)
+- **Notification bell** top-right (`Bell`, 40px rounded glass button) with a lime unread badge (count, "9+" cap) that updates live via Realtime; opens the **notifications popover** in place (§5.6c). The same bell sits top-right on the **Công nợ**, **Friends** and **Tài khoản** headers too, so it's reachable from every nav page. (No forced popup — the badge is the nudge.)
 - No sign-out button (moved to the profile page; reachable from bottom nav).
 
 **Welcome section:**
@@ -217,7 +217,7 @@ Stitch should design **mobile portrait** as primary and provide a wider desktop 
 
 **FABs (see §3.8):**
 - **"+ Tạo nhóm mới"** — create-group modal.
-- **"+ Tạo lịch"** (admins only) — create-match modal: **"Ngày"** (DateField), **"Giờ bắt đầu" + "Giờ kết thúc"** (two TimeFields; end must be after start), **"Sân / Địa điểm"**, optional **"Link Google Maps (tùy chọn)"**; a **"Nhóm"** `SelectField` appears first when the user admins 2+ groups. Footer: **"Hủy"** + **"Tạo lịch"**.
+- **"+ Tạo lịch"** (admins only) — create-match modal: **"Ngày"** (DateField), **"Giờ bắt đầu" + "Giờ kết thúc"** (two TimeFields; end must be after start), **"Sân / Địa điểm"**, optional **"Sân số (tùy chọn)"** (number input 1-99), optional **"Link Google Maps (tùy chọn)"**; a **"Nhóm"** `SelectField` appears first when the user admins 2+ groups. Footer: **"Hủy"** + **"Tạo lịch"**. The same fields are editable later via the match-detail **"Sửa"** modal (§5.4).
 
 **Create-group modal:**
 - Glass panel, title **"Tạo nhóm mới"**, close button labeled **"Đóng"**.
@@ -254,9 +254,10 @@ Stitch should design **mobile portrait** as primary and provide a wider desktop 
   - Label is now **"Mời thêm thành viên (tên đăng nhập hoặc email)"** — the field accepts a **username or email** (resolved server-side). **You can only invite accepted friends**; a non-friend returns **"Bạn chỉ có thể thêm bạn bè vào nhóm. Hãy kết bạn trước."** Inviting now **sends a pending invite** (not an instant add): success says **"Đã gửi lời mời vào nhóm."**, and **"Người này đã được mời."** if one is already pending. The invitee approves it on their dashboard.
 - **Mời từ bạn bè** card (admin-only, shipped): a glass panel with a `UserPlus` heading listing the admin's accepted friends **not already in the group**, each as `name @username#tag` + a small lime **"Mời"** button that flips to a **"Đã mời"** chip once invited. Empty state when all friends are already members: **"Tất cả bạn bè đã ở trong nhóm."**
 - Member list (vertical, gap 12px). Each row is a glass panel:
-  - Left: name (medium) with optional **"(bạn)"** badge after own name; email below in slate-400.
+  - Left (tappable): avatar (image or lime-initial circle) + name (medium) with optional **"(bạn)"** badge after own name; email below in slate-400.
   - Right: role pill (Admin / Member). If user is the group creator, append **"· Tạo nhóm"** to the pill.
   - Admin-only buttons (right of pill, hidden for the creator and for the row of the viewing admin): **"Hạ quyền"** / **"Phong admin"** (toggles based on current role) and **"Xóa"** (destructive style).
+- **Member profile popover** (shipped, Phase 2.19): tapping a member's name/avatar opens a `solid-panel` popover (`w-72`) anchored under that row — avatar + name + `@username#tag` (lime tag), joined date, and a relation-aware friend section (from `get_friends`): not friends → lime **"Kết bạn"** button (`send_friend_request` by `username#tag`, email fallback); outgoing pending → waiting note; incoming pending → **"Chấp nhận kết bạn"**; already friends → ✓ badge; hidden for self. Tap outside (invisible backdrop) or re-tap to dismiss; the open row gets `relative z-10` so the popover beats later glass-panel siblings' stacking contexts.
 
 #### 5.3.3 Settings tab (admin-only)
 
@@ -283,12 +284,12 @@ The most important screen. Mobile-first, vertical scroll. Two visual states: **O
 **Header (both states):**
 - Small lime back-button with `ChevronLeft`: **"← QUAY LẠI"** — uses **browser history** (`router.back()`), so it returns to wherever the user came from (dashboard or group page); falls back to the group page on a direct URL open.
 - Title **"Chi tiết trận đấu"** (28px semibold).
-- Below title: `MapPin` icon + location text. If the match has a `location_url`, append a small lime pill link **"↗ MỞ GOOGLE MAPS"** (with `ExternalLink` icon, opens in new tab).
-- Status pill on the right: **"Đang mở"** (emerald) or **"Đã chốt"** (slate).
+- Right of the title: admin-only **"✎ Sửa"** outline button (opens `EditMatchPanel` — modal mirroring the create form: date, time range, venue, court number, maps link; prefilled, plain `matches` UPDATE) + status pill **"Đang mở"** (emerald) or **"Đã chốt"** (slate). (The old header location row was removed — location lives in the info card.)
 
-**Hero info card (under header):**
-- Lime-tinted rounded icon box with `Calendar` icon.
-- Caps label **"THỜI GIAN"** above the prominent date + **time range** line: **"Thứ 3, 03/06/2026 · 20:00 - 22:00"** (end time shown when set).
+**Info card (under header)** — two-column header + map (Phase 2.19 redesign):
+- Left: **relative day label** (20px semibold): "Hôm nay" / "Ngày mai" / "Chủ Nhật **tuần này**" / "Chủ Nhật **tuần sau**" (Monday-based weeks, computed from today; plain weekday beyond next week), with the full date `07/06/2026` in slate underneath.
+- Right (right-aligned): lime **time range** with `Clock` icon (20px semibold, e.g. **"16:00 – 18:00"**), and under it `MapPin` + venue name + a lime **"Sân {n}"** badge when `court_no` is set.
+- Below (when `location_url` exists): **`MapsPreview`** — full-width static-map image (h-28, via `/api/link-preview` → Google og:image), the entire card opens the link, small **"↗ Mở Google Maps"** tag overlaid bottom-right; a plain link pill is the loading/blocked fallback.
 
 **Attendance-confirm banner (shipped — shown only to a member an admin added, rsvp `pending`):**
 - Lime-bordered glass card above the RSVP card: `UserPlus` + **"Bạn có chơi buổi này không?"** / **"Admin đã thêm bạn vào trận này. Xác nhận để được tính chia tiền."** + two buttons **"Có tham gia"** (lime) / **"Không tham gia"** (outline). Confirming "yes" **auto-recomputes the split** and notifies the payee.
