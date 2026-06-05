@@ -103,7 +103,7 @@
    - `NEXT_PUBLIC_SUPABASE_URL` (base project URL, no `/rest/v1` suffix)
    - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
 2. ~~Supabase Auth: Google provider~~ — **removed** (Phase 2.18). Disable the Google provider in the dashboard; no Google Cloud setup needed anymore.
-3. Supabase **URL Configuration**: Site URL = the Vercel domain (`https://badminton-scheduler-gilt.vercel.app`); Redirect URLs include `https://<app>/**` **and** `http://localhost:3000/**` — otherwise `redirectTo` is ignored and OAuth falls back to the Site URL.
+3. Supabase **URL Configuration**: Site URL = `https://bscheduler.xyz` (custom domain since 2026-06-05; the old `badminton-scheduler-gilt.vercel.app` redirects); Redirect URLs include `https://bscheduler.xyz/**` **and** `http://localhost:3000/**` — otherwise `redirectTo` is ignored and auth emails fall back to the Site URL.
 4. Run the SQL migrations above in the Supabase SQL editor. All are idempotent.
 5. **Web push** (live and verified): five extra env vars in Vercel (+ `.env.local`) — `NEXT_PUBLIC_VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT`, `PUSH_WEBHOOK_SECRET`, `SUPABASE_SERVICE_ROLE_KEY` (see `.env.example`); run `supabase/push.sql`; create a Supabase **Database Webhook**: `notifications` INSERT → POST `https://<app>/api/push/notify` with headers `Content-type: application/json` + `x-webhook-secret: <PUSH_WEBHOOK_SECRET>`. ⚠️ `NEXT_PUBLIC_*` vars are baked at **build** time — redeploy after changing them.
 6. `npm run dev` — restart whenever `.env.local` changes (the Supabase client is cached on `globalThis`).
@@ -158,11 +158,11 @@
 
 ## ▶ Next step (recommended)
 
-**Production readiness — custom SMTP.** The core product loop (schedule → RSVP → split → track payment → debts) is feature-complete, so the highest-value next move is making it safe for real users:
+**Production readiness.** The core product loop (schedule → RSVP → split → track payment → debts) is feature-complete:
 
-1. **Custom SMTP** in Supabase (Authentication → Emails → SMTP) with a provider (Resend / SES / Postmark). The built-in mailer is rate-limited to a few/hour — it tripped us during testing.
-2. **Re-enable "Confirm email"** (turned off during dev to dodge that rate limit) so addresses are verified.
-3. ~~Password-reset flow~~ ✅ shipped 2026-06-04: "Quên mật khẩu?" on the sign-in card (accepts email **or** username via `email_for_username`) → `resetPasswordForEmail` with `redirectTo` → `/reset-password` page (waits for `detectSessionInUrl` to process the recovery hash, handles `#error=` expired links, then `auth.updateUser({password})` → dashboard). ⚠️ Delivery still rides the rate-limited built-in mailer until SMTP is set up.
+1. ~~Custom SMTP~~ ✅ done 2026-06-05: bought **`bscheduler.xyz`** (Porkbun, auto-renew, WHOIS privacy) → primary domain on Vercel (old `badminton-scheduler-gilt.vercel.app` 307-redirects); Resend (free tier, region Tokyo) verified via DKIM/SPF/MX/DMARC records in Porkbun DNS (plus the A `216.198.79.1` for Vercel and CNAME `links` for click tracking); Supabase SMTP = `smtp.resend.com:465`, user `resend`, sender `noreply@bscheduler.xyz`. Site URL + redirect URLs + the push webhook URL all moved to the new domain. ⚠️ PWA installs + push subscriptions are origin-bound — users on the old domain must reinstall the app and re-enable push at `bscheduler.xyz`.
+2. **Re-enable "Confirm email"** (turned off during dev to dodge the old rate limit) so addresses are verified — safe now that SMTP is custom.
+3. ~~Password-reset flow~~ ✅ shipped 2026-06-04: "Quên mật khẩu?" on the sign-in card (accepts email **or** username via `email_for_username`) → `resetPasswordForEmail` with `redirectTo` → `/reset-password` page (waits for `detectSessionInUrl` to process the recovery hash, handles `#error=` expired links, then `auth.updateUser({password})` → dashboard). Delivery now goes through Resend SMTP (no rate-limit worry).
 4. ~~Lock down Supabase URL config~~ ✅ done 2026-06-03 (Site URL → Vercel domain, `/**` wildcards for prod + localhost — also what allows the `/reset-password` redirect).
 
 This is mostly Supabase dashboard + a provider account; little app code. A good quick win to pair with it: **notify the payee when a member submits a payment** (first item below) — it would ride the existing push pipeline for free.
@@ -172,7 +172,7 @@ After that, pick from the candidates below.
 ## Next steps (Phase 3 candidates)
 - ~~Notify the admin/payee when a member submits a payment~~ ✅ done 2026-06-04 (`payment-submitted.sql`, migration #20).
 - ~~Let the settling admin (not just the group creator) be the payee~~ ✅ done 2026-06-04 (`flexible-payee.sql`, #21 — first settler wins, legacy matches keep the creator).
-- Production readiness: custom SMTP (reliable reset/confirmation delivery + re-enable email confirmation). ~~Match reminders~~ ✅ done 2026-06-04 (`match-reminders.sql`, #22 — pg_cron, 2h before, reminder + RSVP nudge). RSVP cutoff still open.
+- Production readiness: ~~custom SMTP~~ ✅ done 2026-06-05 (Resend + `bscheduler.xyz`); re-enable email confirmation still open. ~~Match reminders~~ ✅ done 2026-06-04 (`match-reminders.sql`, #22 — pg_cron, 2h before, reminder + RSVP nudge). RSVP cutoff still open.
 - More notification types (match settled); fold friend requests into the bell.
 - Enforce the tag set-once lock server-side (`set_tag` RPC), and/or let users change it; show `@username#tag` in more places (dashboard greeting, member rows, RSVP rows).
 - ~~i18n polish: persist language in `public.users` + localized push copy~~ ✅ done 2026-06-04 (`user-lang.sql`, #23). Still open: add a 3rd language by dropping in a new dictionary + extending `LANGS`/`Lang`.
