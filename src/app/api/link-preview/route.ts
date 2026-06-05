@@ -1,8 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 
-// Fetches a Google Maps link server-side and extracts its og:image (a static
-// map of the location) so the client can render a preview card. Host is
-// allowlisted to Google Maps domains only — this is not a generic proxy.
+// Resolves a Google Maps link server-side for the client preview card:
+// og:image when Google serves it (it doesn't to datacenter IPs in prod) and,
+// more reliably, the place coordinates parsed from the resolved URL — the
+// client then renders an OpenStreetMap embed. Host is allowlisted to Google
+// Maps domains only — this is not a generic proxy.
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -42,29 +44,37 @@ export async function GET(request: NextRequest) {
     });
 
     // Short links redirect — the final host must still be Google's.
-    const finalHost = new URL(res.url).hostname;
-    if (!res.ok || !hostAllowed(finalHost)) {
-      return NextResponse.json({ image: null });
+    const finalUrl = res.url;
+    if (!res.ok || !hostAllowed(new URL(finalUrl).hostname)) {
+      return NextResponse.json({ image: null, lat: null, lng: null });
     }
 
     const html = await res.text();
     const match = html.match(
       /<meta[^>]+property="og:image"[^>]+content="([^"]+)"/
     ) ?? html.match(/<meta[^>]+content="([^"]+)"[^>]+property="og:image"/);
-
     const image = match ? match[1].replace(/&amp;/g, "&") : null;
 
+    // Coordinates: the place pin (!3d..!4d..) is precise; the @lat,lng
+    // viewport is a good fallback. Check the resolved URL first, then HTML.
+    const haystack = `${decodeURIComponent(finalUrl)}\n${html.slice(0, 200_000)}`;
+    const pin = haystack.match(/!3d(-?\d{1,2}\.\d+)!4d(-?\d{1,3}\.\d+)/);
+    const viewport = haystack.match(/@(-?\d{1,2}\.\d+),(-?\d{1,3}\.\d+)/);
+    const coords = pin ?? viewport;
+    const lat = coords ? Number(coords[1]) : null;
+    const lng = coords ? Number(coords[2]) : null;
+
     return NextResponse.json(
-      { image },
+      { image, lat, lng },
       {
         headers: {
-          // Static-map previews barely change; cache hard at the CDN.
+          // Place previews barely change; cache hard at the CDN.
           "Cache-Control":
             "public, s-maxage=604800, stale-while-revalidate=86400",
         },
       }
     );
   } catch {
-    return NextResponse.json({ image: null });
+    return NextResponse.json({ image: null, lat: null, lng: null });
   }
 }

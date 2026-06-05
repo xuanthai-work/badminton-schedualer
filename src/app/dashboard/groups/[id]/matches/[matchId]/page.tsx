@@ -566,42 +566,40 @@ export default function MatchDetailPage() {
             {error && <p className="text-sm text-rose-400">{error}</p>}
 
             <section className="glass-panel rounded-2xl p-5">
-              <div className="flex items-start justify-between gap-4">
-                {/* The time range must never line-break, so the LEFT column
-                    is the flexible one (the day label may wrap) and the
-                    venue truncates inside whatever is left. */}
-                <div className="min-w-0">
-                  <p className="text-xl font-semibold leading-tight">
-                    {relativeDayLabel(match.date)}
-                  </p>
-                  <p className="mt-1 text-[15px] text-slate-400">
-                    {formatDate(match.date, {
-                      day: "2-digit",
-                      month: "2-digit",
-                      year: "numeric",
-                    })}
-                  </p>
-                </div>
-                <div className="min-w-0 text-right">
-                  <p className="inline-flex items-center gap-1.5 whitespace-nowrap text-xl font-semibold leading-tight text-lime-300">
-                    <Clock size={18} strokeWidth={2} className="shrink-0" />
-                    {match.time.slice(0, 5)}
-                    {match.endTime ? ` – ${match.endTime.slice(0, 5)}` : ""}
-                  </p>
-                  <p className="mt-1 flex items-center justify-end gap-1.5 text-base font-medium text-slate-100">
-                    <MapPin
-                      size={15}
-                      strokeWidth={1.75}
-                      className="shrink-0 text-lime-400"
-                    />
-                    <span className="min-w-0 truncate">{match.location}</span>
-                    {match.courtNo != null && (
-                      <span className="shrink-0 rounded-full bg-lime-500/15 px-2 py-0.5 text-xs font-semibold text-lime-300">
-                        {t("matches.courtShort", { n: match.courtNo })}
-                      </span>
-                    )}
-                  </p>
-                </div>
+              {/* Row 1: day label + date. Row 2: time left, venue right.
+                  Full-width rows wrap gracefully on narrow screens — no
+                  two-column width fight. */}
+              <p className="flex flex-wrap items-baseline gap-x-2">
+                <span className="text-xl font-semibold leading-tight">
+                  {relativeDayLabel(match.date)}
+                </span>
+                <span className="text-sm text-slate-400">
+                  {formatDate(match.date, {
+                    day: "2-digit",
+                    month: "2-digit",
+                    year: "numeric",
+                  })}
+                </span>
+              </p>
+              <div className="mt-2.5 flex flex-wrap items-center justify-between gap-x-3 gap-y-1.5">
+                <p className="inline-flex items-center gap-1.5 whitespace-nowrap text-xl font-semibold leading-tight text-lime-300">
+                  <Clock size={18} strokeWidth={2} className="shrink-0" />
+                  {match.time.slice(0, 5)}
+                  {match.endTime ? ` – ${match.endTime.slice(0, 5)}` : ""}
+                </p>
+                <p className="flex min-w-0 items-center gap-1.5 text-base font-medium text-slate-100">
+                  <MapPin
+                    size={15}
+                    strokeWidth={1.75}
+                    className="shrink-0 text-lime-400"
+                  />
+                  <span className="min-w-0 truncate">{match.location}</span>
+                  {match.courtNo != null && (
+                    <span className="shrink-0 rounded-full bg-lime-500/15 px-2 py-0.5 text-xs font-semibold text-lime-300">
+                      {t("matches.courtShort", { n: match.courtNo })}
+                    </span>
+                  )}
+                </p>
               </div>
 
               {match.locationUrl && (
