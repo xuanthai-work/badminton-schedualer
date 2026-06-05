@@ -117,6 +117,7 @@ const vi = {
     loading: "Đang tải nhóm...",
     tabMatches: "Lịch đánh",
     tabMembers: "Thành viên",
+    tabStats: "Thống kê",
     tabSettings: "Cài đặt",
     errNotFound: "Không tìm thấy nhóm hoặc bạn không có quyền xem.",
     errNotMember: "Bạn không phải thành viên của nhóm này.",
@@ -142,6 +143,9 @@ const vi = {
     optional: "(tùy chọn)",
     courtNo: "Sân số",
     courtShort: "Sân {n}",
+    repeatWeekly: "Lặp lại hàng tuần",
+    repeatWeeklyHint:
+      "Tự tạo lịch này vào cùng thứ + giờ mỗi tuần (tạo trước 3 ngày, cả nhóm được thông báo). Dừng lặp trong Cài đặt nhóm.",
     creating: "Đang tạo...",
     errLoad: "Lỗi tải lịch.",
     errRequired: "Vui lòng nhập đủ ngày, giờ và địa điểm.",
@@ -197,6 +201,14 @@ const vi = {
     namePlaceholder: "Tên nhóm",
     saving: "Đang lưu...",
     saveName: "Lưu tên mới",
+    recurringTitle: "Lịch cố định hàng tuần",
+    recurringEmpty:
+      "Chưa có lịch cố định. Bật \"Lặp lại hàng tuần\" khi tạo lịch để thêm.",
+    recurringStop: "Dừng lặp",
+    recurringConfirmDelete:
+      "Dừng lịch cố định {day}? Các lịch đã tạo sẽ giữ nguyên.",
+    recurringHint:
+      "Lịch tuần kế tiếp được tự tạo trước 3 ngày và thông báo cho cả nhóm.",
     dangerZone: "Vùng nguy hiểm",
     warnP1: "Xóa nhóm sẽ ",
     warnStrong1: "xóa vĩnh viễn",
@@ -216,6 +228,15 @@ const vi = {
     renamed: "Đã đổi tên nhóm.",
     errRename: "Lỗi đổi tên nhóm.",
     errDelete: "Lỗi xóa nhóm.",
+  },
+  stats: {
+    totalMatches: "Tổng trận đã chốt",
+    totalSpend: "Tổng chi phí",
+    leaderboard: "Bảng xếp hạng chăm chỉ",
+    playedCount: "{n} trận",
+    paidLabel: "Đã trả",
+    owedLabel: "Còn nợ",
+    empty: "Chưa có dữ liệu — chốt trận đầu tiên đi!",
   },
   match: {
     backToGroup: "Quay lại nhóm",
@@ -283,6 +304,8 @@ const vi = {
     tomorrow: "Ngày mai",
     thisWeek: "{day} tuần này",
     nextWeek: "{day} tuần sau",
+    rsvpLocked:
+      "Đã khóa điểm danh (30 phút trước giờ đánh). Cần thay đổi hãy nhắn admin.",
     editSave: "Lưu thay đổi",
     errUpdate: "Lỗi cập nhật lịch.",
     addAttendeeTitle: "Thêm người tham gia",
@@ -584,6 +607,7 @@ const en: typeof vi = {
     loading: "Loading group...",
     tabMatches: "Matches",
     tabMembers: "Members",
+    tabStats: "Stats",
     tabSettings: "Settings",
     errNotFound: "Group not found or you don't have access.",
     errNotMember: "You are not a member of this group.",
@@ -609,6 +633,9 @@ const en: typeof vi = {
     optional: "(optional)",
     courtNo: "Court number",
     courtShort: "Court {n}",
+    repeatWeekly: "Repeat weekly",
+    repeatWeeklyHint:
+      "Auto-creates this match every week (3 days ahead; the group gets notified). Stop it in group settings.",
     creating: "Creating...",
     errLoad: "Failed to load matches.",
     errRequired: "Please enter date, time and location.",
@@ -664,6 +691,14 @@ const en: typeof vi = {
     namePlaceholder: "Group name",
     saving: "Saving...",
     saveName: "Save new name",
+    recurringTitle: "Weekly recurring matches",
+    recurringEmpty:
+      "No recurring matches. Tick \"Repeat weekly\" when creating a match.",
+    recurringStop: "Stop",
+    recurringConfirmDelete:
+      "Stop the recurring {day} match? Already-created matches stay.",
+    recurringHint:
+      "Next week's match is auto-created 3 days ahead and the group is notified.",
     dangerZone: "Danger zone",
     warnP1: "Deleting the group will ",
     warnStrong1: "permanently delete",
@@ -683,6 +718,15 @@ const en: typeof vi = {
     renamed: "Group renamed.",
     errRename: "Failed to rename group.",
     errDelete: "Failed to delete group.",
+  },
+  stats: {
+    totalMatches: "Closed matches",
+    totalSpend: "Total spend",
+    leaderboard: "Most active players",
+    playedCount: "{n} matches",
+    paidLabel: "Paid",
+    owedLabel: "Owes",
+    empty: "No data yet — settle your first match!",
   },
   match: {
     backToGroup: "Back to group",
@@ -750,6 +794,8 @@ const en: typeof vi = {
     tomorrow: "Tomorrow",
     thisWeek: "{day} this week",
     nextWeek: "{day} next week",
+    rsvpLocked:
+      "RSVPs are locked (30 minutes before start). Message an admin to change.",
     editSave: "Save changes",
     errUpdate: "Failed to update match.",
     addAttendeeTitle: "Add attendee",

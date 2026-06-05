@@ -26,10 +26,11 @@
 - `src/app/reset-password/page.tsx` — recovery-link landing: waits for the Supabase session from the URL hash (`detectSessionInUrl`), shows invalid/expired state, new-password + confirm form → `auth.updateUser` → dashboard.
 - `src/app/dashboard/page.tsx` — Dashboard hub: greeting, tag-reminder banner, debts card, pending group invites, and the group list with each group's matches **nested beneath it** (upcoming open matches with inline quick-RSVP; collapsible closed matches with admin delete). Live via a `matches` realtime channel.
 - `src/app/dashboard/CreateGroupPanel.tsx` — Create-group FAB modal (safe-area-aware offset above the bottom nav).
-- `src/app/dashboard/CreateMatchPanel.tsx` — "+ Tạo lịch" FAB (admins only): date + start/end time + location + optional court number (free number input, 1-99) + maps link; group `SelectField` appears when admin of 2+ groups.
-- `src/app/dashboard/groups/[id]/page.tsx` — Group detail with **two** tabs: Thành viên (default) + **Cài đặt** (admin-only). The matches tab was removed — matches live on the dashboard.
+- `src/app/dashboard/CreateMatchPanel.tsx` — "+ Tạo lịch" FAB (admins only): date + start/end time + location + optional court number (1-99) + maps link + **"Lặp lại hàng tuần"** checkbox (stores a `recurring_schedules` row); group `SelectField` appears when admin of 2+ groups.
+- `src/app/dashboard/groups/[id]/page.tsx` — Group detail with **three** tabs: Thành viên (default) + **Thống kê** (all members) + **Cài đặt** (admin-only). The matches tab was removed — matches live on the dashboard.
+- `src/app/dashboard/groups/[id]/StatsPanel.tsx` — "Thống kê" tab: closed-match + total-spend tiles and a played-count leaderboard (avatar, bar vs max, paid/owed) from `get_group_stats`.
 - `src/app/dashboard/groups/[id]/MembersPanel.tsx` — List + invite by email + role toggle + remove. Tapping a member opens an **anchored profile popover** (avatar, `@username#tag`, joined date) with a relation-aware friend action (Kết bạn / pending / accept); the open row gets `z-10` so the `solid-panel` popover isn't painted under later glass-panel siblings.
-- `src/app/dashboard/groups/[id]/GroupSettingsPanel.tsx` — Admin-only: rename group + danger-zone delete.
+- `src/app/dashboard/groups/[id]/GroupSettingsPanel.tsx` — Admin-only: rename group, **weekly recurring schedules list** (stop button; created via the create-match checkbox) + danger-zone delete.
 - `src/app/dashboard/groups/[id]/matches/[matchId]/page.tsx` — Info card with a two-column header (relative day label "Hôm nay / Ngày mai / {thứ} tuần này / tuần sau" + full date left; lime time range + venue/court badge right) above a full-width `MapsPreview`; big RSVP buttons, attendance-confirm banner (when admin-added), merged expense+payment card (costs → per-person bar → payee bank/QR), payment status list ("Người thu" badge for the payee), admin settle / update-costs (fees in thousands) + "Thêm người tham gia". Back button uses browser history.
 - `src/app/dashboard/groups/[id]/matches/[matchId]/EditMatchPanel.tsx` — admin-only "Sửa" button (header, next to the status pill) → modal to edit date, time range, venue, court number, maps link. Plain `matches` UPDATE (RLS already allows group admins); other viewers refresh via the existing realtime channel.
 - `src/app/dashboard/groups/[id]/MembersPanel.tsx` — also has an admin-only "Mời từ bạn bè" quick-invite that lists accepted friends not yet in the group.
@@ -95,6 +96,9 @@
 21. `supabase/flexible-payee.sql` — **run after #14/#17/#15/#20** (redefines functions from all of them). `expenses.payee_id` (backfilled with the group creator): the **admin who settles first becomes the payee** and re-settles keep them; `settle_match`, `recompute_split`, `submit_payment`, `get_debt_overview`, `get_owed_to_me` all resolve the payee as `coalesce(expenses.payee_id, groups.created_by)`.
 22. `supabase/match-reminders.sql` — `matches.reminded_at` + `send_match_reminders()` + **pg_cron** schedule (every 10 min): ~2h before start (Asia/Ho_Chi_Minh clock), yes-RSVPers get `match_reminder`, members with no rsvp row get `match_rsvp_nudge`; one-shot per match via `reminded_at`.
 23. `supabase/user-lang.sql` — `users.lang` (`vi`/`en`, default `vi`): per-account language. The I18nProvider syncs it both ways; `/api/push/notify` localizes push copy per recipient.
+24. `supabase/rsvp-cutoff.sql` — RSVPs lock a **fixed 30 minutes before start**: `rsvp_open()` + **rewritten rsvps RLS policies** reject self-service RSVP writes after that (admin RPCs are security definer and unaffected). No per-match setting (an earlier `rsvp_cutoff_hours` column draft was dropped; if you ran that draft the leftover column is unused and harmless).
+25. `supabase/recurring-matches.sql` — **run after #24** (reuses its column). `recurring_schedules` table (weekday 0=Sun…6=Sat + time/venue/court/cutoff, admin-managed RLS), `matches.recurring_schedule_id`, and `generate_recurring_matches()` on an hourly pg_cron: materializes each schedule's next occurrence once it's ≤3 days away (the `notify_match_created` trigger then alerts the group).
+26. `supabase/group-stats.sql` — `get_group_stats(group_id)` (members only): jsonb of group totals (closed matches, total spend) + per-member played/paid/owed.
 
 > Status check (2026-06-03): 1-18 confirmed applied on the live project (probed columns/tables/RPCs via the service role). #19 added 2026-06-04 — verify it has been run.
 
@@ -172,9 +176,11 @@ After that, pick from the candidates below.
 ## Next steps (Phase 3 candidates)
 - ~~Notify the admin/payee when a member submits a payment~~ ✅ done 2026-06-04 (`payment-submitted.sql`, migration #20).
 - ~~Let the settling admin (not just the group creator) be the payee~~ ✅ done 2026-06-04 (`flexible-payee.sql`, #21 — first settler wins, legacy matches keep the creator).
-- Production readiness: ~~custom SMTP~~ ✅ done 2026-06-05 (Resend + `bscheduler.xyz`); re-enable email confirmation still open. ~~Match reminders~~ ✅ done 2026-06-04 (`match-reminders.sql`, #22 — pg_cron, 2h before, reminder + RSVP nudge). RSVP cutoff still open.
+- Production readiness: ~~custom SMTP~~ ✅ done 2026-06-05 (Resend + `bscheduler.xyz`); re-enable email confirmation still open. ~~Match reminders~~ ✅ done 2026-06-04 (#22). ~~RSVP cutoff~~ ✅ done 2026-06-05 (#24 — fixed 30 minutes before start, RLS-enforced, lock notes on detail + dashboard rows).
+- ~~Weekly recurring matches~~ ✅ done 2026-06-05 (#25 — "Lặp lại hàng tuần" checkbox on create; manage/stop in group settings; hourly cron materializes 3 days ahead).
+- ~~Group stats~~ ✅ done 2026-06-05 (#26 — "Thống kê" tab on the group page: totals + per-member leaderboard with bars, paid/owed).
 - More notification types (match settled); fold friend requests into the bell.
 - Enforce the tag set-once lock server-side (`set_tag` RPC), and/or let users change it; show `@username#tag` in more places (dashboard greeting, member rows, RSVP rows).
 - ~~i18n polish: persist language in `public.users` + localized push copy~~ ✅ done 2026-06-04 (`user-lang.sql`, #23). Still open: add a 3rd language by dropping in a new dictionary + extending `LANGS`/`Lang`.
-- ~~Wire the avatar into the dashboard greeting + member list + RSVP list~~ ✅ done 2026-06-04 (greeting, RSVP lists, payment status list; member list had it since 2.19). Group cards still text-only.
+- ~~Wire the avatar into the dashboard greeting + member list + RSVP list~~ ✅ done 2026-06-04; group cards got stacked member avatars (first 3 + "+N") 2026-06-05.
 - ~~Delete `MatchesPanel.tsx` (dead code)~~ ✅ done 2026-06-04. Also done: bell clicks now verify a match still exists before navigating (deleted match → dashboard `?notice=match-gone` toast).

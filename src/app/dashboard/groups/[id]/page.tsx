@@ -8,9 +8,10 @@ import { supabase } from "@/lib/supabaseClient";
 import { useI18n } from "@/lib/i18n";
 import BottomNav from "@/components/BottomNav";
 import MembersPanel from "./MembersPanel";
+import StatsPanel from "./StatsPanel";
 import GroupSettingsPanel from "./GroupSettingsPanel";
 
-type Tab = "members" | "settings";
+type Tab = "members" | "stats" | "settings";
 type GroupInfo = {
   id: string;
   name: string;
@@ -140,6 +141,17 @@ export default function GroupDetailPage() {
           >
             {t("group.tabMembers")}
           </button>
+          <button
+            type="button"
+            className={`flex-1 rounded-full py-2 transition ${
+              tab === "stats"
+                ? "bg-lime-500 text-slate-950"
+                : "text-slate-300 hover:text-slate-100"
+            }`}
+            onClick={() => setTab("stats")}
+          >
+            {t("group.tabStats")}
+          </button>
           {isAdmin && (
             <button
               type="button"
@@ -167,6 +179,8 @@ export default function GroupDetailPage() {
               currentUserId={userId}
               createdBy={group.createdBy}
             />
+          ) : tab === "stats" ? (
+            <StatsPanel groupId={group.id} />
           ) : tab === "settings" && isAdmin ? (
             <GroupSettingsPanel
               groupId={group.id}

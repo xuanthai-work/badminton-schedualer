@@ -44,6 +44,7 @@ type Match = {
   location: string;
   locationUrl: string | null;
   courtNo: number | null;
+  rsvpLocked: boolean;
   status: "open" | "closed";
 };
 
@@ -132,6 +133,13 @@ export default function MatchDetailPage() {
         location: matchRow.location,
         locationUrl: matchRow.location_url ?? null,
         courtNo: matchRow.court_no ?? null,
+        // RSVPs lock 30 minutes before start (mirrors the rsvp_open() RLS
+        // check). Evaluated at load time so render stays pure; realtime
+        // refetches keep it fresh.
+        rsvpLocked:
+          Date.now() >
+          new Date(`${matchRow.match_date}T${matchRow.match_time}`).getTime() -
+            30 * 60_000,
         status: matchRow.status === "closed" ? "closed" : "open",
       });
 
@@ -339,6 +347,8 @@ export default function MatchDetailPage() {
     if (weekDiff === 1) return t("match.nextWeek", { day: weekday });
     return weekday;
   };
+
+  const rsvpLocked = match?.rsvpLocked ?? false;
 
   const myRsvp = userId ? rsvps.find((r) => r.userId === userId) : undefined;
   const yesList = rsvps.filter((r) => r.status === "yes");
@@ -557,7 +567,10 @@ export default function MatchDetailPage() {
 
             <section className="glass-panel rounded-2xl p-5">
               <div className="flex items-start justify-between gap-4">
-                <div className="shrink-0">
+                {/* The time range must never line-break, so the LEFT column
+                    is the flexible one (the day label may wrap) and the
+                    venue truncates inside whatever is left. */}
+                <div className="min-w-0">
                   <p className="text-xl font-semibold leading-tight">
                     {relativeDayLabel(match.date)}
                   </p>
@@ -570,8 +583,8 @@ export default function MatchDetailPage() {
                   </p>
                 </div>
                 <div className="min-w-0 text-right">
-                  <p className="inline-flex items-center gap-1.5 text-xl font-semibold leading-tight text-lime-300">
-                    <Clock size={18} strokeWidth={2} />
+                  <p className="inline-flex items-center gap-1.5 whitespace-nowrap text-xl font-semibold leading-tight text-lime-300">
+                    <Clock size={18} strokeWidth={2} className="shrink-0" />
                     {match.time.slice(0, 5)}
                     {match.endTime ? ` – ${match.endTime.slice(0, 5)}` : ""}
                   </p>
@@ -641,6 +654,10 @@ export default function MatchDetailPage() {
               {match.status === "closed" ? (
                 <p className="mt-3 text-center text-sm text-slate-400">
                   {t("match.closedNoRsvp")}
+                </p>
+              ) : rsvpLocked ? (
+                <p className="mt-3 text-center text-sm text-amber-300">
+                  {t("match.rsvpLocked")}
                 </p>
               ) : (
                 <div className="mt-4 grid grid-cols-2 gap-3">

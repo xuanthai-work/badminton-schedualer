@@ -32,6 +32,7 @@ type GroupCard = {
   role: string;
   memberCount: number;
   adminName: string;
+  avatars: { name: string; url: string | null }[];
 };
 
 type GroupInvite = {
@@ -50,6 +51,7 @@ type GroupMatch = {
   endTime: string | null;
   location: string;
   status: "open" | "closed";
+  rsvpLocked: boolean;
   yesCount: number;
   myStatus: "yes" | "no" | "maybe" | null;
 };
@@ -154,22 +156,36 @@ export default function DashboardPage() {
 
     const { data: members, error: membersError } = await supabase
       .from("group_members")
-      .select("group_id, role, users ( name )")
+      .select("group_id, role, users ( name, avatar_url )")
       .in("group_id", groupIds);
 
     if (membersError) {
       throw membersError;
     }
 
-    const memberMap = new Map<string, { count: number; adminName?: string }>();
+    const memberMap = new Map<
+      string,
+      {
+        count: number;
+        adminName?: string;
+        avatars: { name: string; url: string | null }[];
+      }
+    >();
 
     members?.forEach((member) => {
-      const entry = memberMap.get(member.group_id) ?? { count: 0 };
+      const entry =
+        memberMap.get(member.group_id) ?? { count: 0, avatars: [] };
       entry.count += 1;
 
       const user = Array.isArray(member.users) ? member.users[0] : member.users;
       if (member.role === "admin" && user?.name) {
         entry.adminName = user.name;
+      }
+      if (entry.avatars.length < 4) {
+        entry.avatars.push({
+          name: user?.name ?? "?",
+          url: user?.avatar_url ?? null,
+        });
       }
 
       memberMap.set(member.group_id, entry);
@@ -184,6 +200,7 @@ export default function DashboardPage() {
           role: group.role,
           memberCount: stats?.count ?? 0,
           adminName: stats?.adminName ?? t("dashboard.unknownAdmin"),
+          avatars: stats?.avatars ?? [],
         };
       })
     );
@@ -226,6 +243,12 @@ export default function DashboardPage() {
           endTime: (row.match_end_time as string | null) ?? null,
           location: (row.location as string) ?? "",
           status: row.status === "closed" ? "closed" : "open",
+          // RSVPs lock 30 minutes before start. Evaluated at load time
+          // (refreshed by realtime/visibility) so render stays pure.
+          rsvpLocked:
+            Date.now() >
+            new Date(`${row.match_date}T${row.match_time}`).getTime() -
+              30 * 60_000,
           yesCount,
           myStatus: (mine?.status as GroupMatch["myStatus"]) ?? null,
         };
@@ -663,9 +686,23 @@ function GroupCardItem({
         href={`/dashboard/groups/${group.id}`}
         className="glass-panel group flex items-center gap-3 rounded-2xl p-4 transition hover:border-lime-500/40"
       >
-        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-lime-500/10 text-lime-400">
-          <Users size={18} strokeWidth={1.75} />
-        </span>
+        {group.avatars.length > 0 ? (
+          // Stacked member avatars; overflow shows as "+N".
+          <span className="flex shrink-0 -space-x-2.5">
+            {group.avatars.slice(0, 3).map((a, i) => (
+              <MiniAvatar key={i} name={a.name} url={a.url} />
+            ))}
+            {group.memberCount > 3 && (
+              <span className="flex h-8 w-8 items-center justify-center rounded-full border-2 border-slate-950 bg-slate-800 text-[10px] font-semibold text-slate-300">
+                +{group.memberCount - 3}
+              </span>
+            )}
+          </span>
+        ) : (
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-lime-500/10 text-lime-400">
+            <Users size={18} strokeWidth={1.75} />
+          </span>
+        )}
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
             <h4 className="truncate text-base font-semibold leading-tight">
@@ -800,7 +837,9 @@ function UpcomingMatchRow({
   busy: boolean;
 }) {
   const { t, formatDate } = useI18n();
-  const needsRsvp = match.myStatus === null;
+  // Quick-RSVP hides once the cutoff has passed (the rsvp_open() RLS check
+  // would reject the write anyway).
+  const needsRsvp = match.myStatus === null && !match.rsvpLocked;
   return (
     <div
       className={`glass-panel rounded-xl p-3 transition ${
@@ -872,6 +911,29 @@ function UpcomingMatchRow({
         </div>
       )}
     </div>
+  );
+}
+
+function MiniAvatar({ name, url }: { name: string; url: string | null }) {
+  if (url) {
+    return (
+      <span className="relative h-8 w-8 overflow-hidden rounded-full border-2 border-slate-950">
+        <Image
+          src={url}
+          alt=""
+          fill
+          unoptimized
+          sizes="32px"
+          style={{ objectFit: "cover" }}
+        />
+      </span>
+    );
+  }
+  const initial = (name || "?").trim().charAt(0).toUpperCase() || "?";
+  return (
+    <span className="flex h-8 w-8 items-center justify-center rounded-full border-2 border-slate-950 bg-slate-800 text-xs font-semibold text-lime-300">
+      {initial}
+    </span>
   );
 }
 

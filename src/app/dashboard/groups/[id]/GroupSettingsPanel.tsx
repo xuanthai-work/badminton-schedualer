@@ -1,10 +1,19 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { AlertTriangle, Pencil, Save, Trash2 } from "lucide-react";
+import { AlertTriangle, Pencil, Repeat, Save, Trash2 } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { useI18n } from "@/lib/i18n";
+
+type RecurringSchedule = {
+  id: string;
+  weekday: number;
+  time: string;
+  endTime: string | null;
+  location: string;
+  courtNo: number | null;
+};
 
 type Props = {
   groupId: string;
@@ -18,7 +27,10 @@ export default function GroupSettingsPanel({
   onRenamed,
 }: Props) {
   const router = useRouter();
-  const { t } = useI18n();
+  const { t, lang } = useI18n();
+
+  const [schedules, setSchedules] = useState<RecurringSchedule[]>([]);
+  const [scheduleBusy, setScheduleBusy] = useState<string | null>(null);
 
   const [name, setName] = useState(groupName);
   const [renameBusy, setRenameBusy] = useState(false);
@@ -39,6 +51,66 @@ export default function GroupSettingsPanel({
   };
 
   const canDelete = confirmText.trim() === groupName.trim();
+
+  const loadSchedules = useCallback(async () => {
+    const { data } = await supabase
+      .from("recurring_schedules")
+      .select("id, weekday, match_time, match_end_time, location, court_no")
+      .eq("group_id", groupId)
+      .eq("active", true)
+      .order("weekday");
+    setSchedules(
+      (data ?? []).map((row) => ({
+        id: row.id as string,
+        weekday: Number(row.weekday),
+        time: (row.match_time as string).slice(0, 5),
+        endTime: row.match_end_time
+          ? (row.match_end_time as string).slice(0, 5)
+          : null,
+        location: (row.location as string) ?? "",
+        courtNo: (row.court_no as number | null) ?? null,
+      }))
+    );
+  }, [groupId]);
+
+  useEffect(() => {
+    const run = async () => {
+      await loadSchedules();
+    };
+    void run();
+  }, [loadSchedules]);
+
+  // 2024-01-07 is a Sunday → offset by the stored dow (0 = Sunday).
+  const weekdayName = (weekday: number) =>
+    new Date(2024, 0, 7 + weekday).toLocaleDateString(
+      lang === "vi" ? "vi-VN" : "en-US",
+      { weekday: "long" }
+    );
+
+  const handleDeleteSchedule = async (schedule: RecurringSchedule) => {
+    if (
+      !confirm(
+        t("settings.recurringConfirmDelete", {
+          day: weekdayName(schedule.weekday),
+        })
+      )
+    ) {
+      return;
+    }
+    setScheduleBusy(schedule.id);
+    try {
+      const { error: deleteError } = await supabase
+        .from("recurring_schedules")
+        .delete()
+        .eq("id", schedule.id);
+      if (deleteError) throw new Error(deleteError.message);
+      await loadSchedules();
+    } catch {
+      /* surfaced on next load; keep the row */
+    } finally {
+      setScheduleBusy(null);
+    }
+  };
 
   const handleRename = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -128,6 +200,52 @@ export default function GroupSettingsPanel({
             {renameBusy ? t("settings.saving") : t("settings.saveName")}
           </button>
         </form>
+      </div>
+
+      <div className="glass-panel rounded-2xl p-5">
+        <div className="mb-3 flex items-center gap-2">
+          <Repeat size={18} strokeWidth={1.75} className="text-lime-400" />
+          <h2 className="text-base font-semibold">
+            {t("settings.recurringTitle")}
+          </h2>
+        </div>
+        {schedules.length === 0 ? (
+          <p className="text-sm text-slate-400">
+            {t("settings.recurringEmpty")}
+          </p>
+        ) : (
+          <ul className="space-y-2">
+            {schedules.map((s) => (
+              <li
+                key={s.id}
+                className="flex items-center justify-between gap-3 rounded-xl bg-slate-900/50 px-3 py-2.5"
+              >
+                <div className="min-w-0 text-sm">
+                  <p className="font-medium text-slate-100">
+                    {weekdayName(s.weekday)} · {s.time}
+                    {s.endTime ? ` – ${s.endTime}` : ""}
+                  </p>
+                  <p className="truncate text-xs text-slate-400">
+                    {s.location}
+                    {s.courtNo != null &&
+                      ` · ${t("matches.courtShort", { n: s.courtNo })}`}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  disabled={scheduleBusy === s.id}
+                  onClick={() => handleDeleteSchedule(s)}
+                  className="shrink-0 rounded-lg border border-rose-700/60 px-3 py-1 text-xs text-rose-300 transition hover:border-rose-500 disabled:opacity-60"
+                >
+                  {t("settings.recurringStop")}
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+        <p className="mt-3 text-xs text-slate-500">
+          {t("settings.recurringHint")}
+        </p>
       </div>
 
       <div className="glass-panel rounded-2xl border-rose-700/40 p-5">

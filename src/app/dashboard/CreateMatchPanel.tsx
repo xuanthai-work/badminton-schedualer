@@ -27,6 +27,7 @@ export default function CreateMatchPanel({ groups, onCreated }: Props) {
   const [location, setLocation] = useState("");
   const [locationUrl, setLocationUrl] = useState("");
   const [courtNo, setCourtNo] = useState("");
+  const [repeatWeekly, setRepeatWeekly] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
 
@@ -43,6 +44,7 @@ export default function CreateMatchPanel({ groups, onCreated }: Props) {
     setLocation("");
     setLocationUrl("");
     setCourtNo("");
+    setRepeatWeekly(false);
     setError("");
   };
 
@@ -91,6 +93,27 @@ export default function CreateMatchPanel({ groups, onCreated }: Props) {
 
       if (insertError) {
         throw new Error(insertError.message);
+      }
+
+      // Weekly repeat: store a schedule; an hourly cron materializes each
+      // next occurrence ~3 days ahead. Manage/cancel in group settings.
+      if (repeatWeekly) {
+        const weekday = new Date(`${date}T00:00:00`).getDay();
+        const { error: scheduleError } = await supabase
+          .from("recurring_schedules")
+          .insert({
+            group_id: effectiveGroupId,
+            weekday,
+            match_time: time,
+            match_end_time: endTime,
+            location: location.trim(),
+            location_url: trimmedUrl || null,
+            court_no: courtNo ? Number(courtNo) : null,
+            created_by: uid,
+          });
+        if (scheduleError) {
+          throw new Error(scheduleError.message);
+        }
       }
 
       close();
@@ -219,6 +242,23 @@ export default function CreateMatchPanel({ groups, onCreated }: Props) {
                   onChange={(event) => setLocationUrl(event.target.value)}
                 />
               </div>
+
+              <label className="flex cursor-pointer items-start gap-2.5 rounded-xl border border-slate-800 bg-slate-950/40 px-3 py-2.5 text-sm">
+                <input
+                  type="checkbox"
+                  className="mt-0.5 h-4 w-4 accent-lime-500"
+                  checked={repeatWeekly}
+                  onChange={(event) => setRepeatWeekly(event.target.checked)}
+                />
+                <span>
+                  <span className="font-medium text-slate-100">
+                    {t("matches.repeatWeekly")}
+                  </span>
+                  <span className="mt-0.5 block text-xs text-slate-400">
+                    {t("matches.repeatWeeklyHint")}
+                  </span>
+                </span>
+              </label>
 
               {error && <p className="text-xs text-rose-400">{error}</p>}
 

@@ -9,7 +9,6 @@ import { useI18n } from "@/lib/i18n";
 type Member = {
   userId: string;
   name: string;
-  email: string;
   username: string;
   tag: string | null;
   avatarUrl: string | null;
@@ -63,7 +62,8 @@ export default function MembersPanel({
       const { data, error: queryError } = await supabase
         .from("group_members")
         .select(
-          "user_id, role, joined_at, users ( name, email, username, tag, avatar_url )"
+          // No email here — addresses are private, the handle is the public id.
+          "user_id, role, joined_at, users ( name, username, tag, avatar_url )"
         )
         .eq("group_id", groupId)
         .order("joined_at", { ascending: true });
@@ -78,7 +78,6 @@ export default function MembersPanel({
           return {
             userId: row.user_id,
             name: user?.name ?? t("members.unknownUser"),
-            email: user?.email ?? "",
             username: user?.username ?? "",
             tag: user?.tag ?? null,
             avatarUrl: user?.avatar_url ?? null,
@@ -239,12 +238,10 @@ export default function MembersPanel({
     setFriendBusy(true);
     setFriendMsg("");
     try {
-      // username#tag is the most precise identifier; fall back to email.
-      const identifier = member.username
-        ? member.tag
-          ? `${member.username}#${member.tag}`
-          : member.username
-        : member.email;
+      // username#tag is the precise identifier (every profile has a username).
+      const identifier = member.tag
+        ? `${member.username}#${member.tag}`
+        : member.username;
       const { data, error: rpcError } = await supabase.rpc(
         "send_friend_request",
         { target_identifier: identifier }
@@ -454,7 +451,16 @@ export default function MembersPanel({
                       )}
                     </span>
                     <span className="block truncate text-xs text-slate-400">
-                      {member.email}
+                      {member.username && (
+                        <>
+                          @{member.username}
+                          {member.tag && (
+                            <span className="text-lime-400/80">
+                              #{member.tag}
+                            </span>
+                          )}
+                        </>
+                      )}
                     </span>
                   </span>
                 </button>
