@@ -27,6 +27,7 @@ type Rsvp = {
   userId: string;
   status: "yes" | "no" | "pending";
   name: string;
+  avatarUrl: string | null;
 };
 
 type Member = {
@@ -68,6 +69,7 @@ type Payment = {
   userId: string;
   name: string;
   tag: string | null;
+  avatarUrl: string | null;
   amount: number;
   status: PaymentStatus;
 };
@@ -144,7 +146,7 @@ export default function MatchDetailPage() {
 
       const { data: rsvpRows, error: rsvpError } = await supabase
         .from("rsvps")
-        .select("user_id, status, users ( name )")
+        .select("user_id, status, users ( name, avatar_url )")
         .eq("match_id", matchId);
       if (rsvpError) throw rsvpError;
 
@@ -159,6 +161,7 @@ export default function MatchDetailPage() {
             userId: row.user_id,
             status,
             name: user?.name ?? t("match.unknownUser"),
+            avatarUrl: user?.avatar_url ?? null,
           };
         }) ?? [];
       setRsvps(mapped);
@@ -179,7 +182,9 @@ export default function MatchDetailPage() {
 
       const { data: expenseRow, error: expenseError } = await supabase
         .from("expenses")
-        .select("court_fee, shuttle_fee, water_fee, total_amount, fee_per_person")
+        .select(
+          "court_fee, shuttle_fee, water_fee, total_amount, fee_per_person, payee_id"
+        )
         .eq("match_id", matchId)
         .maybeSingle();
       if (expenseError) throw expenseError;
@@ -204,19 +209,24 @@ export default function MatchDetailPage() {
         setExpense(null);
       }
 
-      // Payee for the closed-match payment card = the group's creator (the
-      // main admin who collects). RLS lets group members read peers' rows.
+      // Payee for the closed-match payment card = the admin who settled
+      // (expenses.payee_id), falling back to the group creator for legacy
+      // matches. RLS lets group members read peers' rows.
       const { data: groupRow } = await supabase
         .from("groups")
         .select("created_by")
         .eq("id", groupId)
         .maybeSingle();
-      setPayeeId(groupRow?.created_by ?? null);
-      if (groupRow?.created_by) {
+      const resolvedPayee =
+        (expenseRow?.payee_id as string | null) ??
+        groupRow?.created_by ??
+        null;
+      setPayeeId(resolvedPayee);
+      if (resolvedPayee) {
         const { data: payeeRow } = await supabase
           .from("users")
           .select("name, bank_id, bank_account, bank_account_name, bank_qr_url")
-          .eq("id", groupRow.created_by)
+          .eq("id", resolvedPayee)
           .maybeSingle();
         setPayee(
           payeeRow
@@ -233,7 +243,7 @@ export default function MatchDetailPage() {
 
       const { data: paymentRows } = await supabase
         .from("payments")
-        .select("user_id, amount, status, users ( name, tag )")
+        .select("user_id, amount, status, users ( name, tag, avatar_url )")
         .eq("match_id", matchId);
       setPayments(
         (paymentRows ?? []).map((row) => {
@@ -242,6 +252,7 @@ export default function MatchDetailPage() {
             userId: row.user_id as string,
             name: user?.name ?? t("match.unknownUser"),
             tag: (user?.tag as string | null) ?? null,
+            avatarUrl: (user?.avatar_url as string | null) ?? null,
             amount: Number(row.amount),
             status: row.status as PaymentStatus,
           };
@@ -901,17 +912,22 @@ function PaymentStatusList({
               key={p.userId}
               className="flex items-center justify-between gap-3 rounded-xl bg-slate-900/50 px-3 py-2"
             >
-              <div className="min-w-0">
-                <p className="truncate text-sm text-slate-100">
-                  {p.name}
-                  {p.tag && <span className="text-lime-400">#{p.tag}</span>}
-                  {isSelf && (
-                    <span className="ml-1 text-xs text-slate-500">
-                      {t("members.you")}
-                    </span>
-                  )}
-                </p>
-                <p className="text-xs text-slate-500">{formatVnd(p.amount)}</p>
+              <div className="flex min-w-0 items-center gap-2.5">
+                <InitialAvatar name={p.name} url={p.avatarUrl} size={32} />
+                <div className="min-w-0">
+                  <p className="truncate text-sm text-slate-100">
+                    {p.name}
+                    {p.tag && <span className="text-lime-400">#{p.tag}</span>}
+                    {isSelf && (
+                      <span className="ml-1 text-xs text-slate-500">
+                        {t("members.you")}
+                      </span>
+                    )}
+                  </p>
+                  <p className="text-xs text-slate-500">
+                    {formatVnd(p.amount)}
+                  </p>
+                </div>
               </div>
               <div className="flex shrink-0 items-center gap-2">
                 {isPayee ? (
@@ -1165,7 +1181,7 @@ function RsvpList({
               key={r.userId}
               className="flex items-center gap-3 rounded-xl bg-slate-900/50 px-3 py-2"
             >
-              <InitialAvatar name={r.name} size={32} />
+              <InitialAvatar name={r.name} url={r.avatarUrl} size={32} />
               <span className="text-sm text-slate-100">{r.name}</span>
             </li>
           ))}
@@ -1175,11 +1191,36 @@ function RsvpList({
   );
 }
 
-function InitialAvatar({ name, size = 32 }: { name: string; size?: number }) {
+function InitialAvatar({
+  name,
+  url = null,
+  size = 32,
+}: {
+  name: string;
+  url?: string | null;
+  size?: number;
+}) {
+  if (url) {
+    return (
+      <div
+        className="relative shrink-0 overflow-hidden rounded-full border border-white/10"
+        style={{ width: size, height: size }}
+      >
+        <Image
+          src={url}
+          alt=""
+          fill
+          unoptimized
+          sizes={`${size}px`}
+          style={{ objectFit: "cover" }}
+        />
+      </div>
+    );
+  }
   const initial = (name || "?").trim().charAt(0).toUpperCase() || "?";
   return (
     <div
-      className="flex items-center justify-center rounded-full border border-white/10 bg-slate-800/80 font-semibold text-lime-300"
+      className="flex shrink-0 items-center justify-center rounded-full border border-white/10 bg-slate-800/80 font-semibold text-lime-300"
       style={{
         width: size,
         height: size,

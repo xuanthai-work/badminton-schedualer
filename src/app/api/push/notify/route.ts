@@ -24,8 +24,12 @@ const fmtDate = (v: unknown) => {
 
 const fmtTime = (v: unknown) => String(v ?? "").slice(0, 5);
 
-// Vietnamese push copy (app default). Mirrors the in-app notification texts.
-function render(rec: NotificationRecord): { title: string; body: string; url: string } {
+// Push copy localized per recipient (users.lang). Mirrors the in-app texts.
+function render(
+  rec: NotificationRecord,
+  lang: "vi" | "en"
+): { title: string; body: string; url: string } {
+  const vi = lang === "vi";
   const d = rec.data ?? {};
   const g = String(d.group_name ?? "");
   const matchUrl =
@@ -38,62 +42,108 @@ function render(rec: NotificationRecord): { title: string; body: string; url: st
   switch (rec.type) {
     case "match_created":
       return {
-        title: "Trận đấu mới",
-        body: `${g}: ${fmtDate(d.match_date)} lúc ${fmtTime(d.match_time)}`,
+        title: vi ? "Trận đấu mới" : "New match",
+        body: vi
+          ? `${g}: ${fmtDate(d.match_date)} lúc ${fmtTime(d.match_time)}`
+          : `${g}: ${fmtDate(d.match_date)} at ${fmtTime(d.match_time)}`,
+        url: matchUrl,
+      };
+    case "match_reminder":
+      return {
+        title: vi ? "Sắp đến giờ đánh 🏸" : "Match starting soon 🏸",
+        body: vi
+          ? `${g}: ${fmtTime(d.match_time)} hôm nay tại ${d.location ?? ""}`
+          : `${g}: today at ${fmtTime(d.match_time)}, ${d.location ?? ""}`,
+        url: matchUrl,
+      };
+    case "match_rsvp_nudge":
+      return {
+        title: vi ? "Bạn chưa chốt lịch hôm nay" : "You haven't RSVP'd yet",
+        body: vi
+          ? `${g} đánh lúc ${fmtTime(d.match_time)} tại ${d.location ?? ""} — tham gia không?`
+          : `${g} plays at ${fmtTime(d.match_time)}, ${d.location ?? ""} — joining?`,
         url: matchUrl,
       };
     case "group_invite":
       return {
-        title: "Lời mời vào nhóm",
-        body: `${d.inviter ?? ""} mời bạn vào nhóm ${g}`,
+        title: vi ? "Lời mời vào nhóm" : "Group invite",
+        body: vi
+          ? `${d.inviter ?? ""} mời bạn vào nhóm ${g}`
+          : `${d.inviter ?? ""} invited you to ${g}`,
         url: "/dashboard",
       };
     case "group_invite_accepted":
       return {
-        title: "Thành viên mới",
-        body: `${d.member ?? ""} đã tham gia nhóm ${g}`,
+        title: vi ? "Thành viên mới" : "New member",
+        body: vi
+          ? `${d.member ?? ""} đã tham gia nhóm ${g}`
+          : `${d.member ?? ""} joined ${g}`,
         url: matchUrl,
       };
     case "friend_request":
       return {
-        title: "Lời mời kết bạn",
-        body: `${d.name ?? ""} đã gửi lời mời kết bạn`,
+        title: vi ? "Lời mời kết bạn" : "Friend request",
+        body: vi
+          ? `${d.name ?? ""} đã gửi lời mời kết bạn`
+          : `${d.name ?? ""} sent you a friend request`,
         url: "/dashboard/friends",
       };
     case "friend_accepted":
       return {
-        title: "Kết bạn",
-        body: `${d.name ?? ""} đã chấp nhận lời mời kết bạn`,
+        title: vi ? "Kết bạn" : "Friends",
+        body: vi
+          ? `${d.name ?? ""} đã chấp nhận lời mời kết bạn`
+          : `${d.name ?? ""} accepted your friend request`,
         url: "/dashboard/friends",
       };
     case "payment_confirmed":
       return {
-        title: "Đã xác nhận thanh toán",
-        body: `Khoản ${fmtAmount(d.amount)} cho nhóm ${g} đã được xác nhận`,
+        title: vi ? "Đã xác nhận thanh toán" : "Payment confirmed",
+        body: vi
+          ? `Khoản ${fmtAmount(d.amount)} cho nhóm ${g} đã được xác nhận`
+          : `Your ${fmtAmount(d.amount)} payment for ${g} was confirmed`,
         url: matchUrl,
       };
     case "payment_submitted":
       return {
-        title: "Chờ xác nhận thanh toán",
-        body: `${d.name ?? ""} đã chuyển ${fmtAmount(d.amount)} cho nhóm ${g} — xác nhận nhé`,
+        title: vi ? "Chờ xác nhận thanh toán" : "Payment to confirm",
+        body: vi
+          ? `${d.name ?? ""} đã chuyển ${fmtAmount(d.amount)} cho nhóm ${g} — xác nhận nhé`
+          : `${d.name ?? ""} sent ${fmtAmount(d.amount)} for ${g} — please confirm`,
         url: matchUrl,
       };
     case "attendance_request":
       return {
-        title: "Xác nhận tham gia",
-        body: `Bạn được thêm vào trận ${g} (${fmtDate(d.match_date)} ${fmtTime(d.match_time)}). Xác nhận tham gia?`,
+        title: vi ? "Xác nhận tham gia" : "Confirm attendance",
+        body: vi
+          ? `Bạn được thêm vào trận ${g} (${fmtDate(d.match_date)} ${fmtTime(d.match_time)}). Xác nhận tham gia?`
+          : `You were added to a ${g} match (${fmtDate(d.match_date)} ${fmtTime(d.match_time)}). Did you play?`,
         url: matchUrl,
       };
     case "attendance_confirmed":
       return {
-        title: d.attended ? "Đã xác nhận tham gia" : "Báo vắng",
+        title: d.attended
+          ? vi
+            ? "Đã xác nhận tham gia"
+            : "Attendance confirmed"
+          : vi
+            ? "Báo vắng"
+            : "Not attending",
         body: d.attended
-          ? `${d.name ?? ""} xác nhận tham gia trận ở ${g}`
-          : `${d.name ?? ""} báo không tham gia trận ở ${g}`,
+          ? vi
+            ? `${d.name ?? ""} xác nhận tham gia trận ở ${g}`
+            : `${d.name ?? ""} confirmed playing in ${g}`
+          : vi
+            ? `${d.name ?? ""} báo không tham gia trận ở ${g}`
+            : `${d.name ?? ""} said they didn't play in ${g}`,
         url: matchUrl,
       };
     default:
-      return { title: "Badminton Scheduler", body: "Bạn có thông báo mới", url: "/dashboard" };
+      return {
+        title: "Badminton Scheduler",
+        body: vi ? "Bạn có thông báo mới" : "You have a new notification",
+        url: "/dashboard",
+      };
   }
 }
 
@@ -132,16 +182,20 @@ export async function POST(request: Request) {
     auth: { persistSession: false },
   });
 
-  const { data: subs } = await admin
-    .from("push_subscriptions")
-    .select("endpoint, p256dh, auth")
-    .eq("user_id", record.user_id);
+  const [{ data: subs }, { data: recipient }] = await Promise.all([
+    admin
+      .from("push_subscriptions")
+      .select("endpoint, p256dh, auth")
+      .eq("user_id", record.user_id),
+    admin.from("users").select("lang").eq("id", record.user_id).maybeSingle(),
+  ]);
 
   if (!subs || subs.length === 0) {
     return Response.json({ sent: 0 });
   }
 
-  const message = JSON.stringify(render(record));
+  const lang = recipient?.lang === "en" ? "en" : "vi";
+  const message = JSON.stringify(render(record, lang));
 
   let sent = 0;
   await Promise.all(

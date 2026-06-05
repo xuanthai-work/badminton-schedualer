@@ -10,6 +10,7 @@ import {
 } from "react";
 import type { Locale } from "date-fns";
 import { vi as viDateLocale, enUS as enDateLocale } from "date-fns/locale";
+import { supabase } from "@/lib/supabaseClient";
 import {
   DEFAULT_LANG,
   dictionaries,
@@ -79,6 +80,21 @@ export function I18nProvider({ children }: { children: React.ReactNode }) {
       if (stored === "vi" || stored === "en") {
         setLangState(stored);
       }
+      // The per-account preference (users.lang) wins over the device value
+      // once signed in, so the language follows the user across devices.
+      const { data } = await supabase.auth.getSession();
+      const uid = data.session?.user?.id;
+      if (!uid) return;
+      const { data: row } = await supabase
+        .from("users")
+        .select("lang")
+        .eq("id", uid)
+        .maybeSingle();
+      const dbLang = row?.lang;
+      if ((dbLang === "vi" || dbLang === "en") && dbLang !== stored) {
+        setLangState(dbLang);
+        window.localStorage.setItem(STORAGE_KEY, dbLang);
+      }
     };
     void applyStored();
   }, []);
@@ -90,6 +106,14 @@ export function I18nProvider({ children }: { children: React.ReactNode }) {
   const setLang = useCallback((next: Lang) => {
     setLangState(next);
     window.localStorage.setItem(STORAGE_KEY, next);
+    // Best-effort sync to the account so other devices + push copy follow.
+    void (async () => {
+      const { data } = await supabase.auth.getSession();
+      const uid = data.session?.user?.id;
+      if (uid) {
+        await supabase.from("users").update({ lang: next }).eq("id", uid);
+      }
+    })();
   }, []);
 
   const value = useMemo<I18nValue>(() => {

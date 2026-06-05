@@ -411,6 +411,10 @@ const vi = {
     paymentConfirmed: "Đã xác nhận thanh toán {amount} cho nhóm {group}",
     paymentSubmitted:
       "{name} đã chuyển {amount} cho nhóm {group} — chờ bạn xác nhận",
+    matchReminder:
+      "Sắp đến giờ đánh: {group} lúc {time} tại {location}",
+    matchRsvpNudge:
+      "{group} đánh lúc {time} tại {location} — bạn chưa chốt, tham gia không?",
     attendanceRequest:
       "Bạn được thêm vào trận {group} ({date} {time}). Xác nhận có tham gia?",
     attendanceConfirmed: "{name} xác nhận có tham gia trận ở {group}",
@@ -875,6 +879,9 @@ const en: typeof vi = {
     paymentConfirmed: "Your {amount} payment for {group} was confirmed",
     paymentSubmitted:
       "{name} sent {amount} for {group} — waiting for your confirmation",
+    matchReminder: "Starting soon: {group} at {time}, {location}",
+    matchRsvpNudge:
+      "{group} plays at {time}, {location} — you haven't RSVP'd, joining?",
     attendanceRequest:
       "You were added to the {group} match ({date} {time}). Confirm you played?",
     attendanceConfirmed: "{name} confirmed playing the {group} match",

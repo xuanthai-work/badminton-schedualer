@@ -104,6 +104,20 @@ export default function NotificationBell() {
         time,
       });
     }
+    if (n.type === "match_reminder") {
+      return t("notifications.matchReminder", {
+        group: String(n.data.group_name ?? ""),
+        time: String(n.data.match_time ?? "").slice(0, 5),
+        location: String(n.data.location ?? ""),
+      });
+    }
+    if (n.type === "match_rsvp_nudge") {
+      return t("notifications.matchRsvpNudge", {
+        group: String(n.data.group_name ?? ""),
+        time: String(n.data.match_time ?? "").slice(0, 5),
+        location: String(n.data.location ?? ""),
+      });
+    }
     if (n.type === "added_to_group") {
       return t("notifications.addedToGroup", {
         actor: String(n.data.added_by ?? ""),
@@ -167,7 +181,13 @@ export default function NotificationBell() {
   };
 
   const hrefFor = (n: NotificationRow) => {
-    if (n.type === "match_created" && n.groupId && n.matchId) {
+    if (
+      (n.type === "match_created" ||
+        n.type === "match_reminder" ||
+        n.type === "match_rsvp_nudge") &&
+      n.groupId &&
+      n.matchId
+    ) {
       return `/dashboard/groups/${n.groupId}/matches/${n.matchId}`;
     }
     // A pending invite goes to the dashboard (accept/decline card) — the
@@ -226,7 +246,13 @@ export default function NotificationBell() {
   };
 
   const iconFor = (type: string) => {
-    if (type === "match_created") return Calendar;
+    if (
+      type === "match_created" ||
+      type === "match_reminder" ||
+      type === "match_rsvp_nudge"
+    ) {
+      return Calendar;
+    }
     if (type === "payment_confirmed" || type === "payment_submitted") {
       return ReceiptText;
     }

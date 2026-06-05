@@ -91,7 +91,10 @@
 17. `supabase/match-attendees.sql` — **run after `payments.sql` + `notifications.sql`.** Adds `'pending'` to the rsvps status CHECK; `recompute_split` (re-splits from the saved totals + current yes-attendees, preserves paid statuses, payee stays confirmed); `admin_add_attendee` (pending rsvp + `attendance_request` notification); `confirm_attendance` (pending → yes/no, auto-recompute on yes, notifies the payee via `attendance_confirmed`).
 18. `supabase/push.sql` — `push_subscriptions` table + RLS (own rows only). Pair with the Database Webhook (see Setup).
 19. `supabase/court-number.sql` — nullable `court_no smallint` (CHECK 1-99) on `matches`. Also folded into `schema.sql`. ⚠️ The match pages select this column — run it **before** deploying Phase 2.19.
-20. `supabase/payment-submitted.sql` — redefines `submit_payment` to also insert a `payment_submitted` notification for the payee (group creator) — reaches the bell **and** push automatically. Also folded into `payments.sql`.
+20. `supabase/payment-submitted.sql` — redefines `submit_payment` to also insert a `payment_submitted` notification for the payee — reaches the bell **and** push automatically. Also folded into `payments.sql`.
+21. `supabase/flexible-payee.sql` — **run after #14/#17/#15/#20** (redefines functions from all of them). `expenses.payee_id` (backfilled with the group creator): the **admin who settles first becomes the payee** and re-settles keep them; `settle_match`, `recompute_split`, `submit_payment`, `get_debt_overview`, `get_owed_to_me` all resolve the payee as `coalesce(expenses.payee_id, groups.created_by)`.
+22. `supabase/match-reminders.sql` — `matches.reminded_at` + `send_match_reminders()` + **pg_cron** schedule (every 10 min): ~2h before start (Asia/Ho_Chi_Minh clock), yes-RSVPers get `match_reminder`, members with no rsvp row get `match_rsvp_nudge`; one-shot per match via `reminded_at`.
+23. `supabase/user-lang.sql` — `users.lang` (`vi`/`en`, default `vi`): per-account language. The I18nProvider syncs it both ways; `/api/push/notify` localizes push copy per recipient.
 
 > Status check (2026-06-03): 1-18 confirmed applied on the live project (probed columns/tables/RPCs via the service role). #19 added 2026-06-04 — verify it has been run.
 
@@ -168,10 +171,10 @@ After that, pick from the candidates below.
 
 ## Next steps (Phase 3 candidates)
 - ~~Notify the admin/payee when a member submits a payment~~ ✅ done 2026-06-04 (`payment-submitted.sql`, migration #20).
-- Let the settling admin (not just the group creator) be the payee.
-- Production readiness: custom SMTP (reliable reset/confirmation delivery + re-enable email confirmation); RSVP cutoff + match reminders (reminders could be a Supabase cron → `notifications` insert → push).
+- ~~Let the settling admin (not just the group creator) be the payee~~ ✅ done 2026-06-04 (`flexible-payee.sql`, #21 — first settler wins, legacy matches keep the creator).
+- Production readiness: custom SMTP (reliable reset/confirmation delivery + re-enable email confirmation). ~~Match reminders~~ ✅ done 2026-06-04 (`match-reminders.sql`, #22 — pg_cron, 2h before, reminder + RSVP nudge). RSVP cutoff still open.
 - More notification types (match settled); fold friend requests into the bell.
 - Enforce the tag set-once lock server-side (`set_tag` RPC), and/or let users change it; show `@username#tag` in more places (dashboard greeting, member rows, RSVP rows).
-- i18n polish: persist language in `public.users` (per-account, not just per-device) — would also let `/api/push/notify` localize push copy (currently VI-only); add a 3rd language by dropping in a new dictionary + extending `LANGS`/`Lang`.
-- Wire the avatar (`users.avatar_url`) into the dashboard greeting + group cards + member list + RSVP list.
+- ~~i18n polish: persist language in `public.users` + localized push copy~~ ✅ done 2026-06-04 (`user-lang.sql`, #23). Still open: add a 3rd language by dropping in a new dictionary + extending `LANGS`/`Lang`.
+- ~~Wire the avatar into the dashboard greeting + member list + RSVP list~~ ✅ done 2026-06-04 (greeting, RSVP lists, payment status list; member list had it since 2.19). Group cards still text-only.
 - ~~Delete `MatchesPanel.tsx` (dead code)~~ ✅ done 2026-06-04. Also done: bell clicks now verify a match still exists before navigating (deleted match → dashboard `?notice=match-gone` toast).

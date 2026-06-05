@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -58,6 +59,7 @@ export default function DashboardPage() {
   const { t, formatVnd } = useI18n();
   const [userId, setUserId] = useState<string | null>(null);
   const [displayName, setDisplayName] = useState<string>("");
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [tagMissing, setTagMissing] = useState(false);
   const [groups, setGroups] = useState<GroupCard[]>([]);
   const [invites, setInvites] = useState<GroupInvite[]>([]);
@@ -300,12 +302,13 @@ export default function DashboardPage() {
 
         const { data: profile } = await supabase
           .from("users")
-          .select("name, tag")
+          .select("name, tag, avatar_url")
           .eq("id", data.session.user.id)
           .maybeSingle();
         if (profile?.name) {
           setDisplayName(profile.name);
         }
+        setAvatarUrl(profile?.avatar_url ?? null);
         setTagMissing(Boolean(profile) && !profile?.tag);
 
         const uid = data.session.user.id;
@@ -421,16 +424,19 @@ export default function DashboardPage() {
           <NotificationBell />
         </header>
 
-        <section className="space-y-1">
-          <h2 className="text-[28px] font-semibold leading-tight">
-            {t("dashboard.greeting")}{" "}
-            <span className="text-lime-400">
-              {displayName || t("dashboard.defaultName")}
-            </span>
-          </h2>
-          <p className="text-sm text-slate-300">
-            {t("dashboard.readyToday")}
-          </p>
+        <section className="flex items-center gap-4">
+          <UserAvatar name={displayName} url={avatarUrl} />
+          <div className="min-w-0 space-y-1">
+            <h2 className="text-[28px] font-semibold leading-tight">
+              {t("dashboard.greeting")}{" "}
+              <span className="text-lime-400">
+                {displayName || t("dashboard.defaultName")}
+              </span>
+            </h2>
+            <p className="text-sm text-slate-300">
+              {t("dashboard.readyToday")}
+            </p>
+          </div>
         </section>
 
         {tagMissing && (
@@ -866,5 +872,28 @@ function UpcomingMatchRow({
         </div>
       )}
     </div>
+  );
+}
+
+function UserAvatar({ name, url }: { name: string; url: string | null }) {
+  if (url) {
+    return (
+      <span className="relative h-14 w-14 shrink-0 overflow-hidden rounded-full border border-lime-500/30">
+        <Image
+          src={url}
+          alt=""
+          fill
+          unoptimized
+          sizes="56px"
+          style={{ objectFit: "cover" }}
+        />
+      </span>
+    );
+  }
+  const initial = (name || "?").trim().charAt(0).toUpperCase() || "?";
+  return (
+    <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full border border-lime-500/30 bg-slate-800/80 text-xl font-semibold text-lime-300">
+      {initial}
+    </span>
   );
 }
