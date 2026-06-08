@@ -466,6 +466,11 @@ const vi = {
       "Nhận báo lịch mới và thanh toán ngay cả khi không mở app. Bạn có thể tắt bất cứ lúc nào trong Tài khoản.",
     pushAction: "Bật thông báo",
     later: "Để sau",
+    shortcutTitle: "Cài app chỉ với 1 chạm",
+    shortcutBody:
+      "Thêm Cầu Lông Đi Mà vào màn hình chính bằng phím tắt — khỏi phải bấm Chia sẻ rồi \"Thêm vào MH chính\" thủ công.",
+    shortcutAction: "Cài đặt ứng dụng",
+    shortcutSkip: "Bỏ qua",
   },
   push: {
     title: "Thông báo đẩy",
@@ -956,6 +961,11 @@ const en: typeof vi = {
       "Get new-match and payment alerts even when the app is closed. You can turn this off anytime in Account.",
     pushAction: "Enable",
     later: "Later",
+    shortcutTitle: "Install the app in one tap",
+    shortcutBody:
+      "Add Badminton Scheduler to your Home Screen with a shortcut — no manual Share → \"Add to Home Screen\" needed.",
+    shortcutAction: "Install app",
+    shortcutSkip: "Skip",
   },
   push: {
     title: "Push notifications",

@@ -68,8 +68,11 @@ export default function OnboardingPrompts() {
 
       const isIos = /iphone|ipad|ipod/i.test(navigator.userAgent);
       if (isIos) {
-        // iOS has no programmatic install — show manual instructions.
-        setStep((s) => s ?? "ios");
+        // iOS install is handled by ShortcutOnboardingPopup (one-tap iCloud
+        // Shortcut). Skip the manual Share-sheet instructions and move on to
+        // the push prompt here.
+        const next = await decidePushStep();
+        if (active) setStep((s) => s ?? next);
         return;
       }
 
