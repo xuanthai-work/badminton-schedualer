@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
+import { SpeedInsights } from "@vercel/speed-insights/next";
 import { I18nProvider } from "@/lib/i18n";
 import UpdatePrompt from "@/components/UpdatePrompt";
 
@@ -51,6 +52,7 @@ export default function RootLayout({
           {children}
           <UpdatePrompt />
         </I18nProvider>
+        <SpeedInsights />
       </body>
     </html>
   );
