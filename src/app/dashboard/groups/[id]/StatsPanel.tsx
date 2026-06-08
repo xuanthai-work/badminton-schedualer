@@ -5,6 +5,7 @@ import Image from "next/image";
 import { BarChart3, ReceiptText, Trophy } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { useI18n } from "@/lib/i18n";
+import EmptyState from "@/components/EmptyState";
 
 type MemberStat = {
   userId: string;
@@ -112,7 +113,7 @@ export default function StatsPanel({ groupId }: Props) {
           <h2 className="text-base font-semibold">{t("stats.leaderboard")}</h2>
         </div>
         {stats.members.length === 0 ? (
-          <p className="text-sm text-slate-400">{t("stats.empty")}</p>
+          <EmptyState icon={BarChart3} message={t("stats.empty")} />
         ) : (
           <ul className="space-y-3">
             {stats.members.map((m, index) => (

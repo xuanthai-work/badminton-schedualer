@@ -3,6 +3,8 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import { I18nProvider } from "@/lib/i18n";
+import { ConfirmProvider } from "@/components/ConfirmProvider";
+import { ToastProvider } from "@/components/ToastProvider";
 import UpdatePrompt from "@/components/UpdatePrompt";
 
 const geistSans = Geist({
@@ -49,8 +51,12 @@ export default function RootLayout({
     >
       <body className="min-h-full flex flex-col">
         <I18nProvider>
-          {children}
-          <UpdatePrompt />
+          <ToastProvider>
+            <ConfirmProvider>
+              {children}
+              <UpdatePrompt />
+            </ConfirmProvider>
+          </ToastProvider>
         </I18nProvider>
         <SpeedInsights />
       </body>

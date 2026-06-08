@@ -16,6 +16,7 @@ const vi = {
     member: "Member",
     cancel: "Hủy",
     close: "Đóng",
+    confirm: "Xác nhận",
   },
   auth: {
     brand: "BSche",
@@ -506,6 +507,7 @@ const en: typeof vi = {
     member: "Member",
     cancel: "Cancel",
     close: "Close",
+    confirm: "Confirm",
   },
   auth: {
     brand: "BSche",

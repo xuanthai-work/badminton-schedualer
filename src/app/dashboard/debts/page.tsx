@@ -3,9 +3,10 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Check } from "lucide-react";
+import { Check, CheckCircle2, Wallet } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { useI18n } from "@/lib/i18n";
+import EmptyState from "@/components/EmptyState";
 import BottomNav from "@/components/BottomNav";
 import NotificationBell from "@/components/NotificationBell";
 
@@ -187,9 +188,7 @@ export default function DebtsPage() {
           <div className="glass-panel h-40 animate-pulse rounded-2xl" />
         ) : activeTab === "owe" ? (
           mine.length === 0 ? (
-            <div className="glass-panel rounded-2xl p-6 text-sm text-slate-300">
-              {t("debts.emptyOwe")}
-            </div>
+            <EmptyState icon={CheckCircle2} message={t("debts.emptyOwe")} />
           ) : (
             <>
               <div className="glass-panel rounded-2xl p-5">
@@ -246,9 +245,7 @@ export default function DebtsPage() {
             </>
           )
         ) : owed.length === 0 ? (
-          <div className="glass-panel rounded-2xl p-6 text-sm text-slate-300">
-            {t("debts.emptyCollect")}
-          </div>
+          <EmptyState icon={Wallet} message={t("debts.emptyCollect")} />
         ) : (
           <>
             <div className="glass-panel rounded-2xl p-5">

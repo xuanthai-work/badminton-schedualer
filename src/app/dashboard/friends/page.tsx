@@ -6,6 +6,9 @@ import { useRouter } from "next/navigation";
 import { Check, Clock, UserPlus, X } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { useI18n } from "@/lib/i18n";
+import { useConfirm } from "@/components/ConfirmProvider";
+import { useToast } from "@/components/ToastProvider";
+import EmptyState from "@/components/EmptyState";
 import BottomNav from "@/components/BottomNav";
 import NotificationBell from "@/components/NotificationBell";
 
@@ -24,6 +27,8 @@ type Friend = {
 export default function FriendsPage() {
   const router = useRouter();
   const { t } = useI18n();
+  const confirm = useConfirm();
+  const toast = useToast();
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -124,6 +129,7 @@ export default function FriendsPage() {
       });
       if (rpcError) throw new Error(rpcError.message);
       await load();
+      if (accept) toast(t("friends.accepted"), "success");
     } catch (err) {
       setError(err instanceof Error ? err.message : t("friends.errAction"));
     } finally {
@@ -134,7 +140,11 @@ export default function FriendsPage() {
   const remove = async (friend: Friend) => {
     if (
       friend.relation === "friend" &&
-      !confirm(t("friends.confirmRemove", { name: friend.name }))
+      !(await confirm({
+        message: t("friends.confirmRemove", { name: friend.name }),
+        confirmLabel: t("members.remove"),
+        destructive: true,
+      }))
     ) {
       return;
     }
@@ -278,9 +288,7 @@ export default function FriendsPage() {
                 {t("friends.friendsTitle", { count: accepted.length })}
               </h2>
               {accepted.length === 0 ? (
-                <div className="glass-panel rounded-2xl p-6 text-sm text-slate-300">
-                  {t("friends.empty")}
-                </div>
+                <EmptyState icon={UserPlus} message={t("friends.empty")} />
               ) : (
                 accepted.map((f) => (
                   <FriendRow key={f.friendshipId} friend={f}>

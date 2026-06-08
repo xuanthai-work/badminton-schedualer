@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { AlertTriangle, Pencil, Repeat, Save, Trash2 } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { useI18n } from "@/lib/i18n";
+import { useConfirm } from "@/components/ConfirmProvider";
 
 type RecurringSchedule = {
   id: string;
@@ -28,6 +29,7 @@ export default function GroupSettingsPanel({
 }: Props) {
   const router = useRouter();
   const { t, lang } = useI18n();
+  const confirm = useConfirm();
 
   const [schedules, setSchedules] = useState<RecurringSchedule[]>([]);
   const [scheduleBusy, setScheduleBusy] = useState<string | null>(null);
@@ -89,11 +91,13 @@ export default function GroupSettingsPanel({
 
   const handleDeleteSchedule = async (schedule: RecurringSchedule) => {
     if (
-      !confirm(
-        t("settings.recurringConfirmDelete", {
+      !(await confirm({
+        message: t("settings.recurringConfirmDelete", {
           day: weekdayName(schedule.weekday),
-        })
-      )
+        }),
+        confirmLabel: t("settings.recurringStop"),
+        destructive: true,
+      }))
     ) {
       return;
     }

@@ -2,9 +2,12 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Image from "next/image";
-import { UserPlus } from "lucide-react";
+import { Users, UserPlus } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { useI18n } from "@/lib/i18n";
+import { useConfirm } from "@/components/ConfirmProvider";
+import { useToast } from "@/components/ToastProvider";
+import EmptyState from "@/components/EmptyState";
 
 type Member = {
   userId: string;
@@ -41,6 +44,8 @@ export default function MembersPanel({
   createdBy,
 }: Props) {
   const { t } = useI18n();
+  const confirm = useConfirm();
+  const toast = useToast();
   const [members, setMembers] = useState<Member[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -166,7 +171,7 @@ export default function MembersPanel({
         | null;
 
       if (result?.status === "invited") {
-        setInviteMsg(t("members.invited"));
+        toast(t("members.invited"), "success");
         setInviteValue("");
       } else if (result?.status === "already_invited") {
         setInviteMsg(t("members.alreadyInvited"));
@@ -197,10 +202,11 @@ export default function MembersPanel({
       if (rpcError) throw new Error(rpcError.message);
       const result = data as { status?: string } | null;
       if (result?.status === "invited" || result?.status === "already_invited") {
-        setInviteMsg(
+        toast(
           result.status === "invited"
             ? t("members.invited")
-            : t("members.alreadyInvited")
+            : t("members.alreadyInvited"),
+          "success"
         );
         setInvitedIds((prev) => new Set(prev).add(friend.userId));
       } else if (result?.status === "already_member") {
@@ -249,9 +255,9 @@ export default function MembersPanel({
       if (rpcError) throw new Error(rpcError.message);
       const status = (data as { status?: string } | null)?.status;
       if (status === "sent" || status === "already_sent") {
-        setFriendMsg(t("members.friendRequestSent"));
+        toast(t("members.friendRequestSent"), "success");
       } else if (status === "accepted" || status === "already_friends") {
-        setFriendMsg(t("members.friendAccepted"));
+        toast(t("members.friendAccepted"), "success");
       } else {
         setFriendMsg(t("members.errFriend"));
       }
@@ -272,7 +278,7 @@ export default function MembersPanel({
         accept: true,
       });
       if (rpcError) throw new Error(rpcError.message);
-      setFriendMsg(t("members.friendAccepted"));
+      toast(t("members.friendAccepted"), "success");
       await loadFriends();
     } catch (err) {
       setFriendMsg(err instanceof Error ? err.message : t("members.errFriend"));
@@ -312,7 +318,14 @@ export default function MembersPanel({
       setError(t("members.errRemoveCreator"));
       return;
     }
-    if (!confirm(t("members.confirmRemove", { name: member.name }))) return;
+    if (
+      !(await confirm({
+        message: t("members.confirmRemove", { name: member.name }),
+        confirmLabel: t("members.remove"),
+        destructive: true,
+      }))
+    )
+      return;
 
     setActionBusy(member.userId);
     setError("");
@@ -417,9 +430,7 @@ export default function MembersPanel({
       {loading ? (
         <div className="glass-panel h-24 animate-pulse rounded-2xl" />
       ) : members.length === 0 ? (
-        <div className="glass-panel rounded-2xl p-6 text-sm text-slate-300">
-          {t("members.empty")}
-        </div>
+        <EmptyState icon={Users} message={t("members.empty")} />
       ) : (
         <ul className="space-y-3">
           {members.map((member) => {

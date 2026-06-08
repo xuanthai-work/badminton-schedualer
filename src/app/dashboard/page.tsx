@@ -20,6 +20,9 @@ import {
 import { supabase } from "@/lib/supabaseClient";
 import { ensureUserProfile } from "@/lib/userProfile";
 import { useI18n } from "@/lib/i18n";
+import { useConfirm } from "@/components/ConfirmProvider";
+import { useToast } from "@/components/ToastProvider";
+import EmptyState from "@/components/EmptyState";
 import BottomNav from "@/components/BottomNav";
 import NotificationBell from "@/components/NotificationBell";
 import OnboardingPrompts from "@/components/OnboardingPrompts";
@@ -59,6 +62,8 @@ type GroupMatch = {
 export default function DashboardPage() {
   const router = useRouter();
   const { t, formatVnd } = useI18n();
+  const confirm = useConfirm();
+  const toast = useToast();
   const [userId, setUserId] = useState<string | null>(null);
   const [displayName, setDisplayName] = useState<string>("");
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
@@ -78,7 +83,6 @@ export default function DashboardPage() {
   }>({ owe: 0, oweMatches: 0, collect: 0, collectMatches: 0, collectGroup: null });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [notice, setNotice] = useState("");
 
   // One-shot toast driven by ?notice=... (e.g. the bell redirects here when
   // a notification points at a deleted match). Cleans the URL immediately.
@@ -87,15 +91,11 @@ export default function DashboardPage() {
     if (params.get("notice") !== "match-gone") return;
     window.history.replaceState(null, "", "/dashboard");
     const show = window.setTimeout(
-      () => setNotice(t("dashboard.matchGone")),
+      () => toast(t("dashboard.matchGone"), "info"),
       0
     );
-    const hide = window.setTimeout(() => setNotice(""), 5000);
-    return () => {
-      window.clearTimeout(show);
-      window.clearTimeout(hide);
-    };
-  }, [t]);
+    return () => window.clearTimeout(show);
+  }, [t, toast]);
 
   const loadInvites = useCallback(async () => {
     const { data } = await supabase.rpc("get_group_invites");
@@ -261,7 +261,14 @@ export default function DashboardPage() {
 
   const handleDeleteMatch = useCallback(
     async (id: string) => {
-      if (!confirm(t("matches.confirmDelete"))) return;
+      if (
+        !(await confirm({
+          message: t("matches.confirmDelete"),
+          confirmLabel: t("matches.delete"),
+          destructive: true,
+        }))
+      )
+        return;
       setDeletingMatchId(id);
       try {
         const { error: deleteError } = await supabase
@@ -276,7 +283,7 @@ export default function DashboardPage() {
         setDeletingMatchId(null);
       }
     },
-    [t]
+    [t, confirm]
   );
 
   const handleQuickRsvp = useCallback(
@@ -606,9 +613,7 @@ export default function DashboardPage() {
           ) : error ? (
             <p className="text-sm text-rose-400">{error}</p>
           ) : groups.length === 0 ? (
-            <div className="glass-panel rounded-2xl p-6 text-sm text-slate-300">
-              {t("dashboard.emptyGroups")}
-            </div>
+            <EmptyState icon={Users} message={t("dashboard.emptyGroups")} />
           ) : (
             <div className="space-y-5">
               {groups.map((group) => (
@@ -636,11 +641,6 @@ export default function DashboardPage() {
       </div>
 
       {userId ? <CreateGroupPanel onCreated={() => loadGroups(userId)} /> : null}
-      {notice && (
-        <div className="solid-panel fixed bottom-[calc(6rem+env(safe-area-inset-bottom))] left-1/2 z-50 -translate-x-1/2 rounded-xl px-4 py-2.5 text-sm text-slate-100 shadow-2xl">
-          {notice}
-        </div>
-      )}
       {userId ? <OnboardingPrompts /> : null}
       <BottomNav />
     </main>
