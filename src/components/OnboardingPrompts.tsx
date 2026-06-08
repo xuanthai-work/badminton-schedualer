@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Bell, Share, Smartphone } from "lucide-react";
+import { Bell, PlusSquare, Share, Smartphone } from "lucide-react";
 import { useI18n } from "@/lib/i18n";
 import { getPushSubscription, enablePush, isPushSupported } from "@/lib/push";
 
@@ -68,11 +68,9 @@ export default function OnboardingPrompts() {
 
       const isIos = /iphone|ipad|ipod/i.test(navigator.userAgent);
       if (isIos) {
-        // iOS install is handled by ShortcutOnboardingPopup (one-tap iCloud
-        // Shortcut). Skip the manual Share-sheet instructions and move on to
-        // the push prompt here.
-        const next = await decidePushStep();
-        if (active) setStep((s) => s ?? next);
+        // iOS has no programmatic install (and an iCloud Shortcut only opens
+        // Safari, not a real PWA) — show the manual Add-to-Home-Screen steps.
+        setStep((s) => s ?? "ios");
         return;
       }
 
@@ -148,18 +146,7 @@ export default function OnboardingPrompts() {
             }}
           />
         )}
-        {step === "ios" && (
-          <PromptBody
-            icon={<Share size={18} strokeWidth={1.75} />}
-            title={t("onboard.installTitle")}
-            body={t("onboard.iosBody")}
-            primary={{
-              label: t("onboard.iosOk"),
-              onClick: dismissInstall,
-              busy: false,
-            }}
-          />
-        )}
+        {step === "ios" && <IosInstructions onDone={dismissInstall} />}
         {step === "push" && (
           <PromptBody
             icon={<Bell size={18} strokeWidth={1.75} />}
@@ -173,6 +160,61 @@ export default function OnboardingPrompts() {
             }}
           />
         )}
+      </div>
+    </div>
+  );
+}
+
+// iOS can't install a PWA programmatically — the only real way to a
+// full-screen Home Screen app is Safari's Share → Add to Home Screen. Walk the
+// user through it as numbered steps with the actual button icons inlined.
+function IosInstructions({ onDone }: { onDone: () => void }) {
+  const { t } = useI18n();
+  const steps: { text: string; icon?: React.ReactNode }[] = [
+    { text: t("onboard.iosStep1"), icon: <Share size={14} strokeWidth={2} /> },
+    {
+      text: t("onboard.iosStep2"),
+      icon: <PlusSquare size={14} strokeWidth={2} />,
+    },
+    { text: t("onboard.iosStep3") },
+  ];
+
+  return (
+    <div className="space-y-3">
+      <div className="flex items-start gap-3">
+        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-lime-500/15 text-lime-300">
+          <Smartphone size={18} strokeWidth={1.75} />
+        </span>
+        <div className="min-w-0">
+          <p className="text-sm font-semibold text-slate-100">
+            {t("onboard.iosTitle")}
+          </p>
+          <p className="mt-0.5 text-xs leading-relaxed text-slate-400">
+            {t("onboard.iosBody")}
+          </p>
+        </div>
+      </div>
+      <ol className="space-y-2">
+        {steps.map((s, i) => (
+          <li key={i} className="flex items-center gap-2.5">
+            <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-lg bg-slate-800 text-[11px] font-semibold text-lime-300">
+              {i + 1}
+            </span>
+            <span className="flex flex-wrap items-center gap-1.5 text-xs text-slate-200">
+              {s.text}
+              {s.icon && <span className="text-lime-300">{s.icon}</span>}
+            </span>
+          </li>
+        ))}
+      </ol>
+      <div className="flex justify-end">
+        <button
+          type="button"
+          onClick={onDone}
+          className="rounded-xl bg-lime-500 px-3 py-1.5 text-xs font-semibold text-slate-950 transition hover:scale-[1.03] active:scale-95"
+        >
+          {t("onboard.iosOk")}
+        </button>
       </div>
     </div>
   );

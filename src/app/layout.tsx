@@ -15,13 +15,13 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  applicationName: "Badminton Scheduler",
-  title: "Badminton Scheduler",
+  applicationName: "BSche",
+  title: "BSche",
   description: "Badminton match scheduling and cost splitting",
   // Makes the home-screen launch open full-screen (no Safari chrome) on iOS.
   appleWebApp: {
     capable: true,
-    title: "Badminton",
+    title: "BSche",
     statusBarStyle: "black-translucent",
   },
 };

@@ -140,7 +140,7 @@ function render(
       };
     default:
       return {
-        title: "Badminton Scheduler",
+        title: "BSche",
         body: vi ? "Bạn có thông báo mới" : "You have a new notification",
         url: "/dashboard",
       };

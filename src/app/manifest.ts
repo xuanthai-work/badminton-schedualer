@@ -2,8 +2,8 @@ import type { MetadataRoute } from "next";
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "Badminton Scheduler",
-    short_name: "Badminton",
+    name: "BSche",
+    short_name: "BSche",
     description: "Lên lịch đánh cầu lông và chia tiền sân.",
     lang: "vi",
     start_url: "/dashboard",
@@ -13,9 +13,15 @@ export default function manifest(): MetadataRoute.Manifest {
     background_color: "#020617",
     theme_color: "#020617",
     icons: [
-      { src: "/icon", sizes: "512x512", type: "image/png", purpose: "any" },
       {
-        src: "/icon",
+        src: "/icon-192.png",
+        sizes: "192x192",
+        type: "image/png",
+        purpose: "any",
+      },
+      { src: "/icon.png", sizes: "512x512", type: "image/png", purpose: "any" },
+      {
+        src: "/icon.png",
         sizes: "512x512",
         type: "image/png",
         purpose: "maskable",
