@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { createPortal } from "react-dom";
 import { Plus } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { useI18n } from "@/lib/i18n";
@@ -122,16 +123,21 @@ export default function CreateMatchPanel({ groupId, onCreated }: Props) {
         {t("createMatch.fab")}
       </button>
 
-      {open && (
-        <div
-          className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 p-4 sm:items-center"
-          onClick={(event) => {
-            if (event.currentTarget === event.target) {
-              close();
-            }
-          }}
-        >
-          <div className="glass-panel w-full max-w-lg rounded-2xl p-6 shadow-2xl">
+      {open &&
+        createPortal(
+          // Portaled to <body>: the trigger lives inside a group card whose
+          // `glass-panel` backdrop-filter is a containing block for fixed
+          // elements (and clips via overflow-hidden), which would trap this
+          // overlay inside the card otherwise.
+          <div
+            className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 p-4 sm:items-center"
+            onClick={(event) => {
+              if (event.currentTarget === event.target) {
+                close();
+              }
+            }}
+          >
+            <div className="glass-panel max-h-[85dvh] w-full max-w-lg overflow-y-auto rounded-2xl p-6 shadow-2xl">
             <div className="mb-4 flex items-center justify-between">
               <h2 className="text-lg font-semibold">
                 {t("matches.modalTitle")}
@@ -248,8 +254,9 @@ export default function CreateMatchPanel({ groupId, onCreated }: Props) {
               </div>
             </form>
           </div>
-        </div>
-      )}
+        </div>,
+          document.body
+        )}
     </>
   );
 }
