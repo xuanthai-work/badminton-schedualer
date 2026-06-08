@@ -1,3 +1,24 @@
+> ⚠️ **Đây là bản THIẾT KẾ GỐC (spec ban đầu).** Sản phẩm thực tế đã vượt xa tài liệu này — nguồn chuẩn về trạng thái hiện tại là **`handoff.md`**. Phần dưới giữ nguyên để tham khảo ý tưởng/lý do ban đầu.
+
+## Trạng thái hiện tại (cập nhật 2026-06-08)
+
+**Cả 4 Phase đã xong. App đã live tại `bscheduler.xyz` (tên "BSche"), deploy qua Vercel.**
+
+Đã làm tới **Phase 2.20** (xem `handoff.md` để biết chi tiết + danh sách 26 migration SQL):
+- ✅ Vòng lặp lõi: tạo nhóm → tạo lịch → điểm danh (RSVP) → chốt & chia tiền → theo dõi thanh toán → công nợ.
+- ✅ Ngoài spec gốc: hệ thống bạn bè + tag `@username#0000`; thông báo in-app (chuông) + **web push** (VAPID); **PWA** cài được + auto-update; i18n (vi/en, theo tài khoản); nhắc lịch tự động (pg_cron); lịch lặp hàng tuần; tab thống kê nhóm; trang công nợ; quên mật khẩu; SMTP riêng (Resend + domain).
+- ✅ UX: confirm dialog / toast / empty state trong app; nút "Tạo lịch" inline trong thẻ nhóm.
+
+**Khác biệt so với spec gốc bên dưới:**
+- ❌ **Bỏ Google Auth** (Phase 2.18 — màn hình consent chưa verify bị Google cảnh báo). Chỉ còn **email/mật khẩu** (đăng nhập bằng username hoặc email).
+- 🔁 **Khóa RSVP cố định 30 phút** trước giờ đánh (không cho cấu hình 1-2 tiếng như spec).
+- 🔁 **Không tự sinh QR VietQR.** Payee tự upload ảnh QR, hoặc hiện thông tin bank dạng text copy được.
+- 🔁 Chi phí không cố định 3 khoản; nhập linh hoạt, nhập theo đơn vị nghìn.
+
+**Next step:** xem mục "▶ Next step" trong `handoff.md` — khuyến nghị **bật lại "Confirm email"** (sau khi xác minh Resend gửi được mail).
+
+---
+
 Dưới đây là bản thiết kế hệ thống và lộ trình phát triển cho ứng dụng quản lý lịch đánh cầu lông của bạn, tập trung vào tính thực dụng và tối ưu chi phí.
 
 ### 1. Kiến trúc Hệ thống & Công nghệ (Tech Stack)
