@@ -184,11 +184,19 @@ export default function ProfilePage() {
     setTagBusy(true);
     setTagMsg(null);
     try {
-      const { error: updateError } = await supabase
-        .from("users")
-        .update({ tag: value })
-        .eq("id", userId);
-      if (updateError) throw new Error(updateError.message);
+      // Server-enforced set-once: the set_tag RPC writes the tag only while
+      // it's null and validates the format (direct UPDATE on the column is
+      // revoked for clients). See supabase/set-tag.sql.
+      const { error: rpcError } = await supabase.rpc("set_tag", {
+        p_tag: value,
+      });
+      if (rpcError) {
+        throw new Error(
+          rpcError.message.includes("invalid_tag_format")
+            ? t("profile.errTagFormat")
+            : t("profile.errTag")
+        );
+      }
       setProfile((p) => (p ? { ...p, tag: value } : p));
       setTagMsg({ text: t("profile.tagSaved"), ok: true });
     } catch (err) {
