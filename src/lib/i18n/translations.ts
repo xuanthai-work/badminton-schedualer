@@ -108,10 +108,7 @@ const vi = {
     errCannotCreate: "Không thể tạo nhóm. Vui lòng thử lại.",
   },
   createMatch: {
-    fab: "+ Tạo lịch",
-    groupLabel: "Nhóm",
-    groupPlaceholder: "Chọn nhóm",
-    errNoGroup: "Vui lòng chọn nhóm.",
+    fab: "Tạo lịch",
   },
   group: {
     loading: "Đang tải nhóm...",
@@ -601,10 +598,7 @@ const en: typeof vi = {
     errCannotCreate: "Could not create group. Please try again.",
   },
   createMatch: {
-    fab: "+ New match",
-    groupLabel: "Group",
-    groupPlaceholder: "Select group",
-    errNoGroup: "Please select a group.",
+    fab: "New match",
   },
   group: {
     loading: "Loading group...",

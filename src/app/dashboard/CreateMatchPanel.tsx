@@ -1,26 +1,22 @@
 "use client";
 
 import { useState } from "react";
+import { Plus } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { useI18n } from "@/lib/i18n";
 import DateField from "@/components/DateField";
 import TimeField from "@/components/TimeField";
-import SelectField from "@/components/SelectField";
-
-export type AdminGroup = {
-  id: string;
-  name: string;
-};
 
 type Props = {
-  groups: AdminGroup[];
+  // The match is always created for this specific group, so there is no
+  // group picker — the trigger lives inline inside that group's card.
+  groupId: string;
   onCreated: () => void;
 };
 
-export default function CreateMatchPanel({ groups, onCreated }: Props) {
+export default function CreateMatchPanel({ groupId, onCreated }: Props) {
   const { t } = useI18n();
   const [open, setOpen] = useState(false);
-  const [groupId, setGroupId] = useState("");
   const [date, setDate] = useState("");
   const [time, setTime] = useState("");
   const [endTime, setEndTime] = useState("");
@@ -31,13 +27,7 @@ export default function CreateMatchPanel({ groups, onCreated }: Props) {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
 
-  if (groups.length === 0) return null;
-
-  // Single-group admins skip the picker; multi-group admins choose explicitly.
-  const effectiveGroupId = groups.length === 1 ? groups[0].id : groupId;
-
   const reset = () => {
-    setGroupId("");
     setDate("");
     setTime("");
     setEndTime("");
@@ -57,10 +47,6 @@ export default function CreateMatchPanel({ groups, onCreated }: Props) {
     event.preventDefault();
     setError("");
 
-    if (!effectiveGroupId) {
-      setError(t("createMatch.errNoGroup"));
-      return;
-    }
     if (!date || !time || !endTime || !location.trim()) {
       setError(t("matches.errRequired"));
       return;
@@ -81,7 +67,7 @@ export default function CreateMatchPanel({ groups, onCreated }: Props) {
       const { data: userData } = await supabase.auth.getUser();
       const uid = userData.user?.id;
       const { error: insertError } = await supabase.from("matches").insert({
-        group_id: effectiveGroupId,
+        group_id: groupId,
         match_date: date,
         match_time: time,
         match_end_time: endTime,
@@ -102,7 +88,7 @@ export default function CreateMatchPanel({ groups, onCreated }: Props) {
         const { error: scheduleError } = await supabase
           .from("recurring_schedules")
           .insert({
-            group_id: effectiveGroupId,
+            group_id: groupId,
             weekday,
             match_time: time,
             match_end_time: endTime,
@@ -129,9 +115,10 @@ export default function CreateMatchPanel({ groups, onCreated }: Props) {
     <>
       <button
         type="button"
-        className="fixed bottom-[calc(10rem+env(safe-area-inset-bottom))] right-6 z-40 rounded-full bg-slate-900/90 px-5 py-3 text-sm font-semibold text-lime-300 shadow-lg ring-1 ring-lime-500/30 backdrop-blur transition hover:ring-lime-500/60"
+        className="flex w-full items-center justify-center gap-1.5 rounded-xl border border-dashed border-lime-500/30 bg-lime-500/[0.06] px-3 py-2 text-sm font-semibold text-lime-300 transition hover:border-lime-500/50 hover:bg-lime-500/10 active:scale-[0.99]"
         onClick={() => setOpen(true)}
       >
+        <Plus size={15} strokeWidth={2.25} />
         {t("createMatch.fab")}
       </button>
 
@@ -159,24 +146,6 @@ export default function CreateMatchPanel({ groups, onCreated }: Props) {
             </div>
 
             <form onSubmit={handleCreate} className="space-y-4">
-              {groups.length > 1 && (
-                <div className="space-y-1 text-sm">
-                  <label className="text-slate-300">
-                    {t("createMatch.groupLabel")}
-                  </label>
-                  <SelectField
-                    value={groupId}
-                    onChange={setGroupId}
-                    placeholder={t("createMatch.groupPlaceholder")}
-                    options={groups.map((g) => ({
-                      value: g.id,
-                      label: g.name,
-                    }))}
-                    required
-                  />
-                </div>
-              )}
-
               <div className="space-y-1 text-sm">
                 <label className="text-slate-300">{t("matches.date")}</label>
                 <DateField value={date} onChange={setDate} required />

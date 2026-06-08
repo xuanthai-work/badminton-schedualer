@@ -372,14 +372,6 @@ export default function DashboardPage() {
     };
   }, [userId, groups, loadMatches]);
 
-  const adminGroups = useMemo(
-    () =>
-      groups
-        .filter((g) => g.role === "admin")
-        .map((g) => ({ id: g.id, name: g.name })),
-    [groups]
-  );
-
   const { openByGroup, closedByGroup } = useMemo(() => {
     const today = new Date().toISOString().slice(0, 10);
     const open = new Map<string, GroupMatch[]>();
@@ -424,7 +416,7 @@ export default function DashboardPage() {
   };
 
   return (
-    <main className="relative min-h-screen overflow-hidden bg-slate-950 px-6 py-10 pb-28 text-slate-50">
+    <main className="relative min-h-screen overflow-hidden bg-slate-950 px-6 py-10 pb-[calc(7rem+env(safe-area-inset-bottom))] text-slate-50">
       <div
         aria-hidden
         className="pointer-events-none fixed -top-32 right-[-80px] h-80 w-80 rounded-full bg-lime-500/10 blur-3xl"
@@ -629,6 +621,13 @@ export default function DashboardPage() {
                   deletingMatchId={deletingMatchId}
                   onRsvp={handleQuickRsvp}
                   rsvpBusyId={rsvpBusyId}
+                  onMatchCreated={() =>
+                    userId &&
+                    loadMatches(
+                      userId,
+                      groups.map((g) => g.id)
+                    )
+                  }
                 />
               ))}
             </div>
@@ -637,17 +636,6 @@ export default function DashboardPage() {
       </div>
 
       {userId ? <CreateGroupPanel onCreated={() => loadGroups(userId)} /> : null}
-      {userId ? (
-        <CreateMatchPanel
-          groups={adminGroups}
-          onCreated={() =>
-            loadMatches(
-              userId,
-              groups.map((g) => g.id)
-            )
-          }
-        />
-      ) : null}
       {notice && (
         <div className="solid-panel fixed bottom-[calc(6rem+env(safe-area-inset-bottom))] left-1/2 z-50 -translate-x-1/2 rounded-xl px-4 py-2.5 text-sm text-slate-100 shadow-2xl">
           {notice}
@@ -667,6 +655,7 @@ function GroupCardItem({
   deletingMatchId,
   onRsvp,
   rsvpBusyId,
+  onMatchCreated,
 }: {
   group: GroupCard;
   openMatches: GroupMatch[];
@@ -675,6 +664,7 @@ function GroupCardItem({
   deletingMatchId: string | null;
   onRsvp: (matchId: string, status: "yes" | "no") => void;
   rsvpBusyId: string | null;
+  onMatchCreated: () => void;
 }) {
   const { t } = useI18n();
   const [showClosed, setShowClosed] = useState(false);
@@ -682,53 +672,60 @@ function GroupCardItem({
   const hasMatches = openMatches.length > 0 || closedMatches.length > 0;
   return (
     <div className="space-y-2">
-      <Link
-        href={`/dashboard/groups/${group.id}`}
-        className="glass-panel group flex items-center gap-3 rounded-2xl p-4 transition hover:border-lime-500/40"
-      >
-        {group.avatars.length > 0 ? (
-          // Stacked member avatars; overflow shows as "+N".
-          <span className="flex shrink-0 -space-x-2.5">
-            {group.avatars.slice(0, 3).map((a, i) => (
-              <MiniAvatar key={i} name={a.name} url={a.url} />
-            ))}
-            {group.memberCount > 3 && (
-              <span className="flex h-8 w-8 items-center justify-center rounded-full border-2 border-slate-950 bg-slate-800 text-[10px] font-semibold text-slate-300">
-                +{group.memberCount - 3}
-              </span>
-            )}
-          </span>
-        ) : (
-          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-lime-500/10 text-lime-400">
-            <Users size={18} strokeWidth={1.75} />
-          </span>
-        )}
-        <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2">
-            <h4 className="truncate text-base font-semibold leading-tight">
-              {group.name}
-            </h4>
-            <span
-              className={`shrink-0 rounded-full border px-2 py-0.5 text-[9px] font-semibold uppercase tracking-[0.16em] ${
-                isAdmin
-                  ? "border-lime-500/30 bg-lime-500/20 text-lime-300"
-                  : "border-white/10 bg-slate-800/80 text-slate-300"
-              }`}
-            >
-              {isAdmin ? t("common.admin") : t("common.member")}
+      <div className="glass-panel overflow-hidden rounded-2xl transition hover:border-lime-500/40">
+        <Link
+          href={`/dashboard/groups/${group.id}`}
+          className="group flex items-center gap-3 p-4"
+        >
+          {group.avatars.length > 0 ? (
+            // Stacked member avatars; overflow shows as "+N".
+            <span className="flex shrink-0 -space-x-2.5">
+              {group.avatars.slice(0, 3).map((a, i) => (
+                <MiniAvatar key={i} name={a.name} url={a.url} />
+              ))}
+              {group.memberCount > 3 && (
+                <span className="flex h-8 w-8 items-center justify-center rounded-full border-2 border-slate-950 bg-slate-800 text-[10px] font-semibold text-slate-300">
+                  +{group.memberCount - 3}
+                </span>
+              )}
             </span>
+          ) : (
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-lime-500/10 text-lime-400">
+              <Users size={18} strokeWidth={1.75} />
+            </span>
+          )}
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-2">
+              <h4 className="truncate text-base font-semibold leading-tight">
+                {group.name}
+              </h4>
+              <span
+                className={`shrink-0 rounded-full border px-2 py-0.5 text-[9px] font-semibold uppercase tracking-[0.16em] ${
+                  isAdmin
+                    ? "border-lime-500/30 bg-lime-500/20 text-lime-300"
+                    : "border-white/10 bg-slate-800/80 text-slate-300"
+                }`}
+              >
+                {isAdmin ? t("common.admin") : t("common.member")}
+              </span>
+            </div>
+            <p className="mt-0.5 truncate text-xs text-slate-400">
+              {t("dashboard.memberCount", { count: group.memberCount })} ·{" "}
+              {group.adminName}
+            </p>
           </div>
-          <p className="mt-0.5 truncate text-xs text-slate-400">
-            {t("dashboard.memberCount", { count: group.memberCount })} ·{" "}
-            {group.adminName}
-          </p>
-        </div>
-        <ChevronRight
-          size={18}
-          strokeWidth={1.75}
-          className="shrink-0 text-lime-400 transition-transform group-hover:translate-x-1"
-        />
-      </Link>
+          <ChevronRight
+            size={18}
+            strokeWidth={1.75}
+            className="shrink-0 text-lime-400 transition-transform group-hover:translate-x-1"
+          />
+        </Link>
+        {isAdmin && (
+          <div className="border-t border-white/10 p-3">
+            <CreateMatchPanel groupId={group.id} onCreated={onMatchCreated} />
+          </div>
+        )}
+      </div>
 
       {hasMatches && (
         <div className="ml-3 space-y-2 border-l border-white/10 pl-4">
