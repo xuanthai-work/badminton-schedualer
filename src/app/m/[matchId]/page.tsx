@@ -563,10 +563,33 @@ function GuestPayment({
       const res = await fetch(qrSrc);
       if (!res.ok) throw new Error("Failed to fetch QR image");
       const blob = await res.blob();
+
+      const fileName = `vietqr-${bankAccount ?? "code"}.png`;
+      const file = new File([blob], fileName, { type: "image/png" });
+
+      // iOS Safari: Web Share API Level 2 opens the native Share Sheet so the
+      // user can "Save Image" straight into Photos (instead of Files).
+      if (
+        typeof navigator !== "undefined" &&
+        typeof navigator.canShare === "function" &&
+        navigator.canShare({ files: [file] })
+      ) {
+        try {
+          await navigator.share({ files: [file], title: "Mã VietQR" });
+          return;
+        } catch (shareErr) {
+          // User dismissed the share sheet — do nothing more.
+          if (shareErr instanceof Error && shareErr.name === "AbortError") {
+            return;
+          }
+          // Any other error falls through to the desktop download path.
+        }
+      }
+
       const blobUrl = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = blobUrl;
-      a.download = `vietqr-${bankAccount ?? "code"}.png`;
+      a.download = fileName;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);

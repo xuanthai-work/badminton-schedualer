@@ -109,6 +109,7 @@ Toàn bộ quá trình phát triển, kiến trúc kỹ thuật và kết quả 
 👉 [**docs/README.md**](docs/README.md)
 
 ### Danh sách các task gần đây:
+- **[TASK-21](docs/tasks/ios-safari-qr-web-share.md)**: Tối ưu nút tải VietQR trên iOS Safari bằng Web Share API (lưu trực tiếp vào Photos).
 - **[TASK-20](docs/tasks/standardize-og-preview-card.md)**: Chuẩn hóa Open Graph Preview Card với Logo BSche (1200x630) & bổ sung `og:url`.
 - **[TASK-19](docs/tasks/add-og-image-preview.md)**: Tích hợp ảnh OG Preview cho link Messenger.
 - **[TASK-17](docs/tasks/dynamic-match-og-metadata.md)**: Dynamic Open Graph Metadata cho trang Magic Match Link.

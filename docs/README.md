@@ -30,3 +30,4 @@ Thư mục lưu trữ tài liệu kỹ thuật và lịch sử các task đã ho
 | TASK-18 | Ẩn Nút Maps Trắng Của Google Và Đồng Bộ Phong Cách Dark-Theme | 2026-10-09 | **PASS** | [crop-google-maps-embed-button.md](file:///D:/work/Stuff/badminton-schedualer/docs/tasks/crop-google-maps-embed-button.md) |
 | TASK-19 | Tích Hợp Ảnh OG Preview "Cầu Lông Đi Mà ^^" Cho Link Messenger | 2026-10-09 | **PASS** | [add-og-image-preview.md](file:///D:/work/Stuff/badminton-schedualer/docs/tasks/add-og-image-preview.md) |
 | TASK-20 | Chuẩn Hóa Open Graph Preview Card Với Logo BSche (1200x630) & Bổ Sung `og:url` | 2026-10-09 | **PASS** | [standardize-og-preview-card.md](file:///D:/work/Stuff/badminton-schedualer/docs/tasks/standardize-og-preview-card.md) |
+| TASK-21 | Tối Ưu Nút Tải VietQR Trên iOS Safari Bằng Web Share API (Lưu Trực Tiếp Vào Photos) | 2026-10-09 | **PASS** | [ios-safari-qr-web-share.md](file:///D:/work/Stuff/badminton-schedualer/docs/tasks/ios-safari-qr-web-share.md) |
