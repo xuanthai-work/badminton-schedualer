@@ -23,7 +23,11 @@ export default function MapsPreview({ url }: Props) {
   const { t } = useI18n();
   const [preview, setPreview] = useState<Preview | null>(null);
 
+  // Only http(s) links are rendered — blocks javascript:/data: XSS vectors.
+  const isSafeUrl = /^https?:\/\//i.test(url);
+
   useEffect(() => {
+    if (!isSafeUrl) return;
     let active = true;
     const run = async () => {
       try {
@@ -40,7 +44,9 @@ export default function MapsPreview({ url }: Props) {
     return () => {
       active = false;
     };
-  }, [url]);
+  }, [url, isSafeUrl]);
+
+  if (!isSafeUrl) return null;
 
   const openTag = (
     <span className="absolute bottom-2 right-2 inline-flex items-center gap-1 rounded-full bg-slate-950/80 px-2.5 py-1 text-[11px] font-semibold text-lime-300 backdrop-blur-sm">

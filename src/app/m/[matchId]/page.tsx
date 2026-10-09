@@ -10,14 +10,13 @@ import {
   Copy,
   MapPin,
   QrCode,
-  XCircle,
 } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { useI18n } from "@/lib/i18n";
 import { bankByCode } from "@/lib/banks";
 import MapsPreview from "@/components/MapsPreview";
+import InitialAvatar from "@/components/InitialAvatar";
 
-type RsvpStatus = "yes" | "no" | "pending";
 type PaymentStatus = "unpaid" | "submitted" | "confirmed";
 
 type PublicMatch = {
@@ -30,13 +29,6 @@ type PublicMatch = {
   locationUrl: string | null;
   courtNo: number | null;
   status: "open" | "closed";
-};
-
-type PublicMember = {
-  userId: string;
-  name: string;
-  avatarUrl: string | null;
-  status: RsvpStatus;
 };
 
 type PublicGuest = {
@@ -63,13 +55,12 @@ type Expense = {
 
 type PublicData = {
   match: PublicMatch;
-  members: PublicMember[];
   guests: PublicGuest[];
   expense: Expense | null;
   payee: Payee | null;
 };
 
-type Identity = { id: string; name: string };
+type Identity = { id: string; name: string; secret?: string };
 
 const IDENTITY_KEY = "badminton_guest_identity";
 
@@ -83,7 +74,7 @@ function newGuestId(): string {
 export default function PublicMatchPage() {
   const params = useParams<{ matchId: string }>();
   const matchId = params?.matchId;
-  const { t, formatDate } = useI18n();
+  const { t, formatMatchHeading } = useI18n();
 
   const [data, setData] = useState<PublicData | null>(null);
   const [identity, setIdentity] = useState<Identity | null>(null);
@@ -170,13 +161,30 @@ export default function PublicMatchPage() {
     setBusy(true);
     setError("");
     try {
-      const { error: rpcError } = await supabase.rpc("guest_rsvp", {
-        p_match_id: matchId,
-        p_guest_id: id,
-        p_name: name,
-        p_status: status,
-      });
-      if (rpcError) throw new Error(rpcError.message);
+      const { data: result, error: rpcError } = await supabase.rpc(
+        "guest_rsvp",
+        {
+          p_match_id: matchId,
+          p_guest_id: id,
+          p_name: name,
+          p_status: status,
+          p_secret: identity?.secret ?? null,
+        }
+      );
+      if (rpcError) {
+        if (rpcError.message?.includes("match_full")) {
+          throw new Error(t("publicMatch.matchFullError"));
+        }
+        if (rpcError.message?.includes("unauthorized_guest")) {
+          throw new Error(t("publicMatch.errUnauthorizedGuest"));
+        }
+        throw new Error(rpcError.message);
+      }
+      // Persist the server-issued secret so later edits/payments are authorized.
+      if (result && typeof result === "object" && "secret" in result) {
+        const secret = (result as { secret?: string }).secret;
+        if (secret) saveIdentity({ id, name, secret });
+      }
       await load();
     } catch (err) {
       setError(err instanceof Error ? err.message : t("publicMatch.errRsvp"));
@@ -223,8 +231,14 @@ export default function PublicMatchPage() {
       const { error: rpcError } = await supabase.rpc("guest_submit_payment", {
         p_match_id: matchId,
         p_guest_id: identity.id,
+        p_secret: identity.secret ?? null,
       });
-      if (rpcError) throw new Error(rpcError.message);
+      if (rpcError) {
+        if (rpcError.message?.includes("unauthorized_guest")) {
+          throw new Error(t("publicMatch.errUnauthorizedGuest"));
+        }
+        throw new Error(rpcError.message);
+      }
       await load();
     } catch (err) {
       setError(err instanceof Error ? err.message : t("publicMatch.errLoad"));
@@ -238,30 +252,14 @@ export default function PublicMatchPage() {
     ? data?.guests.find((g) => g.guestId === identity.id)
     : undefined;
 
-  const yesPeople = [
-    ...(data?.members.filter((m) => m.status === "yes") ?? []).map((m) => ({
-      key: m.userId,
-      name: m.name,
-      avatarUrl: m.avatarUrl,
-    })),
-    ...(data?.guests.filter((g) => g.status === "yes") ?? []).map((g) => ({
+  const yesPeople = (data?.guests.filter((g) => g.status === "yes") ?? []).map(
+    (g) => ({
       key: g.guestId,
       name: g.name,
       avatarUrl: null,
-    })),
-  ];
-  const noPeople = [
-    ...(data?.members.filter((m) => m.status === "no") ?? []).map((m) => ({
-      key: m.userId,
-      name: m.name,
-      avatarUrl: m.avatarUrl,
-    })),
-    ...(data?.guests.filter((g) => g.status === "no") ?? []).map((g) => ({
-      key: g.guestId,
-      name: g.name,
-      avatarUrl: null,
-    })),
-  ];
+    })
+  );
+  const isFull = yesPeople.length >= 20;
 
   return (
     <main className="relative min-h-screen overflow-hidden bg-slate-950 px-5 py-10 pb-16 text-slate-50">
@@ -289,7 +287,7 @@ export default function PublicMatchPage() {
               </p>
               <div className="flex flex-wrap items-center gap-2">
                 <h1 className="text-2xl font-semibold leading-tight">
-                  {data.match.title}
+                  {formatMatchHeading(match.date)}
                 </h1>
                 <span
                   className={`rounded-full border px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.18em] ${
@@ -308,17 +306,7 @@ export default function PublicMatchPage() {
             {error && <p className="text-sm text-rose-400">{error}</p>}
 
             <section className="glass-panel rounded-2xl p-5">
-              <p className="text-lg font-semibold">
-                {formatDate(match.date, { weekday: "long" })}
-              </p>
-              <p className="text-sm text-slate-400">
-                {formatDate(match.date, {
-                  day: "2-digit",
-                  month: "2-digit",
-                  year: "numeric",
-                })}
-              </p>
-              <div className="mt-3 flex flex-wrap items-center justify-between gap-x-3 gap-y-1.5">
+              <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1.5">
                 <p className="inline-flex items-center gap-1.5 whitespace-nowrap text-xl font-semibold text-lime-300">
                   <Clock size={18} strokeWidth={2} className="shrink-0" />
                   {match.time.slice(0, 5)}
@@ -346,78 +334,93 @@ export default function PublicMatchPage() {
               )}
             </section>
 
-            <section className="glass-panel rounded-2xl p-5">
-              <h2 className="text-center text-lg font-semibold">
-                {t("publicMatch.rsvpQuestion")}
-              </h2>
-              {match.status === "closed" ? (
-                <p className="mt-3 text-center text-sm text-slate-400">
-                  {t("publicMatch.closedNoRsvp")}
-                </p>
-              ) : rsvpLocked ? (
-                <p className="mt-3 text-center text-sm text-amber-300">
-                  {t("publicMatch.rsvpLocked")}
-                </p>
+            {match.status === "closed" ? (
+              myGuest?.status === "yes" ? (
+                <GuestPayment
+                  amount={data.expense?.feePerPerson ?? 0}
+                  payee={data.payee}
+                  status={myGuest.paymentStatus}
+                  guestName={identity?.name ?? myGuest.name}
+                  busy={busy}
+                  onSubmit={handleSubmitPayment}
+                />
               ) : (
-                <div className="mt-4 grid grid-cols-2 gap-3">
-                  <RsvpButton
-                    label={t("publicMatch.join")}
-                    icon={<CheckCircle2 size={28} strokeWidth={1.75} />}
-                    active={myGuest?.status === "yes"}
-                    tone="lime"
+                <section className="glass-panel rounded-2xl p-5 text-center">
+                  <p className="text-sm text-slate-400">
+                    {t("publicMatch.matchEndedNotice")}
+                  </p>
+                </section>
+              )
+            ) : (
+              <section className="glass-panel rounded-2xl p-5">
+                <h2 className="text-center text-lg font-semibold">
+                  {t("publicMatch.rsvpQuestion")}
+                </h2>
+                {rsvpLocked ? (
+                  <p className="mt-3 text-center text-sm text-amber-300">
+                    {t("publicMatch.rsvpLocked")}
+                  </p>
+                ) : myGuest?.status === "yes" && identity ? (
+                  <div className="mt-4 space-y-3">
+                    <p className="flex items-center justify-center gap-2 rounded-xl bg-emerald-500/15 px-3 py-3 text-sm font-semibold text-emerald-300">
+                      <CheckCircle2 size={18} strokeWidth={2} />
+                      {t("publicMatch.registeredBadge")}
+                    </p>
+                    <div className="flex justify-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setNameInput(identity.name);
+                          setDialogStatus("rename");
+                        }}
+                        className="rounded-lg border border-slate-700 px-3 py-1.5 text-xs font-semibold text-slate-200 transition hover:border-slate-500 active:scale-95"
+                      >
+                        {t("publicMatch.rename")}
+                      </button>
+                      <button
+                        type="button"
+                        disabled={busy}
+                        onClick={() =>
+                          void submitRsvp(identity.id, identity.name, "no")
+                        }
+                        className="rounded-lg border border-rose-700/60 px-3 py-1.5 text-xs font-semibold text-rose-300 transition hover:border-rose-500 active:scale-95 disabled:opacity-60"
+                      >
+                        {t("publicMatch.cancelRsvp")}
+                      </button>
+                    </div>
+                  </div>
+                ) : isFull ? (
+                  <button
+                    type="button"
+                    disabled
+                    className="mt-4 flex w-full cursor-not-allowed items-center justify-center gap-2 rounded-xl border border-slate-700 bg-slate-800/80 py-4 text-base font-semibold text-slate-400"
+                  >
+                    {t("publicMatch.matchFull")}
+                  </button>
+                ) : (
+                  <button
+                    type="button"
                     disabled={busy}
                     onClick={() => void handleRsvp("yes")}
-                  />
-                  <RsvpButton
-                    label={t("publicMatch.skip")}
-                    icon={<XCircle size={28} strokeWidth={1.75} />}
-                    active={myGuest?.status === "no"}
-                    tone="rose"
-                    disabled={busy}
-                    onClick={() => void handleRsvp("no")}
-                  />
-                </div>
-              )}
-              {identity && match.status === "open" && !rsvpLocked && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setNameInput(identity.name);
-                    setDialogStatus("rename");
-                  }}
-                  className="mx-auto mt-3 block text-xs font-semibold text-slate-400 underline-offset-4 transition hover:text-lime-300 hover:underline"
-                >
-                  {t("publicMatch.rename")}
-                </button>
-              )}
-            </section>
+                    className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl bg-lime-500 py-4 text-base font-semibold text-slate-950 shadow-[0_0_30px_rgba(163,230,53,0.4)] transition hover:scale-[1.01] active:scale-95 disabled:opacity-60"
+                  >
+                    <CheckCircle2 size={22} strokeWidth={2} />
+                    {t("publicMatch.join")}
+                  </button>
+                )}
+              </section>
+            )}
 
-            <section className="grid gap-4 sm:grid-cols-2">
-              <PeopleList
-                title={t("publicMatch.joinList", { count: yesPeople.length })}
-                list={yesPeople}
-                tone="lime"
-                emptyLabel={t("publicMatch.nobody")}
-                selfId={identity?.id ?? null}
-              />
-              <PeopleList
-                title={t("publicMatch.skipList", { count: noPeople.length })}
-                list={noPeople}
-                tone="rose"
-                emptyLabel={t("publicMatch.nobody")}
-                selfId={identity?.id ?? null}
-              />
-            </section>
-
-            {match.status === "closed" && myGuest?.status === "yes" && (
-              <GuestPayment
-                amount={data.expense?.feePerPerson ?? 0}
-                payee={data.payee}
-                status={myGuest.paymentStatus}
-                guestName={identity?.name ?? myGuest.name}
-                busy={busy}
-                onSubmit={handleSubmitPayment}
-              />
+            {match.status === "open" && (
+              <section>
+                <PeopleList
+                  title={t("publicMatch.joinList", { count: yesPeople.length })}
+                  list={yesPeople}
+                  tone="lime"
+                  emptyLabel={t("publicMatch.nobody")}
+                  selfId={identity?.id ?? null}
+                />
+              </section>
             )}
           </>
         ) : null}
@@ -685,81 +688,3 @@ function CopyRow({
   );
 }
 
-function RsvpButton({
-  label,
-  icon,
-  active,
-  tone,
-  disabled,
-  onClick,
-}: {
-  label: string;
-  icon: React.ReactNode;
-  active: boolean;
-  tone: "lime" | "rose";
-  disabled: boolean;
-  onClick: () => void;
-}) {
-  const activeStyles =
-    tone === "lime"
-      ? "border-lime-500/50 bg-lime-500 text-slate-950 shadow-[0_0_30px_rgba(163,230,53,0.4)]"
-      : "border-rose-500/50 bg-rose-500 text-slate-950 shadow-[0_0_30px_rgba(251,113,133,0.35)]";
-  const inactiveHover =
-    tone === "lime" ? "hover:border-lime-500/60" : "hover:border-rose-500/60";
-  return (
-    <button
-      type="button"
-      disabled={disabled}
-      onClick={onClick}
-      className={`flex flex-col items-center justify-center gap-2 rounded-xl border py-5 text-sm font-semibold transition active:scale-95 disabled:opacity-60 ${
-        active
-          ? activeStyles
-          : `border-white/10 bg-slate-900/60 text-slate-200 ${inactiveHover}`
-      }`}
-    >
-      {icon}
-      <span>{label}</span>
-    </button>
-  );
-}
-
-function InitialAvatar({
-  name,
-  url = null,
-  size = 32,
-}: {
-  name: string;
-  url?: string | null;
-  size?: number;
-}) {
-  if (url) {
-    return (
-      <div
-        className="relative shrink-0 overflow-hidden rounded-full border border-white/10"
-        style={{ width: size, height: size }}
-      >
-        <Image
-          src={url}
-          alt=""
-          fill
-          unoptimized
-          sizes={`${size}px`}
-          style={{ objectFit: "cover" }}
-        />
-      </div>
-    );
-  }
-  const initial = (name || "?").trim().charAt(0).toUpperCase() || "?";
-  return (
-    <div
-      className="flex shrink-0 items-center justify-center rounded-full border border-white/10 bg-slate-800/80 font-semibold text-lime-300"
-      style={{
-        width: size,
-        height: size,
-        fontSize: Math.round(size * 0.42),
-      }}
-    >
-      {initial}
-    </div>
-  );
-}

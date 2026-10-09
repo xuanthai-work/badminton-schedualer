@@ -1,23 +1,21 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import Image from "next/image";
 import { useParams, useRouter } from "next/navigation";
 import {
   Check,
   ChevronLeft,
   Clock,
-  Copy,
   MapPin,
-  QrCode,
   ReceiptText,
   Share2,
+  Trash2,
 } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { useI18n } from "@/lib/i18n";
-import { bankByCode } from "@/lib/banks";
 import BottomNav from "@/components/BottomNav";
 import MapsPreview from "@/components/MapsPreview";
+import InitialAvatar from "@/components/InitialAvatar";
 import EditMatchPanel from "./EditMatchPanel";
 
 type Guest = {
@@ -25,12 +23,6 @@ type Guest = {
   name: string;
   status: "yes" | "no";
   paymentStatus: PaymentStatus;
-};
-
-type Person = {
-  key: string;
-  name: string;
-  avatarUrl: string | null;
 };
 
 type Match = {
@@ -55,19 +47,11 @@ type Expense = {
   feePerPerson: number;
 };
 
-type Payee = {
-  name: string;
-  bankId: string | null;
-  bankAccount: string | null;
-  bankAccountName: string | null;
-  bankQrUrl: string | null;
-};
-
 type PaymentStatus = "unpaid" | "submitted" | "confirmed";
 
 export default function MatchDetailPage() {
   const router = useRouter();
-  const { t, formatVnd, formatDate } = useI18n();
+  const { t, formatVnd, formatMatchHeading } = useI18n();
   const params = useParams<{ matchId: string }>();
   const matchId = params?.matchId;
 
@@ -75,9 +59,10 @@ export default function MatchDetailPage() {
   const [match, setMatch] = useState<Match | null>(null);
   const [guests, setGuests] = useState<Guest[]>([]);
   const [expense, setExpense] = useState<Expense | null>(null);
-  const [payee, setPayee] = useState<Payee | null>(null);
   const [payBusy, setPayBusy] = useState<string | null>(null);
   const [linkCopied, setLinkCopied] = useState(false);
+  const [guestToDelete, setGuestToDelete] = useState<Guest | null>(null);
+  const [deleting, setDeleting] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -137,9 +122,7 @@ export default function MatchDetailPage() {
 
       const { data: expenseRow, error: expenseError } = await supabase
         .from("expenses")
-        .select(
-          "court_fee, shuttle_fee, water_fee, total_amount, fee_per_person, payee_id"
-        )
+        .select("court_fee, shuttle_fee, water_fee, total_amount, fee_per_person")
         .eq("match_id", matchId)
         .maybeSingle();
       if (expenseError) throw expenseError;
@@ -161,33 +144,6 @@ export default function MatchDetailPage() {
         setWaterFee(toThousands(expenseRow.water_fee));
       } else {
         setExpense(null);
-      }
-
-      // The payee is whoever settled (expenses.payee_id), falling back to the
-      // match owner for legacy/unsettled rows.
-      const resolvedPayee =
-        (expenseRow?.payee_id as string | null) ??
-        (matchRow.created_by as string | null) ??
-        null;
-      if (resolvedPayee) {
-        const { data: payeeRow } = await supabase
-          .from("users")
-          .select("name, bank_id, bank_account, bank_account_name, bank_qr_url")
-          .eq("id", resolvedPayee)
-          .maybeSingle();
-        setPayee(
-          payeeRow
-            ? {
-                name: payeeRow.name,
-                bankId: payeeRow.bank_id ?? null,
-                bankAccount: payeeRow.bank_account ?? null,
-                bankAccountName: payeeRow.bank_account_name ?? null,
-                bankQrUrl: payeeRow.bank_qr_url ?? null,
-              }
-            : null
-        );
-      } else {
-        setPayee(null);
       }
     },
     [matchId, t]
@@ -238,46 +194,9 @@ export default function MatchDetailPage() {
     };
   }, [userId, matchId, load]);
 
-  const relativeDayLabel = (dateStr: string) => {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const target = new Date(`${dateStr}T00:00:00`);
-    if (Number.isNaN(target.getTime())) return "";
-
-    const dayDiff = Math.round(
-      (target.getTime() - today.getTime()) / 86_400_000
-    );
-    if (dayDiff === 0) return t("match.today");
-    if (dayDiff === 1) return t("match.tomorrow");
-
-    const monday = (d: Date) => {
-      const x = new Date(d);
-      x.setDate(x.getDate() - ((x.getDay() + 6) % 7));
-      return x;
-    };
-    const weekDiff = Math.round(
-      (monday(target).getTime() - monday(today).getTime()) / (7 * 86_400_000)
-    );
-    const weekday = formatDate(dateStr, { weekday: "long" });
-    if (weekDiff === 0) return t("match.thisWeek", { day: weekday });
-    if (weekDiff === 1) return t("match.nextWeek", { day: weekday });
-    return weekday;
-  };
-
   const isHost = Boolean(match && userId && match.createdBy === userId);
 
   const guestYes = guests.filter((g) => g.status === "yes");
-  const guestNo = guests.filter((g) => g.status === "no");
-  const yesPeople: Person[] = guestYes.map((g) => ({
-    key: g.guestId,
-    name: g.name,
-    avatarUrl: null,
-  }));
-  const noPeople: Person[] = guestNo.map((g) => ({
-    key: g.guestId,
-    name: g.name,
-    avatarUrl: null,
-  }));
   const attendeeCount = guestYes.length;
 
   const handleSettle = async (event: React.FormEvent<HTMLFormElement>) => {
@@ -344,6 +263,25 @@ export default function MatchDetailPage() {
     }
   };
 
+  const handleRemoveGuest = async () => {
+    if (!guestToDelete) return;
+    setDeleting(true);
+    setError("");
+    try {
+      const { error: rpcError } = await supabase.rpc("host_remove_guest", {
+        p_match_id: matchId,
+        p_guest_id: guestToDelete.guestId,
+      });
+      if (rpcError) throw new Error(rpcError.message);
+      setGuestToDelete(null);
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t("match.errRemoveGuest"));
+    } finally {
+      setDeleting(false);
+    }
+  };
+
   const handleCopyLink = async () => {
     try {
       await navigator.clipboard.writeText(
@@ -377,7 +315,7 @@ export default function MatchDetailPage() {
           {match && (
             <div className="flex flex-wrap items-end justify-between gap-3">
               <h1 className="text-[28px] font-semibold leading-tight">
-                {match.title}
+                {formatMatchHeading(match.date)}
               </h1>
               <div className="flex items-center gap-2">
                 {isHost && (
@@ -427,19 +365,7 @@ export default function MatchDetailPage() {
             {error && <p className="text-sm text-rose-400">{error}</p>}
 
             <section className="glass-panel rounded-2xl p-5">
-              <p className="flex flex-wrap items-baseline gap-x-2">
-                <span className="text-xl font-semibold leading-tight">
-                  {relativeDayLabel(match.date)}
-                </span>
-                <span className="text-sm text-slate-400">
-                  {formatDate(match.date, {
-                    day: "2-digit",
-                    month: "2-digit",
-                    year: "numeric",
-                  })}
-                </span>
-              </p>
-              <div className="mt-2.5 flex flex-wrap items-center justify-between gap-x-3 gap-y-1.5">
+              <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1.5">
                 <p className="inline-flex items-center gap-1.5 whitespace-nowrap text-xl font-semibold leading-tight text-lime-300">
                   <Clock size={18} strokeWidth={2} className="shrink-0" />
                   {match.time.slice(0, 5)}
@@ -467,20 +393,18 @@ export default function MatchDetailPage() {
               )}
             </section>
 
-            <section className="grid gap-4 sm:grid-cols-2">
-              <RsvpList
-                title={t("match.joinList", { count: yesPeople.length })}
-                list={yesPeople}
-                tone="lime"
-                emptyLabel={t("match.nobody")}
-              />
-              <RsvpList
-                title={t("match.skipList", { count: noPeople.length })}
-                list={noPeople}
-                tone="rose"
-                emptyLabel={t("match.nobody")}
-              />
-            </section>
+            <ParticipantList
+              title={t("match.joinList", { count: guestYes.length })}
+              guests={guestYes}
+              status={match.status}
+              feePerPerson={expense?.feePerPerson ?? 0}
+              isHost={isHost}
+              userId={userId}
+              busyId={payBusy}
+              onConfirm={handleConfirmGuest}
+              onRequestDelete={(g) => setGuestToDelete(g)}
+              emptyLabel={t("match.nobody")}
+            />
 
             {expense && (
               <section className="glass-panel space-y-4 rounded-2xl p-5">
@@ -518,26 +442,7 @@ export default function MatchDetailPage() {
                     amount: formatVnd(expense.feePerPerson),
                   })}
                 </p>
-
-                {match.status === "closed" && (
-                  <div className="border-t border-white/10 pt-4">
-                    <PaymentDetails
-                      payee={payee}
-                      memo={`Cau long ${match.date}`}
-                    />
-                  </div>
-                )}
               </section>
-            )}
-
-            {match.status === "closed" && guests.length > 0 && (
-              <GuestPaymentList
-                guests={guests}
-                feePerPerson={expense?.feePerPerson ?? 0}
-                isHost={isHost}
-                busyId={payBusy}
-                onConfirm={handleConfirmGuest}
-              />
             )}
 
             {isHost && (
@@ -597,23 +502,66 @@ export default function MatchDetailPage() {
           </>
         ) : null}
       </div>
+
+      {guestToDelete && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-950/80 p-4 backdrop-blur-md sm:items-center">
+          <div className="bg-slate-900 border border-slate-800/90 w-full max-w-md rounded-2xl p-6 shadow-2xl">
+            <h2 className="text-lg font-semibold">
+              {t("match.removeGuestTitle")}
+            </h2>
+            <p className="mt-2 text-sm text-slate-300">
+              {guestToDelete.guestId === userId
+                ? t("match.removeSelfBody")
+                : t("match.removeGuestBody", { name: guestToDelete.name })}
+            </p>
+            <div className="mt-5 flex gap-2">
+              <button
+                type="button"
+                disabled={deleting}
+                onClick={() => void handleRemoveGuest()}
+                className="flex-1 rounded-xl bg-rose-500 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-rose-600 active:scale-95 disabled:opacity-60"
+              >
+                {t("match.removeGuestBtn")}
+              </button>
+              <button
+                type="button"
+                onClick={() => setGuestToDelete(null)}
+                className="flex-1 rounded-xl border border-slate-700 px-4 py-2.5 text-sm font-semibold text-slate-300 transition hover:bg-slate-800 active:scale-95"
+              >
+                {t("common.cancel")}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <BottomNav />
     </main>
   );
 }
 
-function GuestPaymentList({
+function ParticipantList({
+  title,
   guests,
+  status,
   feePerPerson,
   isHost,
+  userId,
   busyId,
   onConfirm,
+  onRequestDelete,
+  emptyLabel,
 }: {
+  title: string;
   guests: Guest[];
+  status: "open" | "closed";
   feePerPerson: number;
   isHost: boolean;
+  userId: string | null;
   busyId: string | null;
   onConfirm: (guestId: string, confirmed: boolean) => void;
+  onRequestDelete: (guest: Guest) => void;
+  emptyLabel: string;
 }) {
   const { t, formatVnd } = useI18n();
 
@@ -630,288 +578,84 @@ function GuestPaymentList({
   };
 
   return (
-    <section className="glass-panel rounded-2xl p-5">
-      <div className="mb-3 flex items-center gap-2">
-        <ReceiptText size={18} strokeWidth={1.75} className="text-lime-400" />
-        <h2 className="text-base font-semibold">
-          {t("match.guestPaymentTitle")}
-        </h2>
-      </div>
-      <ul className="space-y-2">
-        {guests.map((g) => {
-          const busy = busyId === g.guestId;
-          return (
-            <li
-              key={g.guestId}
-              className="flex items-center justify-between gap-3 rounded-xl bg-slate-900/50 px-3 py-2"
-            >
-              <div className="flex min-w-0 items-center gap-2.5">
-                <InitialAvatar name={g.name} size={32} />
-                <div className="min-w-0">
-                  <p className="truncate text-sm text-slate-100">
-                    {g.name}
-                    <span className="ml-1 rounded-full bg-white/5 px-1.5 py-0.5 text-[10px] font-semibold text-slate-400">
-                      {t("match.guestBadge")}
-                    </span>
-                  </p>
-                  <p className="text-xs text-slate-500">
-                    {formatVnd(feePerPerson)}
-                  </p>
-                </div>
-              </div>
-              <div className="flex shrink-0 items-center gap-2">
-                {g.status === "no" ? (
-                  <span className="rounded-full bg-slate-800 px-2.5 py-1 text-[11px] font-semibold text-slate-500">
-                    {t("match.skip")}
-                  </span>
-                ) : (
-                  <>
-                    <span
-                      className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${pill[g.paymentStatus].cls}`}
-                    >
-                      {pill[g.paymentStatus].label}
-                    </span>
-                    {isHost && g.paymentStatus === "submitted" && (
-                      <button
-                        type="button"
-                        disabled={busy}
-                        onClick={() => onConfirm(g.guestId, true)}
-                        className="rounded-lg bg-emerald-500 px-3 py-1.5 text-xs font-semibold text-slate-950 transition hover:scale-[1.03] active:scale-95 disabled:opacity-60"
-                      >
-                        {t("match.payConfirm")}
-                      </button>
-                    )}
-                    {isHost && g.paymentStatus === "confirmed" && (
-                      <button
-                        type="button"
-                        disabled={busy}
-                        onClick={() => onConfirm(g.guestId, false)}
-                        className="rounded-lg border border-slate-700 px-3 py-1.5 text-xs text-slate-300 transition hover:border-slate-500 active:scale-95 disabled:opacity-60"
-                      >
-                        {t("match.payUnconfirm")}
-                      </button>
-                    )}
-                  </>
-                )}
-              </div>
-            </li>
-          );
-        })}
-      </ul>
-    </section>
-  );
-}
-
-function CopyButton({
-  copied,
-  onClick,
-  label,
-  copiedLabel,
-}: {
-  copied: boolean;
-  onClick: () => void;
-  label: string;
-  copiedLabel: string;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className="inline-flex items-center gap-1 rounded-lg border border-slate-700 px-2.5 py-1 text-[11px] font-semibold text-slate-200 transition hover:border-slate-500 active:scale-95"
-    >
-      {copied ? (
-        <Check size={12} strokeWidth={2.25} className="text-lime-400" />
-      ) : (
-        <Copy size={12} strokeWidth={1.75} />
-      )}
-      {copied ? copiedLabel : label}
-    </button>
-  );
-}
-
-function PaymentDetails({
-  payee,
-  memo,
-}: {
-  payee: Payee | null;
-  memo: string;
-}) {
-  const { t } = useI18n();
-  const [copied, setCopied] = useState<string | null>(null);
-
-  const copy = async (key: string, value: string) => {
-    try {
-      await navigator.clipboard.writeText(value);
-      setCopied(key);
-      window.setTimeout(() => setCopied((c) => (c === key ? null : c)), 1500);
-    } catch {
-      /* clipboard unavailable — ignore */
-    }
-  };
-
-  const bank = bankByCode(payee?.bankId);
-  const qrSrc = payee?.bankQrUrl ?? null;
-  const hasBank = Boolean(bank && payee?.bankAccount);
-
-  const header = (
-    <div className="mb-3 flex items-center gap-2">
-      <QrCode size={18} strokeWidth={1.75} className="text-lime-400" />
-      <h2 className="text-base font-semibold">{t("match.payTitle")}</h2>
-    </div>
-  );
-
-  if (!payee || (!qrSrc && !hasBank)) {
-    return (
-      <div>
-        {header}
-        <p className="text-sm text-slate-400">{t("match.payNone")}</p>
-      </div>
-    );
-  }
-
-  return (
-    <div>
-      {header}
-
-      {qrSrc && (
-        <div className="flex flex-col items-center gap-2">
-          <div className="overflow-hidden rounded-2xl border border-white/10 bg-white p-2">
-            <Image
-              src={qrSrc}
-              alt="Payment QR"
-              width={220}
-              height={220}
-              unoptimized
-            />
-          </div>
-          <p className="text-xs text-slate-400">{t("match.payScan")}</p>
-        </div>
-      )}
-
-      <dl className="mt-4 space-y-2 text-sm">
-        {bank && (
-          <div className="flex items-center justify-between gap-3">
-            <dt className="text-slate-400">{t("match.payBank")}</dt>
-            <dd className="text-slate-100">{bank.label}</dd>
-          </div>
-        )}
-        {payee.bankAccount && (
-          <div className="flex items-center justify-between gap-3">
-            <dt className="text-slate-400">{t("match.payAccount")}</dt>
-            <dd className="flex items-center gap-2 text-slate-100">
-              <span className="font-semibold tracking-wider">
-                {payee.bankAccount}
-              </span>
-              <CopyButton
-                copied={copied === "acc"}
-                onClick={() => copy("acc", payee.bankAccount!)}
-                label={t("match.payCopyAccount")}
-                copiedLabel={t("match.payCopied")}
-              />
-            </dd>
-          </div>
-        )}
-        {(payee.bankAccountName || payee.name) && (
-          <div className="flex items-center justify-between gap-3">
-            <dt className="text-slate-400">{t("match.payHolder")}</dt>
-            <dd className="text-slate-100">
-              {payee.bankAccountName || payee.name}
-            </dd>
-          </div>
-        )}
-        <div className="flex items-center justify-between gap-3 border-t border-white/10 pt-2">
-          <dt className="text-slate-400">{t("match.payMemoLabel")}</dt>
-          <dd className="flex items-center gap-2 text-slate-100">
-            <span className="truncate">{memo}</span>
-            <CopyButton
-              copied={copied === "memo"}
-              onClick={() => copy("memo", memo)}
-              label={t("match.payCopyMemo")}
-              copiedLabel={t("match.payCopied")}
-            />
-          </dd>
-        </div>
-      </dl>
-    </div>
-  );
-}
-
-function RsvpList({
-  title,
-  list,
-  tone,
-  emptyLabel,
-}: {
-  title: string;
-  list: Person[];
-  tone: "lime" | "rose";
-  emptyLabel: string;
-}) {
-  const toneClass = tone === "lime" ? "text-lime-300" : "text-rose-300";
-  return (
-    <div className="glass-panel rounded-2xl p-4">
-      <p
-        className={`text-[11px] font-semibold uppercase tracking-[0.2em] ${toneClass}`}
-      >
+    <section className="glass-panel rounded-2xl p-4">
+      <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-lime-300">
         {title}
       </p>
-      {list.length === 0 ? (
+      {guests.length === 0 ? (
         <p className="mt-3 text-sm text-slate-500">{emptyLabel}</p>
       ) : (
         <ul className="mt-3 space-y-2">
-          {list.map((r) => (
-            <li
-              key={r.key}
-              className="flex items-center gap-3 rounded-xl bg-slate-900/50 px-3 py-2"
-            >
-              <InitialAvatar name={r.name} url={r.avatarUrl} size={32} />
-              <span className="text-sm text-slate-100">{r.name}</span>
-            </li>
-          ))}
+          {guests.map((g) => {
+            const busy = busyId === g.guestId;
+            const isSelf = g.guestId === userId;
+            // The host collects the money, so their own share is always paid.
+            const paymentStatus: PaymentStatus = isSelf
+              ? "confirmed"
+              : g.paymentStatus;
+            return (
+              <li
+                key={g.guestId}
+                className="flex items-center justify-between gap-3 rounded-xl bg-slate-900/50 px-3 py-2"
+              >
+                <div className="flex min-w-0 items-center gap-2.5">
+                  <InitialAvatar name={g.name} size={32} />
+                  <div className="min-w-0">
+                    <p className="truncate text-sm text-slate-100">{g.name}</p>
+                    {status === "closed" && (
+                      <p className="text-xs text-slate-500">
+                        {formatVnd(feePerPerson)}
+                      </p>
+                    )}
+                  </div>
+                </div>
+                <div className="flex shrink-0 items-center gap-2">
+                  {status === "closed" && (
+                    <>
+                      <span
+                        className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${pill[paymentStatus].cls}`}
+                      >
+                        {pill[paymentStatus].label}
+                      </span>
+                      {isHost && !isSelf && paymentStatus === "submitted" && (
+                        <button
+                          type="button"
+                          disabled={busy}
+                          onClick={() => onConfirm(g.guestId, true)}
+                          className="rounded-lg bg-emerald-500 px-3 py-1.5 text-xs font-semibold text-slate-950 transition hover:scale-[1.03] active:scale-95 disabled:opacity-60"
+                        >
+                          {t("match.payConfirm")}
+                        </button>
+                      )}
+                      {isHost && !isSelf && paymentStatus === "confirmed" && (
+                        <button
+                          type="button"
+                          disabled={busy}
+                          onClick={() => onConfirm(g.guestId, false)}
+                          className="rounded-lg border border-slate-700 px-3 py-1.5 text-xs text-slate-300 transition hover:border-slate-500 active:scale-95 disabled:opacity-60"
+                        >
+                          {t("match.payUnconfirm")}
+                        </button>
+                      )}
+                    </>
+                  )}
+                  {isHost && (
+                    <button
+                      type="button"
+                      aria-label={t("match.removeGuestTitle")}
+                      onClick={() => onRequestDelete(g)}
+                      className="rounded-lg p-1.5 text-slate-400 transition hover:text-rose-400 active:scale-95"
+                    >
+                      <Trash2 size={15} strokeWidth={2} />
+                    </button>
+                  )}
+                </div>
+              </li>
+            );
+          })}
         </ul>
       )}
-    </div>
-  );
-}
-
-function InitialAvatar({
-  name,
-  url = null,
-  size = 32,
-}: {
-  name: string;
-  url?: string | null;
-  size?: number;
-}) {
-  if (url) {
-    return (
-      <div
-        className="relative shrink-0 overflow-hidden rounded-full border border-white/10"
-        style={{ width: size, height: size }}
-      >
-        <Image
-          src={url}
-          alt=""
-          fill
-          unoptimized
-          sizes={`${size}px`}
-          style={{ objectFit: "cover" }}
-        />
-      </div>
-    );
-  }
-  const initial = (name || "?").trim().charAt(0).toUpperCase() || "?";
-  return (
-    <div
-      className="flex shrink-0 items-center justify-center rounded-full border border-white/10 bg-slate-800/80 font-semibold text-lime-300"
-      style={{
-        width: size,
-        height: size,
-        fontSize: Math.round(size * 0.42),
-      }}
-    >
-      {initial}
-    </div>
+    </section>
   );
 }
 

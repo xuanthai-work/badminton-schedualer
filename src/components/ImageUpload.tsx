@@ -19,6 +19,9 @@ type Props = {
 };
 
 const MAX_BYTES = 5 * 1024 * 1024; // 5MB
+// Only raster images — SVG is rejected (stored-XSS vector).
+const ALLOWED_MIME = ["image/jpeg", "image/png", "image/webp"];
+const ALLOWED_EXTS = [".jpg", ".jpeg", ".png", ".webp"];
 
 export default function ImageUpload({
   userId,
@@ -47,8 +50,13 @@ export default function ImageUpload({
     event.target.value = ""; // reset so the same file can be picked again
     if (!file) return;
 
-    if (!file.type.startsWith("image/")) {
-      setError(t("upload.errOnlyImages"));
+    if (!ALLOWED_MIME.includes(file.type)) {
+      setError("Chỉ chấp nhận ảnh định dạng JPG, PNG hoặc WebP.");
+      return;
+    }
+    const ext = "." + (file.name.split(".").pop() || "").toLowerCase();
+    if (!ALLOWED_EXTS.includes(ext)) {
+      setError("Phần mở rộng tệp không hợp lệ.");
       return;
     }
     if (file.size > MAX_BYTES) {
@@ -59,8 +67,8 @@ export default function ImageUpload({
     setBusy(true);
     setError("");
     try {
-      const ext = (file.name.split(".").pop() || "png").toLowerCase();
-      const path = `${userId}/${prefix}-${Date.now()}.${ext}`;
+      const safeExt = ext.slice(1);
+      const path = `${userId}/${prefix}-${Date.now()}.${safeExt}`;
 
       const { error: uploadError } = await supabase.storage
         .from(bucket)
@@ -148,7 +156,7 @@ export default function ImageUpload({
       <input
         ref={fileRef}
         type="file"
-        accept="image/*"
+        accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp"
         className="hidden"
         onChange={handleFile}
       />

@@ -316,6 +316,12 @@ begin
 
   update public.matches set status = 'closed' where id = target_match_id;
 
+  -- The host's own guest slot is always considered paid (they collect, so they
+  -- never owe themselves).
+  update public.match_guests
+    set payment_status = 'confirmed', updated_at = now()
+    where match_id = target_match_id and guest_id = auth.uid()::text;
+
   -- Seed/refresh payment rows for the member attendees, preserving paid
   -- statuses. Guests keep their own payment_status in match_guests.
   insert into public.payments (match_id, user_id, amount, status, updated_at)
@@ -405,12 +411,52 @@ begin
 end;
 $$;
 
+-- Host removes a participant (including themselves) from a match. If the match
+-- is already settled, the per-person split is recomputed for the rest.
+create or replace function public.host_remove_guest(
+  p_match_id uuid,
+  p_guest_id text
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  is_host boolean;
+  m_status text;
+begin
+  if auth.uid() is null then
+    raise exception 'not_authenticated';
+  end if;
+
+  select (created_by = auth.uid()), status
+    into is_host, m_status
+  from public.matches
+  where id = p_match_id;
+
+  if is_host is not true then
+    raise exception 'not_authorized';
+  end if;
+
+  delete from public.match_guests
+  where match_id = p_match_id and guest_id = p_guest_id;
+
+  if m_status = 'closed' then
+    perform public.recompute_split(p_match_id);
+  end if;
+
+  return jsonb_build_object('success', true);
+end;
+$$;
+
 grant execute on function public.guest_rsvp(uuid, text, text, text) to anon, authenticated;
 grant execute on function public.guest_submit_payment(uuid, text) to anon, authenticated;
 grant execute on function public.confirm_guest_payment(uuid, text, boolean) to authenticated;
 grant execute on function public.get_public_match(uuid) to anon, authenticated;
 grant execute on function public.settle_match(uuid, numeric, numeric, numeric) to authenticated;
 grant execute on function public.recompute_split(uuid) to authenticated;
+grant execute on function public.host_remove_guest(uuid, text) to authenticated;
 
 -- Realtime so the public page and host dashboard update live.
 alter table public.match_guests replica identity full;

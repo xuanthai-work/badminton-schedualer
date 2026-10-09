@@ -1,11 +1,20 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import Link from "next/link";
 import { Pencil } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { useI18n } from "@/lib/i18n";
 import DateField from "@/components/DateField";
 import TimeField from "@/components/TimeField";
+import SelectField from "@/components/SelectField";
+
+type Venue = {
+  id: string;
+  name: string;
+  address: string | null;
+  mapsUrl: string | null;
+};
 
 type EditableMatch = {
   id: string;
@@ -33,6 +42,9 @@ export default function EditMatchPanel({ match, onSaved }: Props) {
   const [location, setLocation] = useState("");
   const [locationUrl, setLocationUrl] = useState("");
   const [courtNo, setCourtNo] = useState("");
+  const [venueId, setVenueId] = useState("");
+  const [venues, setVenues] = useState<Venue[]>([]);
+  const [venuesLoading, setVenuesLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
 
@@ -50,6 +62,43 @@ export default function EditMatchPanel({ match, onSaved }: Props) {
   };
 
   const close = () => setOpen(false);
+
+  // Load the host's saved venues when the modal opens and preselect the one
+  // matching the current location (kept flexible: manual entry still works).
+  useEffect(() => {
+    if (!open) return;
+    let active = true;
+    const run = async () => {
+      setVenuesLoading(true);
+      const { data } = await supabase
+        .from("venues")
+        .select("id, name, address, maps_url")
+        .order("name", { ascending: true });
+      if (!active) return;
+      const list: Venue[] = (data ?? []).map((row) => ({
+        id: row.id as string,
+        name: row.name as string,
+        address: (row.address as string | null) ?? null,
+        mapsUrl: (row.maps_url as string | null) ?? null,
+      }));
+      setVenues(list);
+      setVenueId(list.find((v) => v.name === match.location)?.id ?? "");
+      setVenuesLoading(false);
+    };
+    void run();
+    return () => {
+      active = false;
+    };
+  }, [open, match.location]);
+
+  const handleVenueChange = (id: string) => {
+    setVenueId(id);
+    const venue = venues.find((v) => v.id === id);
+    if (venue) {
+      setLocation(venue.name);
+      setLocationUrl(venue.mapsUrl ?? "");
+    }
+  };
 
   const handleSave = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -160,6 +209,36 @@ export default function EditMatchPanel({ match, onSaved }: Props) {
                   </label>
                   <TimeField value={endTime} onChange={setEndTime} required />
                 </div>
+              </div>
+              <div className="space-y-1 text-sm">
+                <div className="flex items-center justify-between gap-2">
+                  <label className="text-slate-300">
+                    {t("venues.selectVenue")}
+                  </label>
+                  <Link
+                    href="/dashboard/venues"
+                    className="text-[11px] font-semibold text-lime-300 transition hover:text-lime-200"
+                  >
+                    {t("venues.manageVenues")}
+                  </Link>
+                </div>
+                {venuesLoading ? (
+                  <div className="h-12 animate-pulse rounded-xl bg-slate-800/40" />
+                ) : venues.length === 0 ? (
+                  <p className="rounded-xl border border-dashed border-slate-700 px-3 py-2 text-xs text-slate-400">
+                    {t("venues.noVenuesYet")}
+                  </p>
+                ) : (
+                  <SelectField
+                    value={venueId}
+                    onChange={handleVenueChange}
+                    placeholder={t("venues.selectVenue")}
+                    options={venues.map((v) => ({
+                      value: v.id,
+                      label: v.name,
+                    }))}
+                  />
+                )}
               </div>
               <div className="space-y-1 text-sm">
                 <label className="text-slate-300">

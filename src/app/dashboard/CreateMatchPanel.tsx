@@ -1,40 +1,47 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Plus } from "lucide-react";
+import { MapPin, Plus } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { useI18n } from "@/lib/i18n";
 import DateField from "@/components/DateField";
 import TimeField from "@/components/TimeField";
+import SelectField from "@/components/SelectField";
 
 type Props = {
   onCreated?: () => void;
 };
 
+type Venue = {
+  id: string;
+  name: string;
+  address: string | null;
+  mapsUrl: string | null;
+};
+
 export default function CreateMatchPanel({ onCreated }: Props) {
   const router = useRouter();
-  const { t } = useI18n();
+  const { t, formatDate } = useI18n();
   const [open, setOpen] = useState(false);
-  const [title, setTitle] = useState("");
   const [date, setDate] = useState("");
   const [time, setTime] = useState("");
   const [endTime, setEndTime] = useState("");
-  const [location, setLocation] = useState("");
-  const [locationUrl, setLocationUrl] = useState("");
   const [courtNo, setCourtNo] = useState("");
+  const [venueId, setVenueId] = useState("");
+  const [venues, setVenues] = useState<Venue[]>([]);
+  const [venuesLoading, setVenuesLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
 
   const reset = () => {
-    setTitle("");
     setDate("");
     setTime("");
     setEndTime("");
-    setLocation("");
-    setLocationUrl("");
     setCourtNo("");
+    setVenueId("");
     setError("");
   };
 
@@ -43,11 +50,38 @@ export default function CreateMatchPanel({ onCreated }: Props) {
     reset();
   };
 
+  // Load the host's saved venues each time the modal opens.
+  useEffect(() => {
+    if (!open) return;
+    let active = true;
+    const run = async () => {
+      setVenuesLoading(true);
+      const { data } = await supabase
+        .from("venues")
+        .select("id, name, address, maps_url")
+        .order("name", { ascending: true });
+      if (!active) return;
+      setVenues(
+        (data ?? []).map((row) => ({
+          id: row.id as string,
+          name: row.name as string,
+          address: (row.address as string | null) ?? null,
+          mapsUrl: (row.maps_url as string | null) ?? null,
+        }))
+      );
+      setVenuesLoading(false);
+    };
+    void run();
+    return () => {
+      active = false;
+    };
+  }, [open]);
+
   const handleCreate = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setError("");
 
-    if (!title.trim() || !date || !time || !endTime || !location.trim()) {
+    if (!date || !time || !endTime || !venueId) {
       setError(t("matches.errRequired"));
       return;
     }
@@ -56,9 +90,9 @@ export default function CreateMatchPanel({ onCreated }: Props) {
       return;
     }
 
-    const trimmedUrl = locationUrl.trim();
-    if (trimmedUrl && !/^https?:\/\//i.test(trimmedUrl)) {
-      setError(t("matches.errMapsUrl"));
+    const venue = venues.find((v) => v.id === venueId);
+    if (!venue) {
+      setError(t("venues.selectVenue"));
       return;
     }
 
@@ -70,15 +104,22 @@ export default function CreateMatchPanel({ onCreated }: Props) {
         throw new Error(t("matches.errCreate"));
       }
 
+      const title = formatDate(date, {
+        weekday: "long",
+        day: "2-digit",
+        month: "2-digit",
+        year: "numeric",
+      });
+
       const { data, error: insertError } = await supabase
         .from("matches")
         .insert({
-          title: title.trim(),
+          title,
           match_date: date,
           match_time: time,
           match_end_time: endTime,
-          location: location.trim(),
-          location_url: trimmedUrl || null,
+          location: venue.name,
+          location_url: venue.mapsUrl ?? null,
           court_no: courtNo ? Number(courtNo) : null,
           created_by: uid,
         })
@@ -87,6 +128,27 @@ export default function CreateMatchPanel({ onCreated }: Props) {
 
       if (insertError) {
         throw new Error(insertError.message);
+      }
+
+      // Auto-add the host to the participant list so a fresh match already
+      // shows one attendee (and the host never owes themselves).
+      if (data?.id) {
+        const { data: hostProfile } = await supabase
+          .from("users")
+          .select("name")
+          .eq("id", uid)
+          .maybeSingle();
+        const hostName =
+          hostProfile?.name?.trim() ||
+          userData.user?.email?.split("@")[0] ||
+          "Host";
+        await supabase.rpc("guest_rsvp", {
+          p_match_id: data.id,
+          p_guest_id: uid,
+          p_name: hostName,
+          p_status: "yes",
+          p_secret: null,
+        });
       }
 
       close();
@@ -138,20 +200,20 @@ export default function CreateMatchPanel({ onCreated }: Props) {
 
               <form onSubmit={handleCreate} className="space-y-4">
                 <div className="space-y-1 text-sm">
-                  <label className="text-slate-300">
-                    {t("matches.titleLabel")}
-                  </label>
-                  <input
-                    className="w-full rounded-xl border border-slate-800 bg-slate-950/60 px-3 py-2 text-slate-100 focus:outline-none focus:ring-2 focus:ring-lime-500/70"
-                    placeholder={t("matches.titlePlaceholder")}
-                    value={title}
-                    onChange={(event) => setTitle(event.target.value)}
-                    required
-                  />
-                </div>
-                <div className="space-y-1 text-sm">
                   <label className="text-slate-300">{t("matches.date")}</label>
                   <DateField value={date} onChange={setDate} required />
+                  {date && (
+                    <p className="ml-1 text-[11px] text-lime-300/80">
+                      {t("matches.autoTitle", {
+                        title: formatDate(date, {
+                          weekday: "long",
+                          day: "2-digit",
+                          month: "2-digit",
+                          year: "numeric",
+                        }),
+                      })}
+                    </p>
+                  )}
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-1 text-sm">
@@ -167,18 +229,44 @@ export default function CreateMatchPanel({ onCreated }: Props) {
                     <TimeField value={endTime} onChange={setEndTime} required />
                   </div>
                 </div>
+
                 <div className="space-y-1 text-sm">
-                  <label className="text-slate-300">
-                    {t("matches.location")}
-                  </label>
-                  <input
-                    className="w-full rounded-xl border border-slate-800 bg-slate-950/60 px-3 py-2 text-slate-100 focus:outline-none focus:ring-2 focus:ring-lime-500/70"
-                    placeholder={t("matches.locationPlaceholder")}
-                    value={location}
-                    onChange={(event) => setLocation(event.target.value)}
-                    required
-                  />
+                  <div className="flex items-center justify-between gap-2">
+                    <label className="text-slate-300">
+                      {t("matches.location")}
+                    </label>
+                    <Link
+                      href="/dashboard/venues"
+                      className="text-[11px] font-semibold text-lime-300 transition hover:text-lime-200"
+                    >
+                      {t("venues.manageVenues")}
+                    </Link>
+                  </div>
+                  {venuesLoading ? (
+                    <div className="h-12 animate-pulse rounded-xl bg-slate-800/40" />
+                  ) : venues.length === 0 ? (
+                    <div className="flex items-center justify-between gap-3 rounded-xl border border-dashed border-slate-700 px-3 py-3 text-xs text-slate-400">
+                      <span>{t("venues.noVenuesYet")}</span>
+                      <Link
+                        href="/dashboard/venues"
+                        className="shrink-0 rounded-lg bg-lime-500 px-3 py-1.5 text-xs font-semibold text-slate-950 transition hover:scale-[1.03] active:scale-95"
+                      >
+                        {t("venues.addVenue")}
+                      </Link>
+                    </div>
+                  ) : (
+                    <SelectField
+                      value={venueId}
+                      onChange={setVenueId}
+                      placeholder={t("venues.selectVenue")}
+                      options={venues.map((v) => ({
+                        value: v.id,
+                        label: v.name,
+                      }))}
+                    />
+                  )}
                 </div>
+
                 <div className="space-y-1 text-sm">
                   <label className="text-slate-300">
                     {t("matches.courtNo")}{" "}
@@ -198,22 +286,6 @@ export default function CreateMatchPanel({ onCreated }: Props) {
                     onChange={(event) => setCourtNo(event.target.value)}
                   />
                 </div>
-                <div className="space-y-1 text-sm">
-                  <label className="text-slate-300">
-                    {t("matches.mapsLink")}{" "}
-                    <span className="text-xs text-slate-500">
-                      {t("matches.optional")}
-                    </span>
-                  </label>
-                  <input
-                    type="url"
-                    inputMode="url"
-                    className="w-full rounded-xl border border-slate-800 bg-slate-950/60 px-3 py-2 text-slate-100 placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-lime-500/70"
-                    placeholder="https://maps.app.goo.gl/..."
-                    value={locationUrl}
-                    onChange={(event) => setLocationUrl(event.target.value)}
-                  />
-                </div>
 
                 {error && <p className="text-xs text-rose-400">{error}</p>}
 
@@ -226,12 +298,19 @@ export default function CreateMatchPanel({ onCreated }: Props) {
                     {t("common.cancel")}
                   </button>
                   <button
-                    className="rounded-xl bg-lime-500 px-4 py-2 text-sm font-semibold text-slate-950 disabled:opacity-60"
-                    disabled={submitting}
+                    className="inline-flex items-center gap-1.5 rounded-xl bg-lime-500 px-4 py-2 text-sm font-semibold text-slate-950 disabled:opacity-60"
+                    disabled={submitting || venues.length === 0}
                   >
                     {submitting ? t("matches.creating") : t("matches.create")}
                   </button>
                 </div>
+
+                {venues.length === 0 && !venuesLoading && (
+                  <p className="flex items-center gap-1.5 text-[11px] text-slate-500">
+                    <MapPin size={12} strokeWidth={1.75} />
+                    {t("venues.needVenueHint")}
+                  </p>
+                )}
               </form>
             </div>
           </div>,

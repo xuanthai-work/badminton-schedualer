@@ -18,7 +18,53 @@ const GOOGLE_HOST =
 const hostAllowed = (hostname: string) =>
   SHORT_HOSTS.has(hostname) || GOOGLE_HOST.test(hostname);
 
+// In-memory rate limit: max 20 requests / minute per client IP.
+const RATE_LIMIT_WINDOW = 60 * 1000; // 1 minute
+const MAX_REQUESTS_PER_WINDOW = 20;
+const MAX_TRACKED_IPS = 1000;
+const ipRequests = new Map<string, number[]>();
+
+function isRateLimited(ip: string): boolean {
+  const now = Date.now();
+
+  // Prune expired entries and hard-cap the map to avoid heap exhaustion from
+  // spoofed IPs.
+  if (ipRequests.size > MAX_TRACKED_IPS) {
+    for (const [key, timestamps] of ipRequests.entries()) {
+      const active = timestamps.filter((t) => now - t < RATE_LIMIT_WINDOW);
+      if (active.length === 0) {
+        ipRequests.delete(key);
+      } else {
+        ipRequests.set(key, active);
+      }
+    }
+    if (ipRequests.size > MAX_TRACKED_IPS) {
+      ipRequests.clear();
+    }
+  }
+
+  const timestamps = ipRequests.get(ip) ?? [];
+  const recent = timestamps.filter((t) => now - t < RATE_LIMIT_WINDOW);
+  if (recent.length >= MAX_REQUESTS_PER_WINDOW) {
+    ipRequests.set(ip, recent);
+    return true;
+  }
+  recent.push(now);
+  ipRequests.set(ip, recent);
+  return false;
+}
+
 export async function GET(request: NextRequest) {
+  const ip =
+    request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
+    "127.0.0.1";
+  if (isRateLimited(ip)) {
+    return NextResponse.json(
+      { error: "Too many requests" },
+      { status: 429 }
+    );
+  }
+
   const raw = request.nextUrl.searchParams.get("url") ?? "";
 
   let target: URL;

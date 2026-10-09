@@ -45,6 +45,8 @@ type I18nValue = {
     value: string,
     options?: Intl.DateTimeFormatOptions
   ) => string;
+  /** Relative day heading + date, e.g. "Hôm nay, 10/10/2026". */
+  formatMatchHeading: (value: string) => string;
 };
 
 const I18nContext = createContext<I18nValue | null>(null);
@@ -120,6 +122,46 @@ export function I18nProvider({ children }: { children: React.ReactNode }) {
     const t = (key: string, vars?: Vars) =>
       interpolate(resolve(lang, key), vars);
 
+    const formatDate = (val: string, options?: Intl.DateTimeFormatOptions) => {
+      const parsed = new Date(`${val}T00:00:00`);
+      if (Number.isNaN(parsed.getTime())) return val;
+      return parsed.toLocaleDateString(
+        INTL_LOCALE[lang],
+        options ?? {
+          weekday: "short",
+          day: "2-digit",
+          month: "2-digit",
+          year: "numeric",
+        }
+      );
+    };
+
+    // Relative day prefix ("Hôm nay" / "Ngày mai" / "Thứ …") + date.
+    const formatMatchHeading = (dateStr: string) => {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const target = new Date(`${dateStr}T00:00:00`);
+      if (Number.isNaN(target.getTime())) return dateStr;
+
+      const dayDiff = Math.round(
+        (target.getTime() - today.getTime()) / 86_400_000
+      );
+      const dateFormatted = formatDate(dateStr, {
+        day: "2-digit",
+        month: "2-digit",
+        year: "numeric",
+      });
+
+      let prefix: string;
+      if (dayDiff === 0) prefix = t("match.today");
+      else if (dayDiff === 1) prefix = t("match.tomorrow");
+      else if (dayDiff === 2) prefix = t("match.theDayAfterTomorrow");
+      else if (dayDiff === -1) prefix = t("match.yesterday");
+      else prefix = formatDate(dateStr, { weekday: "long" });
+
+      return `${prefix}, ${dateFormatted}`;
+    };
+
     return {
       lang,
       setLang,
@@ -133,19 +175,8 @@ export function I18nProvider({ children }: { children: React.ReactNode }) {
           maximumFractionDigits: 0,
         }).format(val);
       },
-      formatDate: (val: string, options?: Intl.DateTimeFormatOptions) => {
-        const parsed = new Date(`${val}T00:00:00`);
-        if (Number.isNaN(parsed.getTime())) return val;
-        return parsed.toLocaleDateString(
-          INTL_LOCALE[lang],
-          options ?? {
-            weekday: "short",
-            day: "2-digit",
-            month: "2-digit",
-            year: "numeric",
-          }
-        );
-      },
+      formatDate,
+      formatMatchHeading,
     };
   }, [lang, setLang]);
 

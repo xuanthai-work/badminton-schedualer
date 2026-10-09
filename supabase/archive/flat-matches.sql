@@ -136,6 +136,12 @@ begin
 
   update public.matches set status = 'closed' where id = target_match_id;
 
+  -- The host's own guest slot is always considered paid (they collect, so they
+  -- never owe themselves).
+  update public.match_guests
+    set payment_status = 'confirmed', updated_at = now()
+    where match_id = target_match_id and guest_id = auth.uid()::text;
+
   -- Seed/refresh payment rows for member attendees (legacy), preserving paid
   -- statuses. Guests keep their own payment_status in match_guests.
   insert into public.payments (match_id, user_id, amount, status, updated_at)

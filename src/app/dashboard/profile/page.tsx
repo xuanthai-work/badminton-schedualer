@@ -1,15 +1,15 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
-  Dices,
+  ChevronRight,
   Globe,
-  Hash,
   KeyRound,
   Landmark,
-  Lock,
   LogOut,
+  MapPin,
   Save,
   UserCog,
 } from "lucide-react";
@@ -17,7 +17,6 @@ import { supabase } from "@/lib/supabaseClient";
 import { useI18n } from "@/lib/i18n";
 import { LANGS } from "@/lib/i18n/translations";
 import BottomNav from "@/components/BottomNav";
-import NotificationBell from "@/components/NotificationBell";
 import SelectField from "@/components/SelectField";
 import ImageUpload from "@/components/ImageUpload";
 import { BANKS } from "@/lib/banks";
@@ -26,21 +25,13 @@ type ProfileRow = {
   name: string;
   username: string;
   email: string;
-  tag: string | null;
   bankId: string | null;
   bankAccount: string | null;
   bankAccountName: string | null;
   avatarUrl: string | null;
-  bankQrUrl: string | null;
 };
 
 const USERNAME_REGEX = /^[a-zA-Z0-9._-]{3,20}$/;
-const TAG_REGEX = /^[0-9]{4}$/;
-// Where users are told to write to change a locked tag.
-const TAG_SUPPORT_EMAIL = "xuanthaibui204@gmail.com";
-
-const randomTag = () =>
-  String(Math.floor(Math.random() * 10000)).padStart(4, "0");
 
 export default function ProfilePage() {
   const router = useRouter();
@@ -57,12 +48,6 @@ export default function ProfilePage() {
   const [name, setName] = useState("");
   const [nameBusy, setNameBusy] = useState(false);
   const [nameMsg, setNameMsg] = useState<{ text: string; ok: boolean } | null>(
-    null
-  );
-
-  const [tagInput, setTagInput] = useState("");
-  const [tagBusy, setTagBusy] = useState(false);
-  const [tagMsg, setTagMsg] = useState<{ text: string; ok: boolean } | null>(
     null
   );
 
@@ -95,7 +80,7 @@ export default function ProfilePage() {
         const { data: row, error: queryError } = await supabase
           .from("users")
           .select(
-            "name, username, email, tag, bank_id, bank_account, bank_account_name, avatar_url, bank_qr_url"
+            "name, username, email, bank_id, bank_account, bank_account_name, avatar_url"
           )
           .eq("id", u.id)
           .maybeSingle();
@@ -106,17 +91,13 @@ export default function ProfilePage() {
           name: row.name,
           username: row.username ?? "",
           email: row.email,
-          tag: row.tag ?? null,
           bankId: row.bank_id ?? null,
           bankAccount: row.bank_account ?? null,
           bankAccountName: row.bank_account_name ?? null,
           avatarUrl: row.avatar_url ?? null,
-          bankQrUrl: row.bank_qr_url ?? null,
         };
         setProfile(profileRow);
         setName(profileRow.username || profileRow.name);
-        // Pre-fill the tag picker with a random suggestion when unset.
-        setTagInput(profileRow.tag ?? randomTag());
         setBankId(profileRow.bankId ?? "");
         setBankAccount(profileRow.bankAccount ?? "");
         setBankAccountName(profileRow.bankAccountName ?? "");
@@ -168,43 +149,6 @@ export default function ProfilePage() {
       });
     } finally {
       setNameBusy(false);
-    }
-  };
-
-  const handleSaveTag = async (event: React.FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    // Tag is set once, then locked (changes go through the admin).
-    if (profile?.tag) return;
-    const value = tagInput.trim();
-    if (!TAG_REGEX.test(value)) {
-      setTagMsg({ text: t("profile.errTagFormat"), ok: false });
-      return;
-    }
-    setTagBusy(true);
-    setTagMsg(null);
-    try {
-      // Server-enforced set-once: the set_tag RPC writes the tag only while
-      // it's null and validates the format (direct UPDATE on the column is
-      // revoked for clients). See supabase/set-tag.sql.
-      const { error: rpcError } = await supabase.rpc("set_tag", {
-        p_tag: value,
-      });
-      if (rpcError) {
-        throw new Error(
-          rpcError.message.includes("invalid_tag_format")
-            ? t("profile.errTagFormat")
-            : t("profile.errTag")
-        );
-      }
-      setProfile((p) => (p ? { ...p, tag: value } : p));
-      setTagMsg({ text: t("profile.tagSaved"), ok: true });
-    } catch (err) {
-      setTagMsg({
-        text: err instanceof Error ? err.message : t("profile.errTag"),
-        ok: false,
-      });
-    } finally {
-      setTagBusy(false);
     }
   };
 
@@ -277,20 +221,13 @@ export default function ProfilePage() {
     router.replace("/");
   };
 
-  const persistImageUrl = async (
-    column: "avatar_url" | "bank_qr_url",
-    url: string | null
-  ) => {
+  const persistAvatarUrl = async (url: string | null) => {
     const { error: updateError } = await supabase
       .from("users")
-      .update({ [column]: url })
+      .update({ avatar_url: url })
       .eq("id", userId);
     if (updateError) throw new Error(updateError.message);
-    setProfile((p) => {
-      if (!p) return p;
-      if (column === "avatar_url") return { ...p, avatarUrl: url };
-      return { ...p, bankQrUrl: url };
-    });
+    setProfile((p) => (p ? { ...p, avatarUrl: url } : p));
   };
 
   return (
@@ -311,7 +248,6 @@ export default function ProfilePage() {
                 {t("profile.title")}
               </h1>
             </div>
-            <NotificationBell />
           </div>
         </header>
 
@@ -342,16 +278,13 @@ export default function ProfilePage() {
                   shape="circle"
                   size={80}
                   emptyLabel={t("profile.avatarEmpty")}
-                  onUploaded={(url) => persistImageUrl("avatar_url", url)}
-                  onRemoved={() => persistImageUrl("avatar_url", null)}
+                  onUploaded={(url) => persistAvatarUrl(url)}
+                  onRemoved={() => persistAvatarUrl(null)}
                 />
                 <div className="min-w-0">
                   <p className="truncate text-lg font-semibold leading-tight">
                     <span className="text-slate-100">
                       @{profile.username || profile.name}
-                    </span>
-                    <span className="text-lime-400">
-                      #{profile.tag ?? "----"}
                     </span>
                   </p>
                   <p className="mt-0.5 text-xs text-slate-400">
@@ -410,82 +343,6 @@ export default function ProfilePage() {
                   {nameBusy ? t("profile.savingName") : t("profile.saveName")}
                 </button>
               </form>
-
-              <div
-                id="tag"
-                className="mt-5 scroll-mt-24 space-y-2 border-t border-white/10 pt-5"
-              >
-                <label className="ml-1 text-[10px] font-semibold uppercase tracking-[0.2em] text-slate-400">
-                  {t("profile.tag")}
-                </label>
-                {profile.tag ? (
-                  <>
-                    <div className="flex items-center gap-2">
-                      <span className="inline-flex items-center gap-1 rounded-xl border border-slate-800 bg-slate-900/40 px-4 py-3 text-slate-100">
-                        <Hash size={14} strokeWidth={2} className="text-lime-400" />
-                        <span className="font-semibold tracking-wider">
-                          {profile.tag}
-                        </span>
-                      </span>
-                      <Lock size={14} strokeWidth={1.75} className="text-slate-500" />
-                    </div>
-                    <p className="ml-1 text-[11px] text-slate-500">
-                      {t("profile.tagLockedHint", { email: TAG_SUPPORT_EMAIL })}
-                    </p>
-                  </>
-                ) : (
-                  <form onSubmit={handleSaveTag} className="space-y-2">
-                    <div className="flex items-center gap-2">
-                      <div className="relative">
-                        <Hash
-                          size={16}
-                          strokeWidth={2}
-                          className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-lime-400"
-                        />
-                        <input
-                          className="w-32 rounded-xl border border-slate-800 bg-slate-950/60 py-3 pl-9 pr-4 font-semibold tracking-wider text-slate-100 placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-lime-500/70"
-                          value={tagInput}
-                          onChange={(event) =>
-                            setTagInput(
-                              event.target.value.replace(/\D/g, "").slice(0, 4)
-                            )
-                          }
-                          placeholder="0000"
-                          inputMode="numeric"
-                          maxLength={4}
-                        />
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => setTagInput(randomTag())}
-                        className="inline-flex items-center gap-1 rounded-xl border border-slate-700 px-3 py-3 text-xs text-slate-200 transition hover:border-slate-500 active:scale-95"
-                      >
-                        <Dices size={14} strokeWidth={1.75} />
-                        {t("profile.randomize")}
-                      </button>
-                      <button
-                        className="inline-flex items-center gap-2 rounded-xl bg-lime-500 px-4 py-3 text-sm font-semibold text-slate-950 shadow-[0_0_20px_rgba(163,230,53,0.25)] transition hover:scale-[1.02] active:scale-95 disabled:opacity-60 disabled:hover:scale-100"
-                        disabled={tagBusy || !TAG_REGEX.test(tagInput)}
-                      >
-                        <Save size={14} strokeWidth={2} />
-                        {tagBusy ? t("profile.savingTag") : t("profile.saveTag")}
-                      </button>
-                    </div>
-                    <p className="ml-1 text-[11px] text-slate-500">
-                      {t("profile.tagHint")}
-                    </p>
-                  </form>
-                )}
-                {tagMsg && (
-                  <p
-                    className={`ml-1 text-xs ${
-                      tagMsg.ok ? "text-lime-300" : "text-rose-400"
-                    }`}
-                  >
-                    {tagMsg.text}
-                  </p>
-                )}
-              </div>
             </section>
 
             {/* relative z-10 — same stacking-context fix for the bank dropdown. */}
@@ -558,26 +415,6 @@ export default function ProfilePage() {
                   {bankBusy ? t("profile.savingBank") : t("profile.saveBank")}
                 </button>
               </form>
-
-              <div className="mt-6 space-y-3 border-t border-white/10 pt-5">
-                <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-slate-400">
-                  {t("profile.qrTitle")}
-                </p>
-                <p className="text-xs text-slate-400">
-                  {t("profile.qrHint")}
-                </p>
-                <ImageUpload
-                  userId={userId}
-                  bucket="bank-qr"
-                  prefix="qr"
-                  currentUrl={profile.bankQrUrl}
-                  shape="square"
-                  size={192}
-                  emptyLabel={t("profile.qrEmpty")}
-                  onUploaded={(url) => persistImageUrl("bank_qr_url", url)}
-                  onRemoved={() => persistImageUrl("bank_qr_url", null)}
-                />
-              </div>
             </section>
 
             <section className="glass-panel rounded-2xl p-5">
@@ -655,6 +492,32 @@ export default function ProfilePage() {
                 onChange={(next) => setLang(next as typeof lang)}
                 options={LANGS.map((l) => ({ value: l.value, label: l.label }))}
               />
+            </section>
+
+            <section className="glass-panel relative z-10 rounded-2xl p-5">
+              <Link
+                href="/dashboard/venues"
+                className="flex items-center justify-between gap-3"
+              >
+                <div className="flex min-w-0 items-center gap-3">
+                  <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-lime-500/10 text-lime-300">
+                    <MapPin size={18} strokeWidth={1.75} />
+                  </span>
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold text-slate-100">
+                      {t("venues.title")}
+                    </p>
+                    <p className="truncate text-xs text-slate-400">
+                      {t("venues.profileHint")}
+                    </p>
+                  </div>
+                </div>
+                <ChevronRight
+                  size={18}
+                  strokeWidth={1.75}
+                  className="shrink-0 text-lime-400"
+                />
+              </Link>
             </section>
 
             <button

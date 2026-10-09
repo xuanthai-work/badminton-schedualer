@@ -7,7 +7,6 @@ import { useRouter } from "next/navigation";
 import {
   CalendarClock,
   Check,
-  Hash,
   MapPin,
   Share2,
   Trash2,
@@ -20,7 +19,6 @@ import { useConfirm } from "@/components/ConfirmProvider";
 import { useToast } from "@/components/ToastProvider";
 import EmptyState from "@/components/EmptyState";
 import BottomNav from "@/components/BottomNav";
-import NotificationBell from "@/components/NotificationBell";
 import CreateMatchPanel from "./CreateMatchPanel";
 
 type HostMatch = {
@@ -38,13 +36,12 @@ type Tab = "upcoming" | "history";
 
 export default function DashboardPage() {
   const router = useRouter();
-  const { t } = useI18n();
+  const { t, formatMatchHeading } = useI18n();
   const confirm = useConfirm();
   const toast = useToast();
   const [userId, setUserId] = useState<string | null>(null);
   const [displayName, setDisplayName] = useState<string>("");
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
-  const [tagMissing, setTagMissing] = useState(false);
   const [matches, setMatches] = useState<HostMatch[]>([]);
   const [tab, setTab] = useState<Tab>("upcoming");
   const [busyId, setBusyId] = useState<string | null>(null);
@@ -112,14 +109,13 @@ export default function DashboardPage() {
 
         const { data: profile } = await supabase
           .from("users")
-          .select("name, tag, avatar_url")
+          .select("name, avatar_url")
           .eq("id", uid)
           .maybeSingle();
         if (profile?.name) {
           setDisplayName(profile.name);
         }
         setAvatarUrl(profile?.avatar_url ?? null);
-        setTagMissing(Boolean(profile) && !profile?.tag);
 
         await loadMatches(uid);
       } catch (err) {
@@ -231,7 +227,6 @@ export default function DashboardPage() {
               {t("dashboard.myMatches")}
             </h1>
           </div>
-          <NotificationBell />
         </header>
 
         <section className="flex items-center gap-4">
@@ -248,27 +243,6 @@ export default function DashboardPage() {
             </p>
           </div>
         </section>
-
-        {tagMissing && (
-          <Link
-            href="/dashboard/profile#tag"
-            className="glass-panel flex items-center justify-between gap-3 rounded-2xl border-lime-500/30 bg-lime-500/5 p-4 transition hover:border-lime-500/50"
-          >
-            <div className="flex min-w-0 items-center gap-3">
-              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-lime-500/15 text-lime-300">
-                <Hash size={18} strokeWidth={2} />
-              </span>
-              <div className="min-w-0">
-                <p className="text-sm font-semibold text-slate-100">
-                  {t("dashboard.tagReminderTitle")}
-                </p>
-                <p className="truncate text-xs text-slate-400">
-                  {t("dashboard.tagReminderBody")}
-                </p>
-              </div>
-            </div>
-          </Link>
-        )}
 
         {userId ? <CreateMatchPanel onCreated={() => void loadMatches(userId)} /> : null}
 
@@ -324,7 +298,7 @@ export default function DashboardPage() {
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
                       <h4 className="truncate text-base font-semibold leading-tight">
-                        {match.title}
+                        {formatMatchHeading(match.date)}
                       </h4>
                       <div className="mt-1 flex items-center gap-1.5 text-sm text-slate-300">
                         <CalendarClock
@@ -333,8 +307,7 @@ export default function DashboardPage() {
                           className="shrink-0 text-lime-400"
                         />
                         <span className="truncate">
-                          {t("matches.date")}{" "}
-                          {match.date} · {match.time.slice(0, 5)}
+                          {match.time.slice(0, 5)}
                           {match.endTime
                             ? ` - ${match.endTime.slice(0, 5)}`
                             : ""}

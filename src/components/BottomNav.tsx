@@ -30,7 +30,9 @@ const items: Item[] = [
     href: "/dashboard/profile",
     labelKey: "nav.account",
     icon: User,
-    matches: (path) => path.startsWith("/dashboard/profile"),
+    matches: (path) =>
+      path.startsWith("/dashboard/profile") ||
+      path.startsWith("/dashboard/venues"),
   },
 ];
 

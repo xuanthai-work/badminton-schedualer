@@ -1,7 +1,6 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Check, ChevronDown, ChevronUp, ReceiptText } from "lucide-react";
@@ -9,17 +8,14 @@ import { supabase } from "@/lib/supabaseClient";
 import { useI18n } from "@/lib/i18n";
 import EmptyState from "@/components/EmptyState";
 import BottomNav from "@/components/BottomNav";
-import NotificationBell from "@/components/NotificationBell";
+import InitialAvatar from "@/components/InitialAvatar";
 
 type PayStatus = "unpaid" | "submitted" | "confirmed";
 
 type Payer = {
   key: string;
-  kind: "member" | "guest";
   id: string;
   name: string;
-  tag: string | null;
-  avatarUrl: string | null;
   amount: number;
   status: PayStatus;
 };
@@ -43,7 +39,7 @@ function one<T>(value: T | T[] | null | undefined): T | null {
 
 export default function LedgerPage() {
   const router = useRouter();
-  const { t, formatVnd, formatDate } = useI18n();
+  const { t, formatVnd, formatMatchHeading } = useI18n();
 
   const [userId, setUserId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -126,51 +122,23 @@ export default function LedgerPage() {
 
     const matchIds = Array.from(base.keys());
     if (matchIds.length > 0) {
-      const [{ data: paymentRows }, { data: guestRows }] = await Promise.all([
-        supabase
-          .from("payments")
-          .select("match_id, user_id, amount, status, users ( name, tag, avatar_url )")
-          .in("match_id", matchIds),
-        supabase
-          .from("match_guests")
-          .select("match_id, guest_id, name, status, payment_status")
-          .in("match_id", matchIds),
-      ]);
-
-      (paymentRows ?? []).forEach((row) => {
-        const match = base.get(row.match_id as string);
-        if (!match) return;
-        const user = one(
-          row.users as
-            | { name: string; tag: string | null; avatar_url: string | null }
-            | { name: string; tag: string | null; avatar_url: string | null }[]
-            | null
-        );
-        match.payers.push({
-          key: `m:${row.user_id}`,
-          kind: "member",
-          id: row.user_id as string,
-          name: user?.name ?? "",
-          tag: user?.tag ?? null,
-          avatarUrl: user?.avatar_url ?? null,
-          amount: Number(row.amount),
-          status: row.status as PayStatus,
-        });
-      });
+      const { data: guestRows } = await supabase
+        .from("match_guests")
+        .select("match_id, guest_id, name, status, payment_status")
+        .in("match_id", matchIds);
 
       (guestRows ?? []).forEach((row) => {
         if (row.status !== "yes") return;
         const match = base.get(row.match_id as string);
         if (!match) return;
+        // The host collects the money, so their own share is always paid.
+        const isSelf = row.guest_id === uid;
         match.payers.push({
           key: `g:${row.guest_id}`,
-          kind: "guest",
           id: row.guest_id as string,
           name: (row.name as string) ?? "",
-          tag: null,
-          avatarUrl: null,
           amount: match.feePerPerson,
-          status: row.payment_status as PayStatus,
+          status: isSelf ? "confirmed" : (row.payment_status as PayStatus),
         });
       });
     }
@@ -205,18 +173,11 @@ export default function LedgerPage() {
     setBusy(payer.key);
     setError("");
     try {
-      const { error: rpcError } =
-        payer.kind === "guest"
-          ? await supabase.rpc("confirm_guest_payment", {
-              p_match_id: match.matchId,
-              p_guest_id: payer.id,
-              p_confirmed: true,
-            })
-          : await supabase.rpc("confirm_payment", {
-              target_match_id: match.matchId,
-              target_user_id: payer.id,
-              confirmed: true,
-            });
+      const { error: rpcError } = await supabase.rpc("confirm_guest_payment", {
+        p_match_id: match.matchId,
+        p_guest_id: payer.id,
+        p_confirmed: true,
+      });
       if (rpcError) throw new Error(rpcError.message);
       if (userId) await load(userId);
     } catch (err) {
@@ -272,7 +233,6 @@ export default function LedgerPage() {
             </h1>
             <p className="text-xs text-slate-400">{t("ledger.subtitle")}</p>
           </div>
-          <NotificationBell />
         </header>
 
         <nav className="flex gap-2 rounded-full bg-slate-900/70 p-1 text-sm">
@@ -320,12 +280,13 @@ export default function LedgerPage() {
                   >
                     <div className="min-w-0">
                       <p className="truncate font-medium text-slate-100">
-                        {match.title || formatDate(match.matchDate)}
+                        {formatMatchHeading(match.matchDate)}
                       </p>
-                      <p className="truncate text-xs text-slate-400">
-                        {formatDate(match.matchDate)}
-                        {match.location ? ` · ${match.location}` : ""}
-                      </p>
+                      {match.location && (
+                        <p className="truncate text-xs text-slate-400">
+                          {match.location}
+                        </p>
+                      )}
                       <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-slate-300">
                         <span>
                           {t("ledger.totalCost")}:{" "}
@@ -395,23 +356,10 @@ export default function LedgerPage() {
                                 className="flex items-center justify-between gap-3 rounded-xl bg-slate-900/50 px-3 py-2"
                               >
                                 <div className="flex min-w-0 items-center gap-2.5">
-                                  <InitialAvatar
-                                    name={payer.name}
-                                    url={payer.avatarUrl}
-                                  />
+                                  <InitialAvatar name={payer.name} />
                                   <div className="min-w-0">
                                     <p className="truncate text-sm text-slate-100">
                                       {payer.name}
-                                      {payer.tag && (
-                                        <span className="text-lime-400">
-                                          #{payer.tag}
-                                        </span>
-                                      )}
-                                      {payer.kind === "guest" && (
-                                        <span className="ml-1 rounded-full bg-white/5 px-1.5 py-0.5 text-[10px] font-semibold text-slate-400">
-                                          {t("ledger.guestBadge")}
-                                        </span>
-                                      )}
                                     </p>
                                     <p className="text-xs text-slate-500">
                                       {formatVnd(payer.amount)}
@@ -451,46 +399,5 @@ export default function LedgerPage() {
       </div>
       <BottomNav />
     </main>
-  );
-}
-
-function InitialAvatar({
-  name,
-  url = null,
-  size = 32,
-}: {
-  name: string;
-  url?: string | null;
-  size?: number;
-}) {
-  if (url) {
-    return (
-      <div
-        className="relative shrink-0 overflow-hidden rounded-full border border-white/10"
-        style={{ width: size, height: size }}
-      >
-        <Image
-          src={url}
-          alt=""
-          fill
-          unoptimized
-          sizes={`${size}px`}
-          style={{ objectFit: "cover" }}
-        />
-      </div>
-    );
-  }
-  const initial = (name || "?").trim().charAt(0).toUpperCase() || "?";
-  return (
-    <div
-      className="flex shrink-0 items-center justify-center rounded-full border border-white/10 bg-slate-800/80 font-semibold text-lime-300"
-      style={{
-        width: size,
-        height: size,
-        fontSize: Math.round(size * 0.42),
-      }}
-    >
-      {initial}
-    </div>
   );
 }

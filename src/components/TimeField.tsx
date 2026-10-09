@@ -94,21 +94,23 @@ export default function TimeField({ value, onChange, required }: Props) {
       />
 
       {open && (
-        <div className="solid-panel absolute left-0 top-full z-50 mt-2 grid grid-cols-2 gap-2 rounded-2xl p-2 shadow-2xl">
-          <Column
-            innerRef={hourListRef}
-            label={t("fields.hour")}
-            items={HOURS}
-            value={hour}
-            onSelect={setHour}
-          />
-          <Column
-            innerRef={minuteListRef}
-            label={t("fields.minute")}
-            items={MINUTES}
-            value={minute}
-            onSelect={setMinute}
-          />
+        <div className="solid-panel absolute right-0 top-full z-50 mt-2 w-36 rounded-2xl p-2 shadow-2xl">
+          <div className="grid grid-cols-2 gap-1.5">
+            <Column
+              innerRef={hourListRef}
+              label={t("fields.hour")}
+              items={HOURS}
+              value={hour}
+              onSelect={setHour}
+            />
+            <Column
+              innerRef={minuteListRef}
+              label={t("fields.minute")}
+              items={MINUTES}
+              value={minute}
+              onSelect={setMinute}
+            />
+          </div>
         </div>
       )}
     </div>
@@ -129,13 +131,13 @@ function Column({
   onSelect: (next: string) => void;
 }) {
   return (
-    <div>
-      <p className="px-2 pb-1 pt-1 text-[10px] font-semibold uppercase tracking-[0.2em] text-slate-400">
+    <div className="min-w-0">
+      <p className="px-1 pb-1 pt-1 text-[10px] font-semibold uppercase tracking-[0.2em] text-slate-400">
         {label}
       </p>
       <div
         ref={innerRef}
-        className="grid h-44 w-20 grid-cols-1 gap-1 overflow-y-auto pr-1"
+        className="grid h-40 w-full min-w-0 grid-cols-1 gap-1 overflow-y-auto pr-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
       >
         {items.map((item) => {
           const active = item === value;
@@ -145,7 +147,7 @@ function Column({
               type="button"
               data-active={active}
               onClick={() => onSelect(item)}
-              className={`rounded-lg px-2 py-1.5 text-sm transition ${
+              className={`flex w-full min-w-0 items-center justify-center rounded-lg px-1 py-1.5 text-center text-sm transition ${
                 active
                   ? "bg-lime-500 font-semibold text-slate-950"
                   : "text-slate-200 hover:bg-lime-500/10 hover:text-slate-100"
