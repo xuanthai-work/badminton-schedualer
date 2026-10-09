@@ -43,6 +43,34 @@ function formatDateVn(dateStr: string): { full: string; short: string; dayName: 
   }
 }
 
+const OG_IMAGE = {
+  url: "/og-image.jpg",
+  width: 600,
+  height: 600,
+  alt: "Cầu lông đi mà ^^",
+};
+
+function getFallbackMetadata(): Metadata {
+  const fallbackTitle = "🏸 Kèo cầu lông | BSche";
+  const fallbackDesc = "Điểm danh tham gia trận cầu lông trên BSche - Cầu lông đi mà ^^";
+  return {
+    title: fallbackTitle,
+    description: fallbackDesc,
+    openGraph: {
+      title: fallbackTitle,
+      description: fallbackDesc,
+      type: "website",
+      images: [OG_IMAGE],
+    },
+    twitter: {
+      card: "summary_large_image",
+      title: fallbackTitle,
+      description: fallbackDesc,
+      images: [OG_IMAGE.url],
+    },
+  };
+}
+
 export async function generateMetadata({
   params,
 }: {
@@ -50,10 +78,7 @@ export async function generateMetadata({
 }): Promise<Metadata> {
   const { matchId } = await params;
   if (!matchId) {
-    return {
-      title: "Kèo cầu lông | BSche",
-      description: "Lên lịch và điểm danh trận cầu lông trên BSche",
-    };
+    return getFallbackMetadata();
   }
 
   try {
@@ -62,10 +87,7 @@ export async function generateMetadata({
     });
 
     if (error || !result || !result.match) {
-      return {
-        title: "Kèo cầu lông | BSche",
-        description: "Điểm danh tham gia trận cầu lông trên BSche",
-      };
+      return getFallbackMetadata();
     }
 
     const match = result.match;
@@ -74,16 +96,10 @@ export async function generateMetadata({
     const endTime = match.endTime ? match.endTime.slice(0, 5) : "";
     const timeDisplay = endTime ? `${startTime} - ${endTime}` : startTime;
 
-    const titleParts: string[] = [];
-    if (match.title) {
-      titleParts.push(match.title);
-    }
-    if (dayName && dateShort) {
-      titleParts.push(`${dayName}, ${dateShort}`);
-    }
-    const ogTitle = titleParts.length > 0 
-      ? `🏸 ${titleParts.join(" | ")}` 
-      : "🏸 Kèo cầu lông | BSche";
+    const venueOrTitle = match.location || match.title || "Kèo cầu lông";
+    const ogTitle = dayName && dateShort 
+      ? `🏸 ${venueOrTitle} | ${dayName}, ${dateShort}`
+      : `🏸 ${venueOrTitle}`;
 
     const descParts: string[] = [];
     if (dayName && dateFull) {
@@ -106,18 +122,17 @@ export async function generateMetadata({
         title: ogTitle,
         description: ogDescription,
         type: "website",
+        images: [OG_IMAGE],
       },
       twitter: {
-        card: "summary",
+        card: "summary_large_image",
         title: ogTitle,
         description: ogDescription,
+        images: [OG_IMAGE.url],
       },
     };
   } catch {
-    return {
-      title: "Kèo cầu lông | BSche",
-      description: "Điểm danh tham gia trận cầu lông trên BSche",
-    };
+    return getFallbackMetadata();
   }
 }
 

@@ -28,3 +28,4 @@ Thư mục lưu trữ tài liệu kỹ thuật và lịch sử các task đã ho
 | TASK-16 | Bổ Sung Nút Tải Ảnh VietQR Trên Trang Magic Match Link | 2026-10-09 | **PASS** | [add-download-qr-button.md](file:///D:/work/Stuff/badminton-schedualer/docs/tasks/add-download-qr-button.md) |
 | TASK-17 | Dynamic Open Graph Metadata Cho Trang Magic Match Link (Messenger Link Preview) | 2026-10-09 | **PASS** | [dynamic-match-og-metadata.md](file:///D:/work/Stuff/badminton-schedualer/docs/tasks/dynamic-match-og-metadata.md) |
 | TASK-18 | Ẩn Nút Maps Trắng Của Google Và Đồng Bộ Phong Cách Dark-Theme | 2026-10-09 | **PASS** | [crop-google-maps-embed-button.md](file:///D:/work/Stuff/badminton-schedualer/docs/tasks/crop-google-maps-embed-button.md) |
+| TASK-19 | Tích Hợp Ảnh OG Preview "Cầu Lông Đi Mà ^^" Cho Link Messenger | 2026-10-09 | **PASS** | [add-og-image-preview.md](file:///D:/work/Stuff/badminton-schedualer/docs/tasks/add-og-image-preview.md) |

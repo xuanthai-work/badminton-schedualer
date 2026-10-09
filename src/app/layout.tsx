@@ -18,6 +18,9 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
+  metadataBase: new URL(
+    process.env.NEXT_PUBLIC_APP_URL || "https://bscheduler.xyz"
+  ),
   applicationName: "BSche",
   title: "BSche",
   description: "Badminton match scheduling and cost splitting",
@@ -26,6 +29,25 @@ export const metadata: Metadata = {
     capable: true,
     title: "BSche",
     statusBarStyle: "black-translucent",
+  },
+  openGraph: {
+    title: "BSche - Cầu lông đi mà ^^",
+    description: "Lên lịch, điểm danh realtime và chia chi phí cho cả nhóm trong vài phút.",
+    type: "website",
+    images: [
+      {
+        url: "/og-image.jpg",
+        width: 600,
+        height: 600,
+        alt: "Cầu lông đi mà ^^",
+      },
+    ],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "BSche - Cầu lông đi mà ^^",
+    description: "Lên lịch, điểm danh realtime và chia chi phí cho cả nhóm trong vài phút.",
+    images: ["/og-image.jpg"],
   },
 };
 
