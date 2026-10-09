@@ -66,7 +66,7 @@ export default function MapsPreview({ url }: Props) {
       <div className="relative h-28 w-full overflow-hidden rounded-xl border border-white/10 transition hover:border-lime-500/40">
         <iframe
           src={preview.embedUrl}
-          className="pointer-events-none h-full w-full border-0"
+          className="pointer-events-none -mt-10 h-[calc(100%+40px)] w-full border-0"
           loading="lazy"
           title="Google Maps"
         />
