@@ -8,6 +8,8 @@ import {
   CheckCircle2,
   Clock,
   Copy,
+  Download,
+  Loader2,
   MapPin,
   QrCode,
 } from "lucide-react";
@@ -531,6 +533,7 @@ function GuestPayment({
 }) {
   const { t, formatVnd } = useI18n();
   const [copied, setCopied] = useState<string | null>(null);
+  const [downloading, setDownloading] = useState(false);
 
   const copy = async (key: string, value: string) => {
     try {
@@ -552,6 +555,29 @@ function GuestPayment({
         amount
       )}&addInfo=${encodeURIComponent(memo)}&accountName=${encodeURIComponent(holder)}`
     : null;
+
+  const handleDownloadQr = async () => {
+    if (!qrSrc || downloading) return;
+    try {
+      setDownloading(true);
+      const res = await fetch(qrSrc);
+      if (!res.ok) throw new Error("Failed to fetch QR image");
+      const blob = await res.blob();
+      const blobUrl = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = blobUrl;
+      a.download = `vietqr-${bankAccount ?? "code"}.png`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(blobUrl);
+    } catch {
+      // Fallback cho mobile browser khi bị hạn chế tải blob
+      window.open(qrSrc, "_blank");
+    } finally {
+      setDownloading(false);
+    }
+  };
 
   return (
     <section className="glass-panel rounded-2xl p-5">
@@ -590,6 +616,24 @@ function GuestPayment({
                     unoptimized
                   />
                 </div>
+                <button
+                  type="button"
+                  onClick={handleDownloadQr}
+                  disabled={downloading}
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-medium text-slate-200 transition hover:bg-white/10 hover:text-white disabled:opacity-50"
+                >
+                  {downloading ? (
+                    <>
+                      <Loader2 size={13} className="animate-spin text-lime-400" />
+                      <span>{t("publicMatch.downloadingQr")}</span>
+                    </>
+                  ) : (
+                    <>
+                      <Download size={13} className="text-lime-400" />
+                      <span>{t("publicMatch.downloadQr")}</span>
+                    </>
+                  )}
+                </button>
                 <p className="text-xs text-slate-400">
                   {t("publicMatch.scanHint")}
                 </p>

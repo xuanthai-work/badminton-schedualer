@@ -71,10 +71,16 @@ export async function GET(request: NextRequest) {
   try {
     target = new URL(raw);
   } catch {
-    return NextResponse.json({ image: null }, { status: 400 });
+    return NextResponse.json(
+      { image: null, lat: null, lng: null, embedUrl: null },
+      { status: 400 }
+    );
   }
   if (target.protocol !== "https:" || !hostAllowed(target.hostname)) {
-    return NextResponse.json({ image: null }, { status: 400 });
+    return NextResponse.json(
+      { image: null, lat: null, lng: null, embedUrl: null },
+      { status: 400 }
+    );
   }
 
   try {
@@ -92,7 +98,25 @@ export async function GET(request: NextRequest) {
     // Short links redirect — the final host must still be Google's.
     const finalUrl = res.url;
     if (!res.ok || !hostAllowed(new URL(finalUrl).hostname)) {
-      return NextResponse.json({ image: null, lat: null, lng: null });
+      return NextResponse.json({
+        image: null,
+        lat: null,
+        lng: null,
+        embedUrl: null,
+      });
+    }
+
+    // A place search redirect carries `q=<address/coords>`; reuse it to build
+    // a Google Maps embed that pins the exact venue.
+    let embedUrl: string | null = null;
+    try {
+      const parsedFinal = new URL(finalUrl);
+      const q = parsedFinal.searchParams.get("q");
+      if (q) {
+        embedUrl = `https://maps.google.com/maps?q=${encodeURIComponent(q)}&output=embed`;
+      }
+    } catch {
+      /* ignore url parse error */
     }
 
     const html = await res.text();
@@ -111,7 +135,7 @@ export async function GET(request: NextRequest) {
     const lng = coords ? Number(coords[2]) : null;
 
     return NextResponse.json(
-      { image, lat, lng },
+      { image, lat, lng, embedUrl },
       {
         headers: {
           // Place previews barely change; cache hard at the CDN.
@@ -121,6 +145,11 @@ export async function GET(request: NextRequest) {
       }
     );
   } catch {
-    return NextResponse.json({ image: null, lat: null, lng: null });
+    return NextResponse.json({
+      image: null,
+      lat: null,
+      lng: null,
+      embedUrl: null,
+    });
   }
 }

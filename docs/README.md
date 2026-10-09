@@ -25,3 +25,4 @@ Thư mục lưu trữ tài liệu kỹ thuật và lịch sử các task đã ho
 | TASK-13 | Giới Hạn Tối Đa 20 Người Tham Gia Cho Trận Đấu (Max Players Hardening) | 2026-10-09 | **PASS** | [max-players-cap.md](file:///D:/work/Stuff/badminton-schedualer/docs/tasks/max-players-cap.md) |
 | TASK-14 | Gia Cố Bảo Mật Toàn Diện (Security Hardening 2.0 - IDOR, XSS, Anti-OOM, Storage) | 2026-10-09 | **PASS** | [security-hardening-2.md](file:///D:/work/Stuff/badminton-schedualer/docs/tasks/security-hardening-2.md) |
 | TASK-15 | Khắc Phục Lỗi Hiển Thị Ảnh Google Maps (Fix Maps Preview CSP & Image Fallback) | 2026-10-09 | **PASS** | [fix-maps-preview-csp.md](file:///D:/work/Stuff/badminton-schedualer/docs/tasks/fix-maps-preview-csp.md) |
+| TASK-16 | Bổ Sung Nút Tải Ảnh VietQR Trên Trang Magic Match Link | 2026-10-09 | **PASS** | [add-download-qr-button.md](file:///D:/work/Stuff/badminton-schedualer/docs/tasks/add-download-qr-button.md) |

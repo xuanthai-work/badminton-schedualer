@@ -10,6 +10,7 @@ type Props = {
 };
 
 type Preview = {
+  embedUrl?: string | null;
   image: string | null;
   lat: number | null;
   lng: number | null;
@@ -59,6 +60,27 @@ export default function MapsPreview({ url }: Props) {
       {t("match.openMaps")}
     </span>
   );
+
+  if (preview?.embedUrl) {
+    return (
+      <div className="relative h-28 w-full overflow-hidden rounded-xl border border-white/10 transition hover:border-lime-500/40">
+        <iframe
+          src={preview.embedUrl}
+          className="pointer-events-none h-full w-full border-0"
+          loading="lazy"
+          title="Google Maps"
+        />
+        <a
+          href={url}
+          target="_blank"
+          rel="noopener noreferrer"
+          aria-label={t("match.openMaps")}
+          className="absolute inset-0"
+        />
+        {openTag}
+      </div>
+    );
+  }
 
   if (preview?.image && !imgError) {
     return (

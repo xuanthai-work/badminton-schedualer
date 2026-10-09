@@ -15,8 +15,8 @@ const securityHeaders = [
       script-src 'self' 'unsafe-eval' 'unsafe-inline';
       style-src 'self' 'unsafe-inline';
       img-src 'self' data: blob: https://*.supabase.co https://img.vietqr.io https://*.tile.openstreetmap.org https://*.google.com https://*.googleusercontent.com https://*.googleapis.com https://*.gstatic.com;
-      connect-src 'self' https://*.supabase.co wss://*.supabase.co;
-      frame-src 'self' https://www.openstreetmap.org;
+      connect-src 'self' https://*.supabase.co wss://*.supabase.co https://img.vietqr.io;
+      frame-src 'self' https://www.openstreetmap.org https://maps.google.com https://www.google.com;
       frame-ancestors 'none';
     `
       .replace(/\s{2,}/g, " ")
