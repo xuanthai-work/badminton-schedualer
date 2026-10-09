@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, Users, User, Wallet } from "lucide-react";
+import { Home, User, ReceiptText } from "lucide-react";
 import { useI18n } from "@/lib/i18n";
 
 type Item = {
@@ -18,19 +18,13 @@ const items: Item[] = [
     labelKey: "nav.home",
     icon: Home,
     matches: (path) =>
-      path === "/dashboard" || path.startsWith("/dashboard/groups"),
+      path === "/dashboard" || path.startsWith("/dashboard/matches"),
   },
   {
     href: "/dashboard/debts",
-    labelKey: "nav.debts",
-    icon: Wallet,
+    labelKey: "nav.ledger",
+    icon: ReceiptText,
     matches: (path) => path.startsWith("/dashboard/debts"),
-  },
-  {
-    href: "/dashboard/friends",
-    labelKey: "nav.friends",
-    icon: Users,
-    matches: (path) => path.startsWith("/dashboard/friends"),
   },
   {
     href: "/dashboard/profile",
@@ -53,7 +47,7 @@ export default function BottomNav() {
           <Link
             key={item.href}
             href={item.href}
-            className={`flex flex-col items-center justify-center gap-0.5 rounded-xl px-3 py-1 transition active:scale-90 ${
+            className={`flex flex-col items-center justify-center gap-0.5 rounded-xl px-4 py-1 transition active:scale-90 ${
               active
                 ? "bg-lime-500/10 text-lime-400"
                 : "text-slate-400 hover:text-slate-200"

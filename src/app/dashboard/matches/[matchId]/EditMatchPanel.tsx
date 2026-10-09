@@ -9,6 +9,7 @@ import TimeField from "@/components/TimeField";
 
 type EditableMatch = {
   id: string;
+  title: string;
   date: string;
   time: string;
   endTime: string | null;
@@ -25,6 +26,7 @@ type Props = {
 export default function EditMatchPanel({ match, onSaved }: Props) {
   const { t } = useI18n();
   const [open, setOpen] = useState(false);
+  const [title, setTitle] = useState("");
   const [date, setDate] = useState("");
   const [time, setTime] = useState("");
   const [endTime, setEndTime] = useState("");
@@ -36,6 +38,7 @@ export default function EditMatchPanel({ match, onSaved }: Props) {
 
   // Prefill from the latest match on every open (realtime may have changed it).
   const openModal = () => {
+    setTitle(match.title);
     setDate(match.date);
     setTime(match.time.slice(0, 5));
     setEndTime(match.endTime ? match.endTime.slice(0, 5) : "");
@@ -52,7 +55,7 @@ export default function EditMatchPanel({ match, onSaved }: Props) {
     event.preventDefault();
     setError("");
 
-    if (!date || !time || !endTime || !location.trim()) {
+    if (!title.trim() || !date || !time || !endTime || !location.trim()) {
       setError(t("matches.errRequired"));
       return;
     }
@@ -71,6 +74,7 @@ export default function EditMatchPanel({ match, onSaved }: Props) {
       const { error: updateError } = await supabase
         .from("matches")
         .update({
+          title: title.trim(),
           match_date: date,
           match_time: time,
           match_end_time: endTime,
@@ -107,14 +111,14 @@ export default function EditMatchPanel({ match, onSaved }: Props) {
 
       {open && (
         <div
-          className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 p-4 sm:items-center"
+          className="fixed inset-0 z-50 flex items-end justify-center bg-slate-950/80 backdrop-blur-md p-4 sm:items-center"
           onClick={(event) => {
             if (event.currentTarget === event.target) {
               close();
             }
           }}
         >
-          <div className="glass-panel w-full max-w-lg rounded-2xl p-6 shadow-2xl">
+          <div className="bg-slate-900 border border-slate-800/90 max-h-[90dvh] w-full max-w-lg overflow-y-auto rounded-2xl p-6 shadow-2xl">
             <div className="mb-4 flex items-center justify-between">
               <h2 className="text-lg font-semibold">{t("match.editTitle")}</h2>
               <button
@@ -127,6 +131,18 @@ export default function EditMatchPanel({ match, onSaved }: Props) {
             </div>
 
             <form onSubmit={handleSave} className="space-y-4">
+              <div className="space-y-1 text-sm">
+                <label className="text-slate-300">
+                  {t("matches.titleLabel")}
+                </label>
+                <input
+                  className="w-full rounded-xl border border-slate-800 bg-slate-950/60 px-3 py-2 text-slate-100 focus:outline-none focus:ring-2 focus:ring-lime-500/70"
+                  placeholder={t("matches.titlePlaceholder")}
+                  value={title}
+                  onChange={(event) => setTitle(event.target.value)}
+                  required
+                />
+              </div>
               <div className="space-y-1 text-sm">
                 <label className="text-slate-300">{t("matches.date")}</label>
                 <DateField value={date} onChange={setDate} required />

@@ -184,34 +184,16 @@ export default function NotificationBell() {
     if (
       (n.type === "match_created" ||
         n.type === "match_reminder" ||
-        n.type === "match_rsvp_nudge") &&
-      n.groupId &&
-      n.matchId
-    ) {
-      return `/dashboard/groups/${n.groupId}/matches/${n.matchId}`;
-    }
-    // A pending invite goes to the dashboard (accept/decline card) — the
-    // invitee isn't a group member yet, so the group page would reject them.
-    if (n.type === "group_invite") return "/dashboard";
-    if (n.type === "friend_request" || n.type === "friend_accepted") {
-      return "/dashboard/friends";
-    }
-    if (
-      (n.type === "payment_confirmed" || n.type === "payment_submitted") &&
-      n.groupId &&
-      n.matchId
-    ) {
-      return `/dashboard/groups/${n.groupId}/matches/${n.matchId}`;
-    }
-    if (
-      (n.type === "attendance_request" ||
+        n.type === "match_rsvp_nudge" ||
+        n.type === "payment_confirmed" ||
+        n.type === "payment_submitted" ||
+        n.type === "attendance_request" ||
         n.type === "attendance_confirmed") &&
-      n.groupId &&
       n.matchId
     ) {
-      return `/dashboard/groups/${n.groupId}/matches/${n.matchId}`;
+      return `/dashboard/matches/${n.matchId}`;
     }
-    if (n.groupId) return `/dashboard/groups/${n.groupId}`;
+    // Legacy group / friend notifications no longer have a group route.
     return "/dashboard";
   };
 

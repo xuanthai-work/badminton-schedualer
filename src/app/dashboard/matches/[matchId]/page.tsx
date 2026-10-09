@@ -5,39 +5,37 @@ import Image from "next/image";
 import { useParams, useRouter } from "next/navigation";
 import {
   Check,
-  Clock,
-  CheckCircle2,
   ChevronLeft,
+  Clock,
   Copy,
   MapPin,
   QrCode,
   ReceiptText,
-  UserPlus,
-  XCircle,
+  Share2,
 } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { useI18n } from "@/lib/i18n";
 import { bankByCode } from "@/lib/banks";
 import BottomNav from "@/components/BottomNav";
 import MapsPreview from "@/components/MapsPreview";
-import SelectField from "@/components/SelectField";
 import EditMatchPanel from "./EditMatchPanel";
 
-type Rsvp = {
-  userId: string;
-  status: "yes" | "no" | "pending";
+type Guest = {
+  guestId: string;
+  name: string;
+  status: "yes" | "no";
+  paymentStatus: PaymentStatus;
+};
+
+type Person = {
+  key: string;
   name: string;
   avatarUrl: string | null;
 };
 
-type Member = {
-  userId: string;
-  name: string;
-};
-
 type Match = {
   id: string;
-  groupId: string;
+  title: string;
   date: string;
   time: string;
   endTime: string | null;
@@ -46,6 +44,7 @@ type Match = {
   courtNo: number | null;
   rsvpLocked: boolean;
   status: "open" | "closed";
+  createdBy: string | null;
 };
 
 type Expense = {
@@ -66,38 +65,21 @@ type Payee = {
 
 type PaymentStatus = "unpaid" | "submitted" | "confirmed";
 
-type Payment = {
-  userId: string;
-  name: string;
-  tag: string | null;
-  avatarUrl: string | null;
-  amount: number;
-  status: PaymentStatus;
-};
-
 export default function MatchDetailPage() {
   const router = useRouter();
   const { t, formatVnd, formatDate } = useI18n();
-  const params = useParams<{ id: string; matchId: string }>();
-  const groupId = params?.id;
+  const params = useParams<{ matchId: string }>();
   const matchId = params?.matchId;
 
   const [userId, setUserId] = useState<string | null>(null);
-  const [isAdmin, setIsAdmin] = useState(false);
   const [match, setMatch] = useState<Match | null>(null);
-  const [rsvps, setRsvps] = useState<Rsvp[]>([]);
-  const [members, setMembers] = useState<Member[]>([]);
-  const [addUserId, setAddUserId] = useState("");
-  const [addBusy, setAddBusy] = useState(false);
-  const [attendBusy, setAttendBusy] = useState(false);
+  const [guests, setGuests] = useState<Guest[]>([]);
   const [expense, setExpense] = useState<Expense | null>(null);
   const [payee, setPayee] = useState<Payee | null>(null);
-  const [payeeId, setPayeeId] = useState<string | null>(null);
-  const [payments, setPayments] = useState<Payment[]>([]);
   const [payBusy, setPayBusy] = useState<string | null>(null);
+  const [linkCopied, setLinkCopied] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [rsvpBusy, setRsvpBusy] = useState(false);
 
   const [courtFee, setCourtFee] = useState("");
   const [shuttleFee, setShuttleFee] = useState("");
@@ -106,86 +88,51 @@ export default function MatchDetailPage() {
   const [settleMsg, setSettleMsg] = useState("");
 
   const load = useCallback(
-    async (uid: string) => {
-      if (!matchId || !groupId) return;
+    async () => {
+      if (!matchId) return;
       setError("");
 
       const { data: matchRow, error: matchError } = await supabase
         .from("matches")
         .select(
-          "id, group_id, match_date, match_time, match_end_time, location, location_url, court_no, status"
+          "id, title, match_date, match_time, match_end_time, location, location_url, court_no, status, created_by"
         )
         .eq("id", matchId)
         .maybeSingle();
 
       if (matchError) throw matchError;
       if (!matchRow) throw new Error(t("match.errNotFound"));
-      if (matchRow.group_id !== groupId) {
-        throw new Error(t("match.errWrongGroup"));
-      }
 
       setMatch({
         id: matchRow.id,
-        groupId: matchRow.group_id,
+        title: matchRow.title ?? t("match.untitled"),
         date: matchRow.match_date,
         time: matchRow.match_time,
         endTime: matchRow.match_end_time ?? null,
         location: matchRow.location,
         locationUrl: matchRow.location_url ?? null,
         courtNo: matchRow.court_no ?? null,
-        // RSVPs lock 30 minutes before start (mirrors the rsvp_open() RLS
-        // check). Evaluated at load time so render stays pure; realtime
-        // refetches keep it fresh.
         rsvpLocked:
           Date.now() >
           new Date(`${matchRow.match_date}T${matchRow.match_time}`).getTime() -
             30 * 60_000,
         status: matchRow.status === "closed" ? "closed" : "open",
+        createdBy: matchRow.created_by ?? null,
       });
 
-      const { data: membership, error: memberError } = await supabase
-        .from("group_members")
-        .select("role")
-        .eq("group_id", groupId)
-        .eq("user_id", uid)
-        .maybeSingle();
-      if (memberError) throw memberError;
-      setIsAdmin(membership?.role === "admin");
-
-      const { data: rsvpRows, error: rsvpError } = await supabase
-        .from("rsvps")
-        .select("user_id, status, users ( name, avatar_url )")
-        .eq("match_id", matchId);
-      if (rsvpError) throw rsvpError;
-
-      const mapped: Rsvp[] =
-        rsvpRows?.map((row) => {
-          const user = Array.isArray(row.users) ? row.users[0] : row.users;
-          const status: Rsvp["status"] =
-            row.status === "yes" || row.status === "pending"
-              ? row.status
-              : "no";
-          return {
-            userId: row.user_id,
-            status,
-            name: user?.name ?? t("match.unknownUser"),
-            avatarUrl: user?.avatar_url ?? null,
-          };
-        }) ?? [];
-      setRsvps(mapped);
-
-      const { data: memberRows } = await supabase
-        .from("group_members")
-        .select("user_id, users ( name )")
-        .eq("group_id", groupId);
-      setMembers(
-        (memberRows ?? []).map((row) => {
-          const user = Array.isArray(row.users) ? row.users[0] : row.users;
-          return {
-            userId: row.user_id as string,
-            name: user?.name ?? t("match.unknownUser"),
-          };
-        })
+      const { data: guestRows, error: guestError } = await supabase
+        .from("match_guests")
+        .select("guest_id, name, status, payment_status")
+        .eq("match_id", matchId)
+        .order("created_at", { ascending: true });
+      if (guestError) throw guestError;
+      setGuests(
+        (guestRows ?? []).map((row) => ({
+          guestId: row.guest_id as string,
+          name: row.name as string,
+          status: row.status === "no" ? "no" : "yes",
+          paymentStatus: row.payment_status as PaymentStatus,
+        }))
       );
 
       const { data: expenseRow, error: expenseError } = await supabase
@@ -205,7 +152,6 @@ export default function MatchDetailPage() {
           totalAmount: Number(expenseRow.total_amount),
           feePerPerson: Number(expenseRow.fee_per_person),
         });
-        // Fee inputs are in thousands (type 300 → 300,000), so divide on load.
         const toThousands = (n: unknown) => {
           const v = Number(n) || 0;
           return v ? String(v / 1000) : "";
@@ -217,19 +163,12 @@ export default function MatchDetailPage() {
         setExpense(null);
       }
 
-      // Payee for the closed-match payment card = the admin who settled
-      // (expenses.payee_id), falling back to the group creator for legacy
-      // matches. RLS lets group members read peers' rows.
-      const { data: groupRow } = await supabase
-        .from("groups")
-        .select("created_by")
-        .eq("id", groupId)
-        .maybeSingle();
+      // The payee is whoever settled (expenses.payee_id), falling back to the
+      // match owner for legacy/unsettled rows.
       const resolvedPayee =
         (expenseRow?.payee_id as string | null) ??
-        groupRow?.created_by ??
+        (matchRow.created_by as string | null) ??
         null;
-      setPayeeId(resolvedPayee);
       if (resolvedPayee) {
         const { data: payeeRow } = await supabase
           .from("users")
@@ -247,27 +186,11 @@ export default function MatchDetailPage() {
               }
             : null
         );
+      } else {
+        setPayee(null);
       }
-
-      const { data: paymentRows } = await supabase
-        .from("payments")
-        .select("user_id, amount, status, users ( name, tag, avatar_url )")
-        .eq("match_id", matchId);
-      setPayments(
-        (paymentRows ?? []).map((row) => {
-          const user = Array.isArray(row.users) ? row.users[0] : row.users;
-          return {
-            userId: row.user_id as string,
-            name: user?.name ?? t("match.unknownUser"),
-            tag: (user?.tag as string | null) ?? null,
-            avatarUrl: (user?.avatar_url as string | null) ?? null,
-            amount: Number(row.amount),
-            status: row.status as PaymentStatus,
-          };
-        })
-      );
     },
-    [groupId, matchId, t]
+    [matchId, t]
   );
 
   useEffect(() => {
@@ -279,7 +202,7 @@ export default function MatchDetailPage() {
           return;
         }
         setUserId(data.session.user.id);
-        await load(data.session.user.id);
+        await load();
       } catch (err) {
         setError(err instanceof Error ? err.message : t("match.errLoad"));
       } finally {
@@ -289,30 +212,25 @@ export default function MatchDetailPage() {
     void init();
   }, [router, load, t]);
 
-  // Live updates: refetch when this match's rsvps/status/expense change.
+  // Live updates: refetch when this match's guests/status/expense change.
   useEffect(() => {
     if (!userId || !matchId) return;
     const channel = supabase
       .channel(`match-${matchId}-${Math.random().toString(36).slice(2)}`)
       .on(
         "postgres_changes",
-        { event: "*", schema: "public", table: "rsvps", filter: `match_id=eq.${matchId}` },
-        () => void load(userId)
+        { event: "*", schema: "public", table: "match_guests", filter: `match_id=eq.${matchId}` },
+        () => void load()
       )
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "matches", filter: `id=eq.${matchId}` },
-        () => void load(userId)
+        () => void load()
       )
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "expenses", filter: `match_id=eq.${matchId}` },
-        () => void load(userId)
-      )
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "payments", filter: `match_id=eq.${matchId}` },
-        () => void load(userId)
+        () => void load()
       )
       .subscribe();
     return () => {
@@ -320,8 +238,6 @@ export default function MatchDetailPage() {
     };
   }, [userId, matchId, load]);
 
-  // "Hôm nay" / "Ngày mai" / "Chủ Nhật tuần này" / "Thứ Bảy tuần sau" —
-  // relative to today (Monday-based weeks); plain weekday otherwise.
   const relativeDayLabel = (dateStr: string) => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
@@ -348,40 +264,21 @@ export default function MatchDetailPage() {
     return weekday;
   };
 
-  const rsvpLocked = match?.rsvpLocked ?? false;
+  const isHost = Boolean(match && userId && match.createdBy === userId);
 
-  const myRsvp = userId ? rsvps.find((r) => r.userId === userId) : undefined;
-  const yesList = rsvps.filter((r) => r.status === "yes");
-  const noList = rsvps.filter((r) => r.status === "no");
-  const pendingList = rsvps.filter((r) => r.status === "pending");
-  const blockedIds = new Set(
-    rsvps
-      .filter((r) => r.status === "yes" || r.status === "pending")
-      .map((r) => r.userId)
-  );
-  const addableMembers = members.filter((m) => !blockedIds.has(m.userId));
-
-  const handleRsvp = async (status: "yes" | "no") => {
-    if (!userId || !matchId || !match) return;
-    if (match.status === "closed") return;
-
-    setRsvpBusy(true);
-    setError("");
-    try {
-      const { error: upsertError } = await supabase
-        .from("rsvps")
-        .upsert(
-          { match_id: matchId, user_id: userId, status, responded_at: new Date().toISOString() },
-          { onConflict: "match_id,user_id" }
-        );
-      if (upsertError) throw new Error(upsertError.message);
-      await load(userId);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : t("match.errRsvp"));
-    } finally {
-      setRsvpBusy(false);
-    }
-  };
+  const guestYes = guests.filter((g) => g.status === "yes");
+  const guestNo = guests.filter((g) => g.status === "no");
+  const yesPeople: Person[] = guestYes.map((g) => ({
+    key: g.guestId,
+    name: g.name,
+    avatarUrl: null,
+  }));
+  const noPeople: Person[] = guestNo.map((g) => ({
+    key: g.guestId,
+    name: g.name,
+    avatarUrl: null,
+  }));
+  const attendeeCount = guestYes.length;
 
   const handleSettle = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -391,7 +288,6 @@ export default function MatchDetailPage() {
     setSettleMsg("");
     setError("");
     try {
-      // Inputs are in thousands (300 → 300,000).
       const court = (Number(courtFee) || 0) * 1000;
       const shuttle = (Number(shuttleFee) || 0) * 1000;
       const water = (Number(waterFee) || 0) * 1000;
@@ -421,7 +317,7 @@ export default function MatchDetailPage() {
       } else {
         setSettleMsg(t("match.settledMsgSimple"));
       }
-      await load(userId);
+      await load();
     } catch (err) {
       setError(err instanceof Error ? err.message : t("match.errSettle"));
     } finally {
@@ -429,77 +325,34 @@ export default function MatchDetailPage() {
     }
   };
 
-  const handleAddAttendee = async (targetUserId: string) => {
-    if (!matchId || !userId || !targetUserId) return;
-    setAddBusy(true);
+  const handleConfirmGuest = async (guestId: string, confirmed: boolean) => {
+    if (!matchId || !userId) return;
+    setPayBusy(guestId);
     setError("");
     try {
-      const { error: rpcError } = await supabase.rpc("admin_add_attendee", {
-        target_match_id: matchId,
-        target_user_id: targetUserId,
+      const { error: rpcError } = await supabase.rpc("confirm_guest_payment", {
+        p_match_id: matchId,
+        p_guest_id: guestId,
+        p_confirmed: confirmed,
       });
       if (rpcError) throw new Error(rpcError.message);
-      await load(userId);
+      await load();
     } catch (err) {
-      setError(err instanceof Error ? err.message : t("match.errAddAttendee"));
+      setError(err instanceof Error ? err.message : t("match.errConfirmGuest"));
     } finally {
-      setAddBusy(false);
+      setPayBusy(null);
     }
   };
 
-  const handleConfirmAttendance = async (attended: boolean) => {
-    if (!matchId || !userId) return;
-    setAttendBusy(true);
-    setError("");
+  const handleCopyLink = async () => {
     try {
-      const { error: rpcError } = await supabase.rpc("confirm_attendance", {
-        target_match_id: matchId,
-        attended,
-      });
-      if (rpcError) throw new Error(rpcError.message);
-      await load(userId);
-    } catch (err) {
-      setError(
-        err instanceof Error ? err.message : t("match.errConfirmAttend")
+      await navigator.clipboard.writeText(
+        `${window.location.origin}/m/${matchId}`
       );
-    } finally {
-      setAttendBusy(false);
-    }
-  };
-
-  const handleSubmitPayment = async () => {
-    if (!matchId || !userId) return;
-    setPayBusy(userId);
-    setError("");
-    try {
-      const { error: rpcError } = await supabase.rpc("submit_payment", {
-        target_match_id: matchId,
-      });
-      if (rpcError) throw new Error(rpcError.message);
-      await load(userId);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : t("match.errPay"));
-    } finally {
-      setPayBusy(null);
-    }
-  };
-
-  const handleConfirmPayment = async (targetUserId: string, confirmed: boolean) => {
-    if (!matchId || !userId) return;
-    setPayBusy(targetUserId);
-    setError("");
-    try {
-      const { error: rpcError } = await supabase.rpc("confirm_payment", {
-        target_match_id: matchId,
-        target_user_id: targetUserId,
-        confirmed,
-      });
-      if (rpcError) throw new Error(rpcError.message);
-      await load(userId);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : t("match.errPay"));
-    } finally {
-      setPayBusy(null);
+      setLinkCopied(true);
+      window.setTimeout(() => setLinkCopied(false), 1600);
+    } catch {
+      /* clipboard unavailable — ignore */
     }
   };
 
@@ -514,30 +367,38 @@ export default function MatchDetailPage() {
         <header className="space-y-3">
           <button
             type="button"
-            onClick={() => {
-              if (typeof window !== "undefined" && window.history.length > 1) {
-                router.back();
-              } else {
-                router.push(`/dashboard/groups/${groupId ?? ""}`);
-              }
-            }}
+            onClick={() => router.push("/dashboard")}
             className="inline-flex items-center gap-1 text-xs font-semibold uppercase tracking-[0.3em] text-lime-400 transition hover:text-lime-300"
           >
             <ChevronLeft size={14} strokeWidth={2} />
-            {t("match.back")}
+            {t("dashboard.eyebrow")}
           </button>
 
           {match && (
             <div className="flex flex-wrap items-end justify-between gap-3">
               <h1 className="text-[28px] font-semibold leading-tight">
-                {t("match.title")}
+                {match.title}
               </h1>
               <div className="flex items-center gap-2">
-                {isAdmin && (
+                {isHost && (
+                  <button
+                    type="button"
+                    onClick={() => void handleCopyLink()}
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-slate-700 px-2.5 py-1 text-xs font-semibold text-slate-200 transition hover:border-lime-500/50 hover:text-lime-300 active:scale-95"
+                  >
+                    {linkCopied ? (
+                      <Check size={12} strokeWidth={2.25} className="text-lime-400" />
+                    ) : (
+                      <Share2 size={12} strokeWidth={2} />
+                    )}
+                    {linkCopied ? t("match.linkCopied") : t("match.shareLink")}
+                  </button>
+                )}
+                {isHost && (
                   <EditMatchPanel
                     match={match}
                     onSaved={() => {
-                      if (userId) void load(userId);
+                      if (userId) void load();
                     }}
                   />
                 )}
@@ -566,9 +427,6 @@ export default function MatchDetailPage() {
             {error && <p className="text-sm text-rose-400">{error}</p>}
 
             <section className="glass-panel rounded-2xl p-5">
-              {/* Row 1: day label + date. Row 2: time left, venue right.
-                  Full-width rows wrap gracefully on narrow screens — no
-                  two-column width fight. */}
               <p className="flex flex-wrap items-baseline gap-x-2">
                 <span className="text-xl font-semibold leading-tight">
                   {relativeDayLabel(match.date)}
@@ -609,86 +467,16 @@ export default function MatchDetailPage() {
               )}
             </section>
 
-            {myRsvp?.status === "pending" && (
-              <section className="glass-panel rounded-2xl border-lime-500/40 bg-lime-500/5 p-5">
-                <div className="mb-1 flex items-center gap-2">
-                  <UserPlus
-                    size={18}
-                    strokeWidth={1.75}
-                    className="text-lime-400"
-                  />
-                  <h2 className="text-base font-semibold">
-                    {t("match.confirmAttendTitle")}
-                  </h2>
-                </div>
-                <p className="mb-4 text-sm text-slate-300">
-                  {t("match.confirmAttendBody")}
-                </p>
-                <div className="grid grid-cols-2 gap-3">
-                  <button
-                    type="button"
-                    disabled={attendBusy}
-                    onClick={() => handleConfirmAttendance(true)}
-                    className="rounded-xl bg-lime-500 py-3 text-sm font-semibold text-slate-950 transition hover:scale-[1.01] active:scale-95 disabled:opacity-60"
-                  >
-                    {t("match.confirmAttendYes")}
-                  </button>
-                  <button
-                    type="button"
-                    disabled={attendBusy}
-                    onClick={() => handleConfirmAttendance(false)}
-                    className="rounded-xl border border-slate-700 py-3 text-sm font-semibold text-slate-200 transition hover:border-slate-500 active:scale-95 disabled:opacity-60"
-                  >
-                    {t("match.confirmAttendNo")}
-                  </button>
-                </div>
-              </section>
-            )}
-
-            <section className="glass-panel rounded-2xl p-5">
-              <h2 className="text-center text-lg font-semibold">
-                {t("match.rsvpQuestion")}
-              </h2>
-              {match.status === "closed" ? (
-                <p className="mt-3 text-center text-sm text-slate-400">
-                  {t("match.closedNoRsvp")}
-                </p>
-              ) : rsvpLocked ? (
-                <p className="mt-3 text-center text-sm text-amber-300">
-                  {t("match.rsvpLocked")}
-                </p>
-              ) : (
-                <div className="mt-4 grid grid-cols-2 gap-3">
-                  <RsvpButton
-                    label={t("match.join")}
-                    icon={<CheckCircle2 size={28} strokeWidth={1.75} />}
-                    active={myRsvp?.status === "yes"}
-                    tone="lime"
-                    disabled={rsvpBusy}
-                    onClick={() => handleRsvp("yes")}
-                  />
-                  <RsvpButton
-                    label={t("match.skip")}
-                    icon={<XCircle size={28} strokeWidth={1.75} />}
-                    active={myRsvp?.status === "no"}
-                    tone="rose"
-                    disabled={rsvpBusy}
-                    onClick={() => handleRsvp("no")}
-                  />
-                </div>
-              )}
-            </section>
-
             <section className="grid gap-4 sm:grid-cols-2">
               <RsvpList
-                title={t("match.joinList", { count: yesList.length })}
-                list={yesList}
+                title={t("match.joinList", { count: yesPeople.length })}
+                list={yesPeople}
                 tone="lime"
                 emptyLabel={t("match.nobody")}
               />
               <RsvpList
-                title={t("match.skipList", { count: noList.length })}
-                list={noList}
+                title={t("match.skipList", { count: noPeople.length })}
+                list={noPeople}
                 tone="rose"
                 emptyLabel={t("match.nobody")}
               />
@@ -742,19 +530,17 @@ export default function MatchDetailPage() {
               </section>
             )}
 
-            {match.status === "closed" && payments.length > 0 && (
-              <PaymentStatusList
-                payments={payments}
-                currentUserId={userId}
-                payeeId={payeeId}
-                isAdmin={isAdmin}
+            {match.status === "closed" && guests.length > 0 && (
+              <GuestPaymentList
+                guests={guests}
+                feePerPerson={expense?.feePerPerson ?? 0}
+                isHost={isHost}
                 busyId={payBusy}
-                onSubmit={handleSubmitPayment}
-                onConfirm={handleConfirmPayment}
+                onConfirm={handleConfirmGuest}
               />
             )}
 
-            {isAdmin && (
+            {isHost && (
               <section className="glass-panel rounded-2xl border-lime-500/20 bg-lime-500/5 p-5">
                 <div className="mb-4 flex items-center gap-2">
                   <ReceiptText
@@ -790,9 +576,11 @@ export default function MatchDetailPage() {
                     />
                   </div>
                   <p className="text-xs text-slate-400">
-                    {t("match.splitNote", { count: yesList.length })}
+                    {t("match.splitNote", { count: attendeeCount })}
                   </p>
-                  {settleMsg && <p className="text-xs text-lime-300">{settleMsg}</p>}
+                  {settleMsg && (
+                    <p className="text-xs text-lime-300">{settleMsg}</p>
+                  )}
                   <button
                     className="w-full rounded-xl bg-lime-500 py-3 text-sm font-semibold text-slate-950 shadow-[0_0_20px_rgba(163,230,53,0.4)] transition hover:scale-[1.01] active:scale-[0.98] disabled:opacity-60 disabled:hover:scale-100"
                     disabled={settleBusy}
@@ -806,72 +594,6 @@ export default function MatchDetailPage() {
                 </form>
               </section>
             )}
-
-            {isAdmin && (
-              <section className="glass-panel rounded-2xl p-5">
-                <div className="mb-2 flex items-center gap-2">
-                  <UserPlus
-                    size={18}
-                    strokeWidth={1.75}
-                    className="text-lime-400"
-                  />
-                  <h2 className="text-base font-semibold">
-                    {t("match.addAttendeeTitle")}
-                  </h2>
-                </div>
-                <p className="mb-3 text-xs text-slate-400">
-                  {t("match.addAttendeeHint")}
-                </p>
-
-                <div className="flex items-end gap-2">
-                  <div className="min-w-0 flex-1">
-                    <SelectField
-                      value={addUserId}
-                      onChange={setAddUserId}
-                      placeholder={t("match.addAttendeePick")}
-                      options={addableMembers.map((m) => ({
-                        value: m.userId,
-                        label: m.name,
-                      }))}
-                    />
-                  </div>
-                  <button
-                    type="button"
-                    disabled={addBusy || !addUserId}
-                    onClick={async () => {
-                      await handleAddAttendee(addUserId);
-                      setAddUserId("");
-                    }}
-                    className="shrink-0 rounded-xl bg-lime-500 px-4 py-2.5 text-sm font-semibold text-slate-950 transition hover:scale-[1.02] active:scale-95 disabled:opacity-50"
-                  >
-                    {t("match.addAttendeeBtn")}
-                  </button>
-                </div>
-                {addableMembers.length === 0 && (
-                  <p className="mt-2 text-xs text-slate-500">
-                    {t("match.addAttendeeEmpty")}
-                  </p>
-                )}
-
-                {pendingList.length > 0 && (
-                  <ul className="mt-4 space-y-2 border-t border-white/10 pt-3">
-                    {pendingList.map((p) => (
-                      <li
-                        key={p.userId}
-                        className="flex items-center justify-between gap-3 text-sm"
-                      >
-                        <span className="truncate text-slate-200">
-                          {p.name}
-                        </span>
-                        <span className="shrink-0 rounded-full bg-amber-500/20 px-2.5 py-0.5 text-[11px] font-semibold text-amber-300">
-                          {t("match.attendeePending")}
-                        </span>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </section>
-            )}
           </>
         ) : null}
       </div>
@@ -880,22 +602,18 @@ export default function MatchDetailPage() {
   );
 }
 
-function PaymentStatusList({
-  payments,
-  currentUserId,
-  payeeId,
-  isAdmin,
+function GuestPaymentList({
+  guests,
+  feePerPerson,
+  isHost,
   busyId,
-  onSubmit,
   onConfirm,
 }: {
-  payments: Payment[];
-  currentUserId: string | null;
-  payeeId: string | null;
-  isAdmin: boolean;
+  guests: Guest[];
+  feePerPerson: number;
+  isHost: boolean;
   busyId: string | null;
-  onSubmit: () => void;
-  onConfirm: (userId: string, confirmed: boolean) => void;
+  onConfirm: (guestId: string, confirmed: boolean) => void;
 }) {
   const { t, formatVnd } = useI18n();
 
@@ -915,76 +633,65 @@ function PaymentStatusList({
     <section className="glass-panel rounded-2xl p-5">
       <div className="mb-3 flex items-center gap-2">
         <ReceiptText size={18} strokeWidth={1.75} className="text-lime-400" />
-        <h2 className="text-base font-semibold">{t("match.payStatusTitle")}</h2>
+        <h2 className="text-base font-semibold">
+          {t("match.guestPaymentTitle")}
+        </h2>
       </div>
       <ul className="space-y-2">
-        {payments.map((p) => {
-          const isSelf = p.userId === currentUserId;
-          const isPayee = p.userId === payeeId;
-          const busy = busyId === p.userId;
+        {guests.map((g) => {
+          const busy = busyId === g.guestId;
           return (
             <li
-              key={p.userId}
+              key={g.guestId}
               className="flex items-center justify-between gap-3 rounded-xl bg-slate-900/50 px-3 py-2"
             >
               <div className="flex min-w-0 items-center gap-2.5">
-                <InitialAvatar name={p.name} url={p.avatarUrl} size={32} />
+                <InitialAvatar name={g.name} size={32} />
                 <div className="min-w-0">
                   <p className="truncate text-sm text-slate-100">
-                    {p.name}
-                    {p.tag && <span className="text-lime-400">#{p.tag}</span>}
-                    {isSelf && (
-                      <span className="ml-1 text-xs text-slate-500">
-                        {t("members.you")}
-                      </span>
-                    )}
+                    {g.name}
+                    <span className="ml-1 rounded-full bg-white/5 px-1.5 py-0.5 text-[10px] font-semibold text-slate-400">
+                      {t("match.guestBadge")}
+                    </span>
                   </p>
                   <p className="text-xs text-slate-500">
-                    {formatVnd(p.amount)}
+                    {formatVnd(feePerPerson)}
                   </p>
                 </div>
               </div>
               <div className="flex shrink-0 items-center gap-2">
-                {isPayee ? (
-                  <span className="rounded-full bg-lime-500/15 px-2.5 py-1 text-[11px] font-semibold text-lime-300">
-                    {t("match.payCollector")}
+                {g.status === "no" ? (
+                  <span className="rounded-full bg-slate-800 px-2.5 py-1 text-[11px] font-semibold text-slate-500">
+                    {t("match.skip")}
                   </span>
                 ) : (
-                  <span
-                    className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${pill[p.status].cls}`}
-                  >
-                    {pill[p.status].label}
-                  </span>
-                )}
-                {isSelf && !isPayee && p.status === "unpaid" && (
-                  <button
-                    type="button"
-                    disabled={busy}
-                    onClick={onSubmit}
-                    className="rounded-lg bg-lime-500 px-3 py-1.5 text-xs font-semibold text-slate-950 transition hover:scale-[1.03] active:scale-95 disabled:opacity-60"
-                  >
-                    {t("match.payIPaid")}
-                  </button>
-                )}
-                {isAdmin && !isPayee && p.status === "submitted" && (
-                  <button
-                    type="button"
-                    disabled={busy}
-                    onClick={() => onConfirm(p.userId, true)}
-                    className="rounded-lg bg-emerald-500 px-3 py-1.5 text-xs font-semibold text-slate-950 transition hover:scale-[1.03] active:scale-95 disabled:opacity-60"
-                  >
-                    {t("match.payConfirm")}
-                  </button>
-                )}
-                {isAdmin && !isPayee && p.status === "confirmed" && (
-                  <button
-                    type="button"
-                    disabled={busy}
-                    onClick={() => onConfirm(p.userId, false)}
-                    className="rounded-lg border border-slate-700 px-3 py-1.5 text-xs text-slate-300 transition hover:border-slate-500 active:scale-95 disabled:opacity-60"
-                  >
-                    {t("match.payUnconfirm")}
-                  </button>
+                  <>
+                    <span
+                      className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${pill[g.paymentStatus].cls}`}
+                    >
+                      {pill[g.paymentStatus].label}
+                    </span>
+                    {isHost && g.paymentStatus === "submitted" && (
+                      <button
+                        type="button"
+                        disabled={busy}
+                        onClick={() => onConfirm(g.guestId, true)}
+                        className="rounded-lg bg-emerald-500 px-3 py-1.5 text-xs font-semibold text-slate-950 transition hover:scale-[1.03] active:scale-95 disabled:opacity-60"
+                      >
+                        {t("match.payConfirm")}
+                      </button>
+                    )}
+                    {isHost && g.paymentStatus === "confirmed" && (
+                      <button
+                        type="button"
+                        disabled={busy}
+                        onClick={() => onConfirm(g.guestId, false)}
+                        className="rounded-lg border border-slate-700 px-3 py-1.5 text-xs text-slate-300 transition hover:border-slate-500 active:scale-95 disabled:opacity-60"
+                      >
+                        {t("match.payUnconfirm")}
+                      </button>
+                    )}
+                  </>
                 )}
               </div>
             </li>
@@ -1053,7 +760,6 @@ function PaymentDetails({
     </div>
   );
 
-  // Only an admin-uploaded QR is shown; otherwise just the text details.
   if (!payee || (!qrSrc && !hasBank)) {
     return (
       <div>
@@ -1130,44 +836,6 @@ function PaymentDetails({
   );
 }
 
-function RsvpButton({
-  label,
-  icon,
-  active,
-  tone,
-  disabled,
-  onClick,
-}: {
-  label: string;
-  icon: React.ReactNode;
-  active: boolean;
-  tone: "lime" | "rose";
-  disabled: boolean;
-  onClick: () => void;
-}) {
-  const activeStyles =
-    tone === "lime"
-      ? "border-lime-500/50 bg-lime-500 text-slate-950 shadow-[0_0_30px_rgba(163,230,53,0.4)]"
-      : "border-rose-500/50 bg-rose-500 text-slate-950 shadow-[0_0_30px_rgba(251,113,133,0.35)]";
-  const inactiveHover =
-    tone === "lime" ? "hover:border-lime-500/60" : "hover:border-rose-500/60";
-  return (
-    <button
-      type="button"
-      disabled={disabled}
-      onClick={onClick}
-      className={`flex flex-col items-center justify-center gap-2 rounded-xl border py-5 text-sm font-semibold transition active:scale-95 disabled:opacity-60 ${
-        active
-          ? activeStyles
-          : `border-white/10 bg-slate-900/60 text-slate-200 ${inactiveHover}`
-      }`}
-    >
-      {icon}
-      <span>{label}</span>
-    </button>
-  );
-}
-
 function RsvpList({
   title,
   list,
@@ -1175,7 +843,7 @@ function RsvpList({
   emptyLabel,
 }: {
   title: string;
-  list: Rsvp[];
+  list: Person[];
   tone: "lime" | "rose";
   emptyLabel: string;
 }) {
@@ -1193,7 +861,7 @@ function RsvpList({
         <ul className="mt-3 space-y-2">
           {list.map((r) => (
             <li
-              key={r.userId}
+              key={r.key}
               className="flex items-center gap-3 rounded-xl bg-slate-900/50 px-3 py-2"
             >
               <InitialAvatar name={r.name} url={r.avatarUrl} size={32} />
@@ -1281,7 +949,7 @@ function FeeInput({
         </span>
       </div>
       <p className="ml-1 text-[11px] text-lime-300/80">
-        {thousands > 0 ? `= ${formatVnd(thousands * 1000)}` : " "}
+        {thousands > 0 ? `= ${formatVnd(thousands * 1000)}` : " "}
       </p>
     </div>
   );
