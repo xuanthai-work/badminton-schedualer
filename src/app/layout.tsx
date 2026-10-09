@@ -33,13 +33,16 @@ export const metadata: Metadata = {
   openGraph: {
     title: "BSche - Cầu lông đi mà ^^",
     description: "Lên lịch, điểm danh realtime và chia chi phí cho cả nhóm trong vài phút.",
+    siteName: "BSche",
+    locale: "vi_VN",
     type: "website",
     images: [
       {
-        url: "/og-image.jpg",
-        width: 600,
-        height: 600,
-        alt: "Cầu lông đi mà ^^",
+        url: "/og-image.png",
+        width: 1200,
+        height: 630,
+        type: "image/png",
+        alt: "BSche - Cầu lông đi mà ^^",
       },
     ],
   },
@@ -47,7 +50,7 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: "BSche - Cầu lông đi mà ^^",
     description: "Lên lịch, điểm danh realtime và chia chi phí cho cả nhóm trong vài phút.",
-    images: ["/og-image.jpg"],
+    images: ["/og-image.png"],
   },
 };
 

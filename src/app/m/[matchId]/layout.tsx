@@ -44,10 +44,12 @@ function formatDateVn(dateStr: string): { full: string; short: string; dayName: 
 }
 
 const OG_IMAGE = {
-  url: "/og-image.jpg",
-  width: 600,
-  height: 600,
-  alt: "Cầu lông đi mà ^^",
+  url: "https://bscheduler.xyz/og-image.png",
+  secureUrl: "https://bscheduler.xyz/og-image.png",
+  width: 1200,
+  height: 630,
+  type: "image/png",
+  alt: "BSche - Cầu lông đi mà ^^",
 };
 
 function getFallbackMetadata(): Metadata {
@@ -59,6 +61,9 @@ function getFallbackMetadata(): Metadata {
     openGraph: {
       title: fallbackTitle,
       description: fallbackDesc,
+      url: "https://bscheduler.xyz",
+      siteName: "BSche",
+      locale: "vi_VN",
       type: "website",
       images: [OG_IMAGE],
     },
@@ -121,6 +126,9 @@ export async function generateMetadata({
       openGraph: {
         title: ogTitle,
         description: ogDescription,
+        url: `https://bscheduler.xyz/m/${matchId}`,
+        siteName: "BSche",
+        locale: "vi_VN",
         type: "website",
         images: [OG_IMAGE],
       },
