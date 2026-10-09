@@ -14,7 +14,7 @@ const securityHeaders = [
       default-src 'self';
       script-src 'self' 'unsafe-eval' 'unsafe-inline';
       style-src 'self' 'unsafe-inline';
-      img-src 'self' data: blob: https://*.supabase.co https://img.vietqr.io https://*.tile.openstreetmap.org;
+      img-src 'self' data: blob: https://*.supabase.co https://img.vietqr.io https://*.tile.openstreetmap.org https://*.google.com https://*.googleusercontent.com https://*.googleapis.com https://*.gstatic.com;
       connect-src 'self' https://*.supabase.co wss://*.supabase.co;
       frame-src 'self' https://www.openstreetmap.org;
       frame-ancestors 'none';

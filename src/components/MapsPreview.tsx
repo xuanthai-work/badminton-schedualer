@@ -22,9 +22,14 @@ type Preview = {
 export default function MapsPreview({ url }: Props) {
   const { t } = useI18n();
   const [preview, setPreview] = useState<Preview | null>(null);
+  // The image URL that failed to load — tracked by URL so it resets itself
+  // whenever the preview (and thus the URL) changes, with no extra effect.
+  const [imgErrorUrl, setImgErrorUrl] = useState<string | null>(null);
 
   // Only http(s) links are rendered — blocks javascript:/data: XSS vectors.
   const isSafeUrl = /^https?:\/\//i.test(url);
+
+  const imgError = preview?.image != null && imgErrorUrl === preview.image;
 
   useEffect(() => {
     if (!isSafeUrl) return;
@@ -55,7 +60,7 @@ export default function MapsPreview({ url }: Props) {
     </span>
   );
 
-  if (preview?.image) {
+  if (preview?.image && !imgError) {
     return (
       <a
         href={url}
@@ -70,6 +75,7 @@ export default function MapsPreview({ url }: Props) {
           unoptimized
           sizes="(max-width: 768px) 100vw, 640px"
           style={{ objectFit: "cover" }}
+          onError={() => setImgErrorUrl(preview.image)}
         />
         {openTag}
       </a>

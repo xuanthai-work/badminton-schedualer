@@ -24,3 +24,4 @@ Thư mục lưu trữ tài liệu kỹ thuật và lịch sử các task đã ho
 | TASK-12 | Vá Lỗ Hổng Bảo Mật & Gia Cố Toàn Diện Hệ Thống (Security Hardening) | 2026-10-09 | **PASS** | [security-hardening.md](file:///D:/work/Stuff/badminton-schedualer/docs/tasks/security-hardening.md) |
 | TASK-13 | Giới Hạn Tối Đa 20 Người Tham Gia Cho Trận Đấu (Max Players Hardening) | 2026-10-09 | **PASS** | [max-players-cap.md](file:///D:/work/Stuff/badminton-schedualer/docs/tasks/max-players-cap.md) |
 | TASK-14 | Gia Cố Bảo Mật Toàn Diện (Security Hardening 2.0 - IDOR, XSS, Anti-OOM, Storage) | 2026-10-09 | **PASS** | [security-hardening-2.md](file:///D:/work/Stuff/badminton-schedualer/docs/tasks/security-hardening-2.md) |
+| TASK-15 | Khắc Phục Lỗi Hiển Thị Ảnh Google Maps (Fix Maps Preview CSP & Image Fallback) | 2026-10-09 | **PASS** | [fix-maps-preview-csp.md](file:///D:/work/Stuff/badminton-schedualer/docs/tasks/fix-maps-preview-csp.md) |
