@@ -15,6 +15,7 @@ export const BANKS: Bank[] = [
   { code: "agribank", label: "Agribank", vietqr: "VBA" },
   { code: "tpbank", label: "TPBank", vietqr: "TPB" },
   { code: "vib", label: "VIB", vietqr: "VIB" },
+  { code: "cake", label: "Cake by VPBank", vietqr: "CAKE" },
   { code: "shb", label: "SHB", vietqr: "SHB" },
   { code: "ocb", label: "OCB", vietqr: "OCB" },
 ];

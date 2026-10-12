@@ -49,7 +49,7 @@ class BankNotificationListenerService : NotificationListenerService() {
     override fun onNotificationPosted(sbn: StatusBarNotification?) {
         val notification = sbn?.notification ?: return
         val pkg = sbn.packageName ?: return
-        if (pkg != VCB_PACKAGE && pkg != TEST_PACKAGE) return
+        if (pkg != CAKE_PACKAGE && pkg != CAKE_LEGACY_PACKAGE && pkg != TEST_PACKAGE) return
 
         val extras = notification.extras
         val title = extras.getCharSequence(Notification.EXTRA_TITLE)?.toString().orEmpty()
@@ -63,7 +63,7 @@ class BankNotificationListenerService : NotificationListenerService() {
         if (!combined.contains(BS_MARKER, ignoreCase = true)) return
 
         val amount = parseAmount(combined)
-        val bank = if (pkg == VCB_PACKAGE) "VCB" else "TEST"
+        val bank = if (pkg == CAKE_PACKAGE || pkg == CAKE_LEGACY_PACKAGE) "CAKE" else "TEST"
 
         db.insertTransaction(bank, combined.trim(), amount)
         notifyUi()
@@ -108,7 +108,8 @@ class BankNotificationListenerService : NotificationListenerService() {
     }
 
     companion object {
-        const val VCB_PACKAGE = "com.VCB"
+        const val CAKE_PACKAGE = "vn.cake.banking"
+        const val CAKE_LEGACY_PACKAGE = "xyz.be.cake"
         const val TEST_PACKAGE = "com.bsche.banksync"
         const val BS_MARKER = "BS "
         const val ACTION_TX_UPDATE = "com.bsche.banksync.TX_UPDATE"

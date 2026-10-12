@@ -1,10 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">BSche Bank Sync</string>
-    <string name="service_label">BSche Bank Sync (Vietcombank)</string>
+    <string name="service_label">BSche Bank Sync (Cake by VPBank)</string>
 
     <string name="header_title">BSche Bank Sync</string>
-    <string name="header_subtitle">Tự động bắt biến động số dư Vietcombank và đồng bộ về BSche</string>
+    <string name="header_subtitle">Tự động bắt biến động số dư Cake by VPBank và đồng bộ về BSche</string>
 
     <string name="card_service_title">Trạng thái dịch vụ</string>
     <string name="permission_granted">Dịch vụ đang chạy ngầm</string>
@@ -20,7 +20,7 @@
     <string name="config_missing">Vui lòng nhập URL và Secret</string>
 
     <string name="card_simulate_title">Kiểm tra mô phỏng</string>
-    <string name="btn_simulate">Bắn thông báo VCB giả lập</string>
+    <string name="btn_simulate">Bắn thông báo Cake giả lập</string>
 
     <string name="card_history_title">Lịch sử giao dịch gần đây</string>
     <string name="history_empty">Chưa có giao dịch nào được bắt.</string>

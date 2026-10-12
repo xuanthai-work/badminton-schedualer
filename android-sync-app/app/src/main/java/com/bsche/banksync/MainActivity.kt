@@ -125,7 +125,7 @@ class MainActivity : AppCompatActivity() {
     private fun simulateTest() {
         val content = getString(R.string.simulated_content)
         val amount = 50000L
-        val id = db.insertTransaction("VCB", content, amount)
+        val id = db.insertTransaction("CAKE", content, amount)
         refreshHistory()
 
         val url = prefs.webhookUrl
@@ -135,7 +135,7 @@ class MainActivity : AppCompatActivity() {
             return
         }
         lifecycleScope.launch {
-            val result = WebhookSender.send(url, secret, "VCB", amount, content, "BS-$id")
+            val result = WebhookSender.send(url, secret, "CAKE", amount, content, "BS-$id")
             if (result.success) {
                 db.markSynced(id, result.message)
             } else {
