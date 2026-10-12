@@ -39,8 +39,16 @@ export async function POST(request: Request) {
     return Response.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  // ---- Extract the transfer code -----------------------------------------
+  // ---- Ping / Health check -----------------------------------------------
   const content = typeof body.content === "string" ? body.content : "";
+  if (body.bank === "PING" || content.toUpperCase().includes("PING")) {
+    return Response.json({
+      ok: true,
+      message: "Pong! Connection and secret verified successfully.",
+    });
+  }
+
+  // ---- Extract the transfer code -----------------------------------------
   const match =
     content.match(TRANSFER_CODE) ?? content.match(TRANSFER_CODE_LOOSE);
   if (!match) {
@@ -51,6 +59,11 @@ export async function POST(request: Request) {
   }
   const shortMatch = match[1].toUpperCase();
   const shortGuest = match[2].toUpperCase();
+
+  // If shortMatch is not valid hex, it cannot be a UUID prefix
+  if (!/^[0-9a-f]{6,8}$/i.test(shortMatch)) {
+    return Response.json({ error: "Match not found" }, { status: 404 });
+  }
 
   if (!supabaseUrl || !serviceRoleKey) {
     return Response.json(
