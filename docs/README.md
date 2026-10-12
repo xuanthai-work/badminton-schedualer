@@ -44,3 +44,4 @@ Thư mục lưu trữ tài liệu kỹ thuật và lịch sử các task đã ho
 | TASK-32 | Ẩn Nút Xóa Người Chơi Khi Đã Xác Nhận Thanh Toán (Confirmed) | 2026-10-12 | **PASS** | [hide-delete-btn-when-confirmed.md](file:///D:/work/Stuff/badminton-schedualer/docs/tasks/hide-delete-btn-when-confirmed.md) |
 | TASK-33 | Tối Ưu Trải Nghiệm PWA Mượt Như Native App & Đồng Bộ Sổ Nợ Realtime | 2026-10-12 | **PASS** | [native-pwa-mobile-experience.md](file:///D:/work/Stuff/badminton-schedualer/docs/tasks/native-pwa-mobile-experience.md) |
 | TASK-34 | Tích Hợp Kéo Xuống Để Làm Mới (Pull-To-Refresh) Chuẩn Mobile PWA | 2026-10-12 | **PASS** | [pull-to-refresh.md](file:///D:/work/Stuff/badminton-schedualer/docs/tasks/pull-to-refresh.md) |
+| TASK-35 | Chuẩn Hóa Cú Pháp VietQR & Xây Dựng Webhook Tự Động Xác Nhận Chuyển Khoản | 2026-10-12 | **PASS** | [standardize-vietqr-bank-webhook.md](file:///D:/work/Stuff/badminton-schedualer/docs/tasks/standardize-vietqr-bank-webhook.md) |

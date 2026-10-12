@@ -344,7 +344,8 @@ export default function PublicMatchPage() {
                   amount={data.expense?.feePerPerson ?? 0}
                   payee={data.payee}
                   status={myGuest.paymentStatus}
-                  guestName={identity?.name ?? myGuest.name}
+                  matchId={matchId}
+                  guestId={identity?.id ?? myGuest.guestId}
                   busy={busy}
                   onSubmit={handleSubmitPayment}
                 />
@@ -523,14 +524,16 @@ function GuestPayment({
   amount,
   payee,
   status,
-  guestName,
+  matchId,
+  guestId,
   busy,
   onSubmit,
 }: {
   amount: number;
   payee: Payee | null;
   status: PaymentStatus;
-  guestName: string;
+  matchId: string | undefined;
+  guestId: string;
   busy: boolean;
   onSubmit: () => void;
 }) {
@@ -550,7 +553,17 @@ function GuestPayment({
   const bank = bankByCode(payee?.bankId);
   const bankAccount = payee?.bankAccount ?? null;
   const holder = payee?.bankAccountName || payee?.name || "";
-  const memo = `${guestName} tien cau`;
+  // Standardized, regex-extractable transfer code: "BS <match> <guest>".
+  // The webhook (/api/webhook/bank-payment) parses it to reconcile payments.
+  const shortMatch = (matchId ?? "")
+    .replace(/-/g, "")
+    .slice(0, 8)
+    .toUpperCase();
+  const shortGuest = (guestId ?? "")
+    .replace(/[^a-zA-Z0-9]/g, "")
+    .slice(0, 6)
+    .toUpperCase();
+  const memo = `BS ${shortMatch} ${shortGuest}`;
   const hasBank = Boolean(bank && bankAccount);
   const qrSrc = hasBank
     ? `https://img.vietqr.io/image/${bank!.vietqr}-${bankAccount}-compact2.png?amount=${Math.round(
