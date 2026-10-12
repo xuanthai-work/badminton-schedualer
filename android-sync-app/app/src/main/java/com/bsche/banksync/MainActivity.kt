@@ -1,9 +1,11 @@
 package com.bsche.banksync
 
 import android.content.BroadcastReceiver
+import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.content.pm.PackageManager
 import android.os.Bundle
 import android.provider.Settings
 import android.view.View
@@ -52,6 +54,7 @@ class MainActivity : AppCompatActivity() {
     override fun onResume() {
         super.onResume()
         updatePermissionStatus()
+        rebindNotificationService()
         refreshHistory()
         ContextCompat.registerReceiver(
             this,
@@ -68,6 +71,26 @@ class MainActivity : AppCompatActivity() {
 
     private fun isNotificationAccessGranted(): Boolean =
         NotificationManagerCompat.getEnabledListenerPackages(this).contains(packageName)
+
+    /**
+     * MIUI (and Android 12+) sometimes fails to (re)bind the listener after the
+     * OS kills it. Toggling the component off/on forces system_server to bind
+     * it again without killing our app process.
+     */
+    private fun rebindNotificationService() {
+        if (!isNotificationAccessGranted()) return
+        val component = ComponentName(this, BankNotificationListenerService::class.java)
+        packageManager.setComponentEnabledSetting(
+            component,
+            PackageManager.COMPONENT_ENABLED_STATE_DISABLED,
+            PackageManager.DONT_KILL_APP
+        )
+        packageManager.setComponentEnabledSetting(
+            component,
+            PackageManager.COMPONENT_ENABLED_STATE_ENABLED,
+            PackageManager.DONT_KILL_APP
+        )
+    }
 
     private fun updatePermissionStatus() {
         if (isNotificationAccessGranted()) {
@@ -105,6 +128,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun testConnection() {
+        rebindNotificationService()
         val url = binding.etWebhookUrl.text.toString().trim()
         val secret = binding.etWebhookSecret.text.toString().trim()
         if (url.isBlank() || secret.isBlank()) {
@@ -124,7 +148,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun simulateTest() {
         val content = getString(R.string.simulated_content)
-        val amount = 50000L
+        val amount = 10000L
         val id = db.insertTransaction("CAKE", content, amount)
         refreshHistory()
 

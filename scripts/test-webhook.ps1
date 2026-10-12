@@ -9,7 +9,7 @@
 param(
   [string]$BaseUrl = "http://localhost:3000",
   [string]$Secret = $env:BANK_WEBHOOK_SECRET,
-  [string]$Content = "So du TK 123456789: +50,000 VND. ND: BS 8A2F9B1C 3D4E5F GD 987654321",
+  [string]$Content = "So du TK 123456789: +50,000 VND. ND: BSCHEL 8A2F9B1C 3D4E5F GD 987654321",
   [int]$Amount = 50000,
   [string]$Bank = "VCB",
   [string]$TransactionId = "FT12345678"

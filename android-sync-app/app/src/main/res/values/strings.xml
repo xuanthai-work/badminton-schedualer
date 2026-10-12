@@ -29,7 +29,7 @@
     <string name="status_pending">Chờ mạng</string>
     <string name="status_failed">Thất bại</string>
 
-    <string name="simulated_content">So du TK 0123456789: +50,000 VND. ND: BS 8A2F9B1C 3D4E5F GD 987654321</string>
+    <string name="simulated_content">Số dư tài khoản của bạn vừa tăng 10.000 đ. Nội dung: MBVCB.16501824738.6285BFTVGLM6VEXK.BSCHEL 69808AB4 8323C1.CT tu 1028226793 BUI XUAN THAI toi 0988820103 BUI XUAN THAI tai CAKE.</string>
     <string name="tx_sent">Đã gửi webhook thành công</string>
     <string name="tx_pending">Chưa gửi được, sẽ thử lại khi có mạng</string>
 </resources>

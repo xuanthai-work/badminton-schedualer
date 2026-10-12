@@ -563,7 +563,7 @@ function GuestPayment({
     .replace(/[^a-zA-Z0-9]/g, "")
     .slice(0, 6)
     .toUpperCase();
-  const memo = `BS ${shortMatch} ${shortGuest}`;
+  const memo = `BSCHEL ${shortMatch} ${shortGuest}`;
   const hasBank = Boolean(bank && bankAccount);
   const qrSrc = hasBank
     ? `https://img.vietqr.io/image/${bank!.vietqr}-${bankAccount}-compact2.png?amount=${Math.round(

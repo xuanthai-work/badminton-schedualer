@@ -11,11 +11,10 @@ type WebhookBody = {
   secret?: string;
 };
 
-// Canonical transfer-code syntax: "BS <shortMatch> <shortGuest>".
-// Primary pattern per spec; the loose fallback also accepts guest ids that
-// aren't strictly hex (anonymous guests use "g_..." ids).
-const TRANSFER_CODE = /BS\s+([A-Fa-f0-9]{6,8})\s+([A-Fa-f0-9]{4,8})/i;
-const TRANSFER_CODE_LOOSE = /BS\s+([A-Za-z0-9]{6,8})\s+([A-Za-z0-9]{4,8})/i;
+// Canonical transfer-code syntax: "BSCHEL <shortMatch> <shortGuest>".
+// Only BSCHEL is accepted to prevent any false positives.
+const TRANSFER_CODE = /BSCHEL\s+([A-Fa-f0-9]{6,8})\s+([A-Fa-f0-9]{4,8})/i;
+const TRANSFER_CODE_LOOSE = /BSCHEL\s+([A-Za-z0-9]{6,8})\s+([A-Za-z0-9]{4,8})/i;
 
 const normalizeId = (value: string) =>
   value.replace(/[^a-zA-Z0-9]/g, "").toUpperCase();

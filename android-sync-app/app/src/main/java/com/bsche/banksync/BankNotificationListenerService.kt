@@ -14,9 +14,9 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 
 /**
- * Listens to system notifications, keeps only Vietcombank (com.VCB) ones that
- * carry a BSche transfer code ("BS "), queues them and syncs them to the
- * webhook — retrying automatically whenever connectivity returns.
+ * Listens to system notifications, keeps only Cake (xyz.be.cake) ones that
+ * carry a BSche transfer code ("BSCHEL" / legacy "BS "), queues them and syncs
+ * them to the webhook — retrying automatically whenever connectivity returns.
  */
 class BankNotificationListenerService : NotificationListenerService() {
 
@@ -60,7 +60,7 @@ class BankNotificationListenerService : NotificationListenerService() {
             .joinToString(" ")
 
         // Only reconcile notifications that actually carry a BSche code.
-        if (!combined.contains(BS_MARKER, ignoreCase = true)) return
+        if (!combined.contains(BSCHEL_MARKER, ignoreCase = true)) return
 
         val amount = parseAmount(combined)
         val bank = if (pkg == CAKE_PACKAGE || pkg == CAKE_LEGACY_PACKAGE) "CAKE" else "TEST"
@@ -108,12 +108,16 @@ class BankNotificationListenerService : NotificationListenerService() {
     }
 
     companion object {
-        const val CAKE_PACKAGE = "vn.cake.banking"
-        const val CAKE_LEGACY_PACKAGE = "xyz.be.cake"
+        const val CAKE_PACKAGE = "xyz.be.cake"
+        const val CAKE_LEGACY_PACKAGE = "vn.cake.banking"
         const val TEST_PACKAGE = "com.bsche.banksync"
-        const val BS_MARKER = "BS "
+        const val BSCHEL_MARKER = "BSCHEL"
         const val ACTION_TX_UPDATE = "com.bsche.banksync.TX_UPDATE"
 
-        private val AMOUNT_REGEX = Regex("""\+([0-9][0-9.,]*)\s*(?:VND|đ|₫)?""")
+        // Matches both "+10.000 đ" and Cake's "vừa tăng 10.000 đ" wording.
+        private val AMOUNT_REGEX = Regex(
+            """(?:\+|vừa tăng\s+)([0-9][0-9.,]*)\s*(?:VND|đ|₫)?""",
+            RegexOption.IGNORE_CASE
+        )
     }
 }
