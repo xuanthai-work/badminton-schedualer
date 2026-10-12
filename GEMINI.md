@@ -61,6 +61,14 @@ Gemini đóng vai trò **Business Analyst (BA) + QA / Technical Auditor & Code R
   - `status: IN_PROGRESS`: Dev Agent đang thực thi.
   - `status: DONE`: Dev Agent làm xong. Script cập nhật trạng thái để Gemini tự động thức dậy QA Audit.
   - `status: IDLE`: Trạng thái nghỉ sau khi QA PASS và task đã được lưu vào `docs/tasks/`.
+- **Cơ chế Tự Động Đánh Thức QA Audit (Reactive Wakeup - 0 Token)**:
+  - Ngay sau khi chuyển task sang `status: APPROVED`, Gemini **bắt buộc khởi chạy một Background Command cực nhẹ** (OS-level process) để chờ Dev Agent:
+    ```powershell
+    powershell -Command "while (!(Get-Content justdoit.md -Raw -ErrorAction SilentlyContinue | Select-String 'status:\s*DONE')) { Start-Sleep -Seconds 2 }"
+    ```
+    (chạy qua `run_command` với `WaitMsBeforeAsync: 1000` để đưa vào background task).
+  - Lệnh này chạy ở tầng OS, tiêu thụ **0 token** trong suốt thời gian Dev Agent code.
+  - Khi Developer Agent (OpenCode) hoàn thành và đổi sang `status: DONE`, lệnh background task trên sẽ kết thúc. Antigravity tự động kích hoạt **Reactive Wakeup**, đánh thức chính phiên Gemini hiện tại để QA Audit ngay lập tức mà User không cần nhắc.
 - Mỗi task phải có đầy đủ các mục:
   - **Objective**: Mục tiêu rõ ràng của task.
   - **Scope**: Phạm vi thay đổi (các file, module liên quan).
