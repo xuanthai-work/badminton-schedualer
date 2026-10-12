@@ -45,3 +45,4 @@ Thư mục lưu trữ tài liệu kỹ thuật và lịch sử các task đã ho
 | TASK-33 | Tối Ưu Trải Nghiệm PWA Mượt Như Native App & Đồng Bộ Sổ Nợ Realtime | 2026-10-12 | **PASS** | [native-pwa-mobile-experience.md](file:///D:/work/Stuff/badminton-schedualer/docs/tasks/native-pwa-mobile-experience.md) |
 | TASK-34 | Tích Hợp Kéo Xuống Để Làm Mới (Pull-To-Refresh) Chuẩn Mobile PWA | 2026-10-12 | **PASS** | [pull-to-refresh.md](file:///D:/work/Stuff/badminton-schedualer/docs/tasks/pull-to-refresh.md) |
 | TASK-35 | Chuẩn Hóa Cú Pháp VietQR & Xây Dựng Webhook Tự Động Xác Nhận Chuyển Khoản | 2026-10-12 | **PASS** | [standardize-vietqr-bank-webhook.md](file:///D:/work/Stuff/badminton-schedualer/docs/tasks/standardize-vietqr-bank-webhook.md) |
+| TASK-36 | Xây Dựng Ứng Dụng Android Native BSche Bank Sync (APK) & Offline Queue | 2026-10-12 | **PASS** | [build-android-bank-sync-app.md](file:///D:/work/Stuff/badminton-schedualer/docs/tasks/build-android-bank-sync-app.md) |

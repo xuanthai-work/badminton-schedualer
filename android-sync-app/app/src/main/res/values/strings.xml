@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">BSche Bank Sync</string>
+    <string name="service_label">BSche Bank Sync (Vietcombank)</string>
+
+    <string name="header_title">BSche Bank Sync</string>
+    <string name="header_subtitle">Tự động bắt biến động số dư Vietcombank và đồng bộ về BSche</string>
+
+    <string name="card_service_title">Trạng thái dịch vụ</string>
+    <string name="permission_granted">Dịch vụ đang chạy ngầm</string>
+    <string name="permission_denied">Chưa được cấp quyền truy cập thông báo</string>
+    <string name="btn_open_settings">Cấp quyền truy cập thông báo</string>
+
+    <string name="card_config_title">Cấu hình Webhook</string>
+    <string name="hint_webhook_url">http://192.168.1.10:3000/api/webhook/bank-payment</string>
+    <string name="hint_webhook_secret">Webhook secret key</string>
+    <string name="btn_save_config">Lưu cấu hình</string>
+    <string name="btn_test_connection">Kiểm tra kết nối</string>
+    <string name="config_saved">Đã lưu cấu hình</string>
+    <string name="config_missing">Vui lòng nhập URL và Secret</string>
+
+    <string name="card_simulate_title">Kiểm tra mô phỏng</string>
+    <string name="btn_simulate">Bắn thông báo VCB giả lập</string>
+
+    <string name="card_history_title">Lịch sử giao dịch gần đây</string>
+    <string name="history_empty">Chưa có giao dịch nào được bắt.</string>
+
+    <string name="status_synced">Đã gửi</string>
+    <string name="status_pending">Chờ mạng</string>
+    <string name="status_failed">Thất bại</string>
+
+    <string name="simulated_content">So du TK 0123456789: +50,000 VND. ND: BS 8A2F9B1C 3D4E5F GD 987654321</string>
+    <string name="tx_sent">Đã gửi webhook thành công</string>
+    <string name="tx_pending">Chưa gửi được, sẽ thử lại khi có mạng</string>
+</resources>
