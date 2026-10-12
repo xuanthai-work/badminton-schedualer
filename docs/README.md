@@ -46,3 +46,4 @@ Thư mục lưu trữ tài liệu kỹ thuật và lịch sử các task đã ho
 | TASK-34 | Tích Hợp Kéo Xuống Để Làm Mới (Pull-To-Refresh) Chuẩn Mobile PWA | 2026-10-12 | **PASS** | [pull-to-refresh.md](file:///D:/work/Stuff/badminton-schedualer/docs/tasks/pull-to-refresh.md) |
 | TASK-35 | Chuẩn Hóa Cú Pháp VietQR & Xây Dựng Webhook Tự Động Xác Nhận Chuyển Khoản | 2026-10-12 | **PASS** | [standardize-vietqr-bank-webhook.md](file:///D:/work/Stuff/badminton-schedualer/docs/tasks/standardize-vietqr-bank-webhook.md) |
 | TASK-36 | Xây Dựng Ứng Dụng Android Native BSche Bank Sync (APK) & Offline Queue | 2026-10-12 | **PASS** | [build-android-bank-sync-app.md](file:///D:/work/Stuff/badminton-schedualer/docs/tasks/build-android-bank-sync-app.md) |
+| TASK-37 | Tự Động Chuyển Hướng Sang Sổ Thu Tiền & Mở Bung Trận Đấu Khi Chốt Chi Phí | 2026-10-12 | **PASS** | [auto-redirect-ledger-on-settle.md](file:///D:/work/Stuff/badminton-schedualer/docs/tasks/auto-redirect-ledger-on-settle.md) |

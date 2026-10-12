@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { useI18n } from "@/lib/i18n";
+import { triggerHaptic } from "@/lib/haptics";
 import BottomNav from "@/components/BottomNav";
 import PullToRefresh from "@/components/PullToRefresh";
 import MapsPreview from "@/components/MapsPreview";
@@ -248,7 +249,10 @@ export default function MatchDetailPage() {
       } else {
         setSettleMsg(t("match.settledMsgSimple"));
       }
-      await load();
+      // Jump straight to the ledger with this match auto-expanded so the host
+      // sees the collection table and VietQR right away.
+      triggerHaptic("success");
+      router.push(`/dashboard/debts?matchId=${matchId}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : t("match.errSettle"));
     } finally {

@@ -1,7 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { Suspense, useCallback, useEffect, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   CalendarClock,
   Check,
@@ -51,7 +51,26 @@ function one<T>(value: T | T[] | null | undefined): T | null {
 }
 
 export default function LedgerPage() {
+  return (
+    <Suspense fallback={<LedgerFallback />}>
+      <LedgerContent />
+    </Suspense>
+  );
+}
+
+function LedgerFallback() {
+  return (
+    <main className="relative min-h-screen overflow-hidden bg-slate-950 px-6 py-10 pb-28 text-slate-50">
+      <div className="relative mx-auto w-full max-w-2xl">
+        <div className="glass-panel h-40 animate-pulse rounded-2xl" />
+      </div>
+    </main>
+  );
+}
+
+function LedgerContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { t, formatVnd, formatMatchHeading } = useI18n();
   const confirm = useConfirm();
 
@@ -59,7 +78,10 @@ export default function LedgerPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [matches, setMatches] = useState<LedgerMatch[]>([]);
-  const [expanded, setExpanded] = useState<string | null>(null);
+  // Deep link from the match page after settling: that match starts expanded.
+  const [expanded, setExpanded] = useState<string | null>(
+    () => searchParams?.get("matchId") ?? null
+  );
   const [busy, setBusy] = useState<string | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
