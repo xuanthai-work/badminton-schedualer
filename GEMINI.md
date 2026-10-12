@@ -52,9 +52,15 @@ Gemini đóng vai trò **Business Analyst (BA) + QA / Technical Auditor & Code R
 
 ---
 
-## 3. Quản lý Task (`justdoit.md`)
+## 3. Quản lý Task (`justdoit.md`) & State Machine
 
 - `justdoit.md` **chỉ chứa duy nhất task implementation hiện tại**.
+- **Vòng đời trạng thái (State Machine)**:
+  - `status: DRAFT`: Gemini soạn task, đang thảo luận với User. Dev Agent không được chạy.
+  - `status: APPROVED`: User đã duyệt. Script watcher (`npm run watch:task`) tự động kích hoạt OpenCode (`opencode run --continue`).
+  - `status: IN_PROGRESS`: Dev Agent đang thực thi.
+  - `status: DONE`: Dev Agent làm xong. Script cập nhật trạng thái để Gemini tự động thức dậy QA Audit.
+  - `status: IDLE`: Trạng thái nghỉ sau khi QA PASS và task đã được lưu vào `docs/tasks/`.
 - Mỗi task phải có đầy đủ các mục:
   - **Objective**: Mục tiêu rõ ràng của task.
   - **Scope**: Phạm vi thay đổi (các file, module liên quan).

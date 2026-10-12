@@ -42,3 +42,5 @@ Thư mục lưu trữ tài liệu kỹ thuật và lịch sử các task đã ho
 | TASK-30 | Đổi Logic Khóa Điểm Danh RSVP: Chỉ Khóa Khi Host Chốt Tiền | 2026-10-12 | **PASS** | [rsvp-lock-on-match-settle.md](file:///D:/work/Stuff/badminton-schedualer/docs/tasks/rsvp-lock-on-match-settle.md) |
 | TASK-31 | Thiết Kế Lại Phân Cấp Thị Giác Form Chi Phí (Sổ Thu Tiền & Chi Tiết Trận) | 2026-10-12 | **PASS** | [redesign-fee-form-visual-hierarchy.md](file:///D:/work/Stuff/badminton-schedualer/docs/tasks/redesign-fee-form-visual-hierarchy.md) |
 | TASK-32 | Ẩn Nút Xóa Người Chơi Khi Đã Xác Nhận Thanh Toán (Confirmed) | 2026-10-12 | **PASS** | [hide-delete-btn-when-confirmed.md](file:///D:/work/Stuff/badminton-schedualer/docs/tasks/hide-delete-btn-when-confirmed.md) |
+| TASK-33 | Tối Ưu Trải Nghiệm PWA Mượt Như Native App & Đồng Bộ Sổ Nợ Realtime | 2026-10-12 | **PASS** | [native-pwa-mobile-experience.md](file:///D:/work/Stuff/badminton-schedualer/docs/tasks/native-pwa-mobile-experience.md) |
+| TASK-34 | Tích Hợp Kéo Xuống Để Làm Mới (Pull-To-Refresh) Chuẩn Mobile PWA | 2026-10-12 | **PASS** | [pull-to-refresh.md](file:///D:/work/Stuff/badminton-schedualer/docs/tasks/pull-to-refresh.md) |

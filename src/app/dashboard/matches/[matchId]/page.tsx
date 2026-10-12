@@ -14,6 +14,7 @@ import {
 import { supabase } from "@/lib/supabaseClient";
 import { useI18n } from "@/lib/i18n";
 import BottomNav from "@/components/BottomNav";
+import PullToRefresh from "@/components/PullToRefresh";
 import MapsPreview from "@/components/MapsPreview";
 import InitialAvatar from "@/components/InitialAvatar";
 import EditMatchPanel from "./EditMatchPanel";
@@ -312,7 +313,8 @@ export default function MatchDetailPage() {
         className="pointer-events-none fixed -top-32 right-[-80px] h-80 w-80 rounded-full bg-lime-500/10 blur-3xl"
       />
 
-      <div className="relative mx-auto flex w-full max-w-3xl flex-col gap-6">
+      <PullToRefresh onRefresh={load}>
+        <div className="relative mx-auto flex w-full max-w-3xl flex-col gap-6">
         <header className="space-y-3">
           <button
             type="button"
@@ -541,7 +543,8 @@ export default function MatchDetailPage() {
             )}
           </>
         ) : null}
-      </div>
+        </div>
+      </PullToRefresh>
 
       {guestToDelete && (
         <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-950/80 p-4 backdrop-blur-md sm:items-center">

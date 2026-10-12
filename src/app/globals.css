@@ -29,6 +29,34 @@
     font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
   }
 
+  /* Mobile touch hygiene: kill the iOS rubber-band overscroll and the grey
+     tap-highlight flash so the app feels native. */
+  html,
+  body {
+    overscroll-behavior-y: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  /* Remove the ~300ms tap delay and double-tap-zoom on interactive elements. */
+  button,
+  a,
+  input,
+  select,
+  label,
+  [role="button"] {
+    touch-action: manipulation;
+  }
+
+  /* Prevent accidental text selection while tapping/scrolling nav & buttons. */
+  nav,
+  button,
+  [role="button"],
+  label {
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-touch-callout: none;
+  }
+
   /* Installed as a PWA: status bar is translucent, so keep content below the
      notch. (Browser tabs are unaffected.) */
   @media (display-mode: standalone) {

@@ -8,14 +8,17 @@ import {
   CheckCircle2,
   Clock,
   Copy,
+  Loader2,
   MapPin,
   QrCode,
 } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { useI18n } from "@/lib/i18n";
+import { triggerHaptic } from "@/lib/haptics";
 import { bankByCode } from "@/lib/banks";
 import MapsPreview from "@/components/MapsPreview";
 import InitialAvatar from "@/components/InitialAvatar";
+import PullToRefresh from "@/components/PullToRefresh";
 
 type PaymentStatus = "unpaid" | "submitted" | "confirmed";
 
@@ -152,6 +155,7 @@ export default function PublicMatchPage() {
   };
 
   const submitRsvp = async (id: string, name: string, status: "yes" | "no") => {
+    triggerHaptic("light");
     setBusy(true);
     setError("");
     try {
@@ -180,8 +184,10 @@ export default function PublicMatchPage() {
         if (secret) saveIdentity({ id, name, secret });
       }
       await load();
+      triggerHaptic("success");
     } catch (err) {
       setError(err instanceof Error ? err.message : t("publicMatch.errRsvp"));
+      triggerHaptic("warning");
     } finally {
       setBusy(false);
     }
@@ -219,6 +225,7 @@ export default function PublicMatchPage() {
 
   const handleSubmitPayment = async () => {
     if (!identity || busy) return;
+    triggerHaptic("light");
     setBusy(true);
     setError("");
     try {
@@ -234,8 +241,10 @@ export default function PublicMatchPage() {
         throw new Error(rpcError.message);
       }
       await load();
+      triggerHaptic("success");
     } catch (err) {
       setError(err instanceof Error ? err.message : t("publicMatch.errLoad"));
+      triggerHaptic("warning");
     } finally {
       setBusy(false);
     }
@@ -262,7 +271,8 @@ export default function PublicMatchPage() {
         className="pointer-events-none fixed -top-32 right-[-80px] h-80 w-80 rounded-full bg-lime-500/10 blur-3xl"
       />
 
-      <div className="relative mx-auto flex w-full max-w-xl flex-col gap-6">
+      <PullToRefresh onRefresh={load}>
+        <div className="relative mx-auto flex w-full max-w-xl flex-col gap-6">
         <p className="text-xs font-semibold uppercase tracking-[0.35em] text-lime-400">
           BSche
         </p>
@@ -394,7 +404,11 @@ export default function PublicMatchPage() {
                     onClick={() => void handleRsvp("yes")}
                     className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl bg-lime-500 py-4 text-base font-semibold text-slate-950 shadow-[0_0_30px_rgba(163,230,53,0.4)] transition hover:scale-[1.01] active:scale-95 disabled:opacity-60"
                   >
-                    <CheckCircle2 size={22} strokeWidth={2} />
+                    {busy ? (
+                      <Loader2 size={22} className="animate-spin" />
+                    ) : (
+                      <CheckCircle2 size={22} strokeWidth={2} />
+                    )}
                     {t("publicMatch.join")}
                   </button>
                 )}
@@ -414,7 +428,8 @@ export default function PublicMatchPage() {
             )}
           </>
         ) : null}
-      </div>
+        </div>
+      </PullToRefresh>
 
       {dialogStatus && (
         <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-950/80 p-4 backdrop-blur-md sm:items-center">
@@ -627,8 +642,9 @@ function GuestPayment({
                 type="button"
                 disabled={busy}
                 onClick={onSubmit}
-                className="mt-4 w-full rounded-xl bg-lime-500 py-3 text-sm font-semibold text-slate-950 shadow-[0_0_20px_rgba(163,230,53,0.35)] transition hover:scale-[1.01] active:scale-95 disabled:opacity-60"
+                className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl bg-lime-500 py-3 text-sm font-semibold text-slate-950 shadow-[0_0_20px_rgba(163,230,53,0.35)] transition hover:scale-[1.01] active:scale-95 disabled:opacity-60"
               >
+                {busy && <Loader2 size={16} className="animate-spin" />}
                 {t("publicMatch.iPaid")}
               </button>
             )

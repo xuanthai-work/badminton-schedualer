@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Home, User, ReceiptText } from "lucide-react";
 import { useI18n } from "@/lib/i18n";
+import { triggerHaptic } from "@/lib/haptics";
 
 type Item = {
   href: string;
@@ -49,6 +50,7 @@ export default function BottomNav() {
           <Link
             key={item.href}
             href={item.href}
+            onClick={() => triggerHaptic("light")}
             className={`flex flex-col items-center justify-center gap-0.5 rounded-xl px-4 py-1 transition active:scale-90 ${
               active
                 ? "bg-lime-500/10 text-lime-400"

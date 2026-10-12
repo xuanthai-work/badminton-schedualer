@@ -19,6 +19,7 @@ import { useConfirm } from "@/components/ConfirmProvider";
 import { useToast } from "@/components/ToastProvider";
 import EmptyState from "@/components/EmptyState";
 import BottomNav from "@/components/BottomNav";
+import PullToRefresh from "@/components/PullToRefresh";
 import CreateMatchPanel from "./CreateMatchPanel";
 
 type HostMatch = {
@@ -211,7 +212,10 @@ export default function DashboardPage() {
         className="pointer-events-none fixed -bottom-40 -left-32 h-80 w-80 rounded-full bg-lime-500/5 blur-3xl"
       />
 
-      <div className="relative mx-auto flex w-full max-w-2xl flex-col gap-8 pb-16">
+      <PullToRefresh
+        onRefresh={() => (userId ? loadMatches(userId) : Promise.resolve())}
+      >
+        <div className="relative mx-auto flex w-full max-w-2xl flex-col gap-8 pb-16">
         <header className="flex items-start justify-between gap-4">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.3em] text-lime-400">
@@ -338,7 +342,8 @@ export default function DashboardPage() {
             ))
           )}
         </section>
-      </div>
+        </div>
+      </PullToRefresh>
 
       <BottomNav />
     </main>

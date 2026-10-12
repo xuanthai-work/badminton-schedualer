@@ -7,15 +7,18 @@ import {
   Check,
   ChevronDown,
   ChevronUp,
+  Loader2,
   ReceiptText,
   Share2,
   Trash2,
 } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { useI18n } from "@/lib/i18n";
+import { triggerHaptic } from "@/lib/haptics";
 import { useConfirm } from "@/components/ConfirmProvider";
 import EmptyState from "@/components/EmptyState";
 import BottomNav from "@/components/BottomNav";
+import PullToRefresh from "@/components/PullToRefresh";
 import InitialAvatar from "@/components/InitialAvatar";
 
 type PayStatus = "unpaid" | "submitted" | "confirmed";
@@ -209,7 +212,25 @@ export default function LedgerPage() {
     void init();
   }, [router, load, t]);
 
+  // Live ledger: sync whenever any guest's payment status changes elsewhere.
+  useEffect(() => {
+    if (!userId) return;
+    const channel = supabase
+      .channel(`ledger-${Math.random().toString(36).slice(2)}`)
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "match_guests" },
+        () => void load(userId)
+      )
+      .subscribe();
+
+    return () => {
+      void supabase.removeChannel(channel);
+    };
+  }, [userId, load]);
+
   const confirmPayer = async (match: LedgerMatch, payer: Payer) => {
+    triggerHaptic("light");
     setBusy(payer.key);
     setError("");
     try {
@@ -220,8 +241,10 @@ export default function LedgerPage() {
       });
       if (rpcError) throw new Error(rpcError.message);
       if (userId) await load(userId);
+      triggerHaptic("success");
     } catch (err) {
       setError(err instanceof Error ? err.message : t("ledger.actionError"));
+      triggerHaptic("warning");
     } finally {
       setBusy(null);
     }
@@ -320,7 +343,10 @@ export default function LedgerPage() {
         className="pointer-events-none fixed -top-32 right-[-80px] h-80 w-80 rounded-full bg-lime-500/10 blur-3xl"
       />
 
-      <div className="relative mx-auto flex w-full max-w-2xl flex-col gap-6">
+      <PullToRefresh
+        onRefresh={() => (userId ? load(userId) : Promise.resolve())}
+      >
+        <div className="relative mx-auto flex w-full max-w-2xl flex-col gap-6">
         <header className="flex items-start justify-between gap-4">
           <div className="space-y-1">
             <h1 className="text-[28px] font-semibold leading-tight">
@@ -485,7 +511,14 @@ export default function LedgerPage() {
                                       onClick={() => void confirmPayer(match, payer)}
                                       className="inline-flex items-center gap-1 rounded-lg bg-emerald-500 px-2.5 py-1.5 text-xs font-semibold text-slate-950 transition hover:scale-[1.03] active:scale-95 disabled:opacity-60"
                                     >
-                                      <Check size={12} strokeWidth={2.25} />
+                                      {busy === payer.key ? (
+                                        <Loader2
+                                          size={12}
+                                          className="animate-spin"
+                                        />
+                                      ) : (
+                                        <Check size={12} strokeWidth={2.25} />
+                                      )}
                                       {t("ledger.confirmPay")}
                                     </button>
                                   ) : (
@@ -528,7 +561,8 @@ export default function LedgerPage() {
             })}
           </ul>
         )}
-      </div>
+        </div>
+      </PullToRefresh>
 
       {payerToRemove && (
         <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-950/80 p-4 backdrop-blur-md sm:items-center">
