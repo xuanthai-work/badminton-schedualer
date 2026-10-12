@@ -34,7 +34,6 @@ type Match = {
   location: string;
   locationUrl: string | null;
   courtNo: number | null;
-  rsvpLocked: boolean;
   status: "open" | "closed";
   createdBy: string | null;
 };
@@ -67,6 +66,8 @@ export default function MatchDetailPage() {
   const [error, setError] = useState("");
 
   const [courtFee, setCourtFee] = useState("");
+  const [tubePrice, setTubePrice] = useState("");
+  const [shuttleCount, setShuttleCount] = useState("");
   const [shuttleFee, setShuttleFee] = useState("");
   const [waterFee, setWaterFee] = useState("");
   const [settleBusy, setSettleBusy] = useState(false);
@@ -97,10 +98,6 @@ export default function MatchDetailPage() {
         location: matchRow.location,
         locationUrl: matchRow.location_url ?? null,
         courtNo: matchRow.court_no ?? null,
-        rsvpLocked:
-          Date.now() >
-          new Date(`${matchRow.match_date}T${matchRow.match_time}`).getTime() -
-            30 * 60_000,
         status: matchRow.status === "closed" ? "closed" : "open",
         createdBy: matchRow.created_by ?? null,
       });
@@ -199,6 +196,20 @@ export default function MatchDetailPage() {
   const guestYes = guests.filter((g) => g.status === "yes");
   const attendeeCount = guestYes.length;
 
+  // Shuttle cost is derived from tube price + shuttle count; falls back to the
+  // stored total when the host hasn't entered the tube/count pair.
+  const tubePriceNum = Number(tubePrice) || 0;
+  const shuttleCountNum = Number(shuttleCount) || 0;
+  const shuttleFeeCalculated =
+    tubePriceNum > 0 && shuttleCountNum > 0
+      ? Math.round(((tubePriceNum * 1000) / 12) * shuttleCountNum)
+      : (Number(shuttleFee) || 0) * 1000;
+  const courtFeeTotal = (Number(courtFee) || 0) * 1000;
+  const waterFeeTotal = (Number(waterFee) || 0) * 1000;
+  const totalCost = courtFeeTotal + shuttleFeeCalculated + waterFeeTotal;
+  const feePerPersonPreview =
+    attendeeCount > 0 ? Math.round(totalCost / attendeeCount) : 0;
+
   const handleSettle = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!matchId || !userId) return;
@@ -207,9 +218,9 @@ export default function MatchDetailPage() {
     setSettleMsg("");
     setError("");
     try {
-      const court = (Number(courtFee) || 0) * 1000;
-      const shuttle = (Number(shuttleFee) || 0) * 1000;
-      const water = (Number(waterFee) || 0) * 1000;
+      const court = courtFeeTotal;
+      const shuttle = shuttleFeeCalculated;
+      const water = waterFeeTotal;
       if (court < 0 || shuttle < 0 || water < 0) {
         throw new Error(t("match.errNegativeFee"));
       }
@@ -468,17 +479,46 @@ export default function MatchDetailPage() {
                   />
                   <div className="grid grid-cols-2 gap-3">
                     <FeeInput
-                      label={t("match.shuttleFee")}
-                      value={shuttleFee}
-                      onChange={setShuttleFee}
-                      placeholder="150"
+                      label={t("ledger.tubePrice")}
+                      value={tubePrice}
+                      onChange={setTubePrice}
+                      placeholder="240"
                     />
                     <FeeInput
-                      label={t("match.waterFee")}
-                      value={waterFee}
-                      onChange={setWaterFee}
-                      placeholder="50"
+                      label={t("ledger.shuttleCount")}
+                      value={shuttleCount}
+                      onChange={setShuttleCount}
+                      placeholder="6"
+                      suffix={t("ledger.shuttleUnit")}
+                      showPreview={false}
                     />
+                  </div>
+                  <p className="ml-1 text-[11px] text-slate-400">
+                    = {t("match.shuttleFee")}:{" "}
+                    {formatVnd(shuttleFeeCalculated)}
+                  </p>
+                  <FeeInput
+                    label={t("match.waterFee")}
+                    value={waterFee}
+                    onChange={setWaterFee}
+                    placeholder="50"
+                  />
+                  <div className="space-y-2 rounded-xl border border-white/10 bg-slate-900/60 p-3.5">
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-slate-400">{t("match.total")}</span>
+                      <span className="font-semibold text-slate-100">
+                        {formatVnd(totalCost)}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between border-t border-white/10 pt-2">
+                      <span className="text-xs font-medium uppercase tracking-wider text-lime-400">
+                        {t("ledger.perPerson")} (
+                        {t("ledger.peopleCount", { count: attendeeCount })})
+                      </span>
+                      <span className="text-xl font-bold text-lime-300">
+                        {formatVnd(feePerPersonPreview)}
+                      </span>
+                    </div>
                   </div>
                   <p className="text-xs text-slate-400">
                     {t("match.splitNote", { count: attendeeCount })}
@@ -609,23 +649,25 @@ function ParticipantList({
                     )}
                   </div>
                 </div>
-                <div className="flex shrink-0 items-center gap-2">
+                <div className="flex shrink-0 items-center gap-1.5">
                   {status === "closed" && (
                     <>
-                      <span
-                        className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${pill[paymentStatus].cls}`}
-                      >
-                        {pill[paymentStatus].label}
-                      </span>
-                      {isHost && !isSelf && paymentStatus === "submitted" && (
+                      {isHost && !isSelf && paymentStatus === "submitted" ? (
                         <button
                           type="button"
                           disabled={busy}
                           onClick={() => onConfirm(g.guestId, true)}
-                          className="rounded-lg bg-emerald-500 px-3 py-1.5 text-xs font-semibold text-slate-950 transition hover:scale-[1.03] active:scale-95 disabled:opacity-60"
+                          className="inline-flex items-center gap-1 rounded-lg bg-emerald-500 px-2.5 py-1.5 text-xs font-semibold text-slate-950 transition hover:scale-[1.03] active:scale-95 disabled:opacity-60"
                         >
+                          <Check size={12} strokeWidth={2.25} />
                           {t("match.payConfirm")}
                         </button>
+                      ) : (
+                        <span
+                          className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${pill[paymentStatus].cls}`}
+                        >
+                          {pill[paymentStatus].label}
+                        </span>
                       )}
                       {isHost && !isSelf && paymentStatus === "confirmed" && (
                         <button
@@ -639,16 +681,17 @@ function ParticipantList({
                       )}
                     </>
                   )}
-                  {isHost && (
-                    <button
-                      type="button"
-                      aria-label={t("match.removeGuestTitle")}
-                      onClick={() => onRequestDelete(g)}
-                      className="rounded-lg p-1.5 text-slate-400 transition hover:text-rose-400 active:scale-95"
-                    >
-                      <Trash2 size={15} strokeWidth={2} />
-                    </button>
-                  )}
+                  {isHost &&
+                    (status !== "closed" || paymentStatus !== "confirmed") && (
+                      <button
+                        type="button"
+                        aria-label={t("match.removeGuestTitle")}
+                        onClick={() => onRequestDelete(g)}
+                        className="rounded-lg p-1.5 text-slate-400 transition hover:text-rose-400 active:scale-95"
+                      >
+                        <Trash2 size={15} strokeWidth={2} />
+                      </button>
+                    )}
                 </div>
               </li>
             );
@@ -664,11 +707,15 @@ function FeeInput({
   value,
   onChange,
   placeholder,
+  suffix,
+  showPreview = true,
 }: {
   label: string;
   value: string;
   onChange: (next: string) => void;
   placeholder?: string;
+  suffix?: string;
+  showPreview?: boolean;
 }) {
   const { t, formatVnd } = useI18n();
   const thousands = Number(value) || 0;
@@ -689,12 +736,14 @@ function FeeInput({
           placeholder={placeholder ?? "0"}
         />
         <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs font-semibold text-slate-500">
-          {t("match.feeThousands")}
+          {suffix ?? t("match.feeThousands")}
         </span>
       </div>
-      <p className="ml-1 text-[11px] text-lime-300/80">
-        {thousands > 0 ? `= ${formatVnd(thousands * 1000)}` : " "}
-      </p>
+      {showPreview && (
+        <p className="ml-1 text-[11px] text-lime-300/80">
+          {thousands > 0 ? `= ${formatVnd(thousands * 1000)}` : " "}
+        </p>
+      )}
     </div>
   );
 }

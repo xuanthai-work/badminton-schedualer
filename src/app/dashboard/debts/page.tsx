@@ -1,11 +1,19 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Check, ChevronDown, ChevronUp, ReceiptText } from "lucide-react";
+import {
+  CalendarClock,
+  Check,
+  ChevronDown,
+  ChevronUp,
+  ReceiptText,
+  Share2,
+  Trash2,
+} from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { useI18n } from "@/lib/i18n";
+import { useConfirm } from "@/components/ConfirmProvider";
 import EmptyState from "@/components/EmptyState";
 import BottomNav from "@/components/BottomNav";
 import InitialAvatar from "@/components/InitialAvatar";
@@ -22,15 +30,17 @@ type Payer = {
 
 type LedgerMatch = {
   matchId: string;
-  title: string;
   matchDate: string;
+  matchTime: string;
+  matchEndTime: string | null;
   location: string;
+  courtFee: number;
+  shuttleFee: number;
+  waterFee: number;
   totalAmount: number;
   feePerPerson: number;
   payers: Payer[];
 };
-
-type Filter = "all" | "pending" | "completed";
 
 function one<T>(value: T | T[] | null | undefined): T | null {
   if (!value) return null;
@@ -40,14 +50,20 @@ function one<T>(value: T | T[] | null | undefined): T | null {
 export default function LedgerPage() {
   const router = useRouter();
   const { t, formatVnd, formatMatchHeading } = useI18n();
+  const confirm = useConfirm();
 
   const [userId, setUserId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [matches, setMatches] = useState<LedgerMatch[]>([]);
-  const [filter, setFilter] = useState<Filter>("all");
   const [expanded, setExpanded] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
+  const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [payerToRemove, setPayerToRemove] = useState<
+    { match: LedgerMatch; payer: Payer } | null
+  >(null);
+  const [removing, setRemoving] = useState(false);
 
   const load = useCallback(async (uid: string) => {
     const base = new Map<string, LedgerMatch>();
@@ -56,7 +72,7 @@ export default function LedgerPage() {
     const { data: matchRows, error: matchError } = await supabase
       .from("matches")
       .select(
-        "id, title, match_date, location, expenses ( total_amount, fee_per_person )"
+        "id, match_date, match_time, match_end_time, location, expenses ( court_fee, shuttle_fee, water_fee, total_amount, fee_per_person )"
       )
       .eq("created_by", uid)
       .eq("status", "closed");
@@ -65,16 +81,32 @@ export default function LedgerPage() {
     (matchRows ?? []).forEach((row) => {
       const expense = one(
         row.expenses as
-          | { total_amount: number; fee_per_person: number }
-          | { total_amount: number; fee_per_person: number }[]
+          | {
+              court_fee: number;
+              shuttle_fee: number;
+              water_fee: number;
+              total_amount: number;
+              fee_per_person: number;
+            }
+          | {
+              court_fee: number;
+              shuttle_fee: number;
+              water_fee: number;
+              total_amount: number;
+              fee_per_person: number;
+            }[]
           | null
       );
       if (!expense) return;
       base.set(row.id as string, {
         matchId: row.id as string,
-        title: (row.title as string | null) ?? "",
         matchDate: row.match_date as string,
+        matchTime: (row.match_time as string) ?? "",
+        matchEndTime: (row.match_end_time as string | null) ?? null,
         location: (row.location as string) ?? "",
+        courtFee: Number(expense.court_fee),
+        shuttleFee: Number(expense.shuttle_fee),
+        waterFee: Number(expense.water_fee),
         totalAmount: Number(expense.total_amount),
         feePerPerson: Number(expense.fee_per_person),
         payers: [],
@@ -85,7 +117,7 @@ export default function LedgerPage() {
     const { data: payeeRows } = await supabase
       .from("expenses")
       .select(
-        "match_id, total_amount, fee_per_person, matches ( id, title, match_date, location, status )"
+        "match_id, court_fee, shuttle_fee, water_fee, total_amount, fee_per_person, matches ( id, match_date, match_time, match_end_time, location, status )"
       )
       .eq("payee_id", uid);
 
@@ -94,15 +126,17 @@ export default function LedgerPage() {
         row.matches as
           | {
               id: string;
-              title: string | null;
               match_date: string;
+              match_time: string | null;
+              match_end_time: string | null;
               location: string | null;
               status: string;
             }
           | {
               id: string;
-              title: string | null;
               match_date: string;
+              match_time: string | null;
+              match_end_time: string | null;
               location: string | null;
               status: string;
             }[]
@@ -111,9 +145,13 @@ export default function LedgerPage() {
       if (!match || match.status !== "closed" || base.has(match.id)) return;
       base.set(match.id, {
         matchId: match.id,
-        title: match.title ?? "",
         matchDate: match.match_date,
+        matchTime: match.match_time ?? "",
+        matchEndTime: match.match_end_time ?? null,
         location: match.location ?? "",
+        courtFee: Number(row.court_fee),
+        shuttleFee: Number(row.shuttle_fee),
+        waterFee: Number(row.water_fee),
         totalAmount: Number(row.total_amount),
         feePerPerson: Number(row.fee_per_person),
         payers: [],
@@ -145,7 +183,9 @@ export default function LedgerPage() {
 
     setMatches(
       Array.from(base.values()).sort((a, b) =>
-        a.matchDate < b.matchDate ? 1 : a.matchDate > b.matchDate ? -1 : 0
+        `${b.matchDate}${b.matchTime}`.localeCompare(
+          `${a.matchDate}${a.matchTime}`
+        )
       )
     );
   }, []);
@@ -187,6 +227,66 @@ export default function LedgerPage() {
     }
   };
 
+  const handleCopyLink = async (matchId: string) => {
+    try {
+      await navigator.clipboard.writeText(
+        `${window.location.origin}/m/${matchId}`
+      );
+      setCopiedId(matchId);
+      window.setTimeout(
+        () => setCopiedId((c) => (c === matchId ? null : c)),
+        1600
+      );
+    } catch {
+      /* clipboard unavailable — ignore */
+    }
+  };
+
+  const handleDelete = async (matchId: string) => {
+    if (
+      !(await confirm({
+        message: t("matches.confirmDelete"),
+        confirmLabel: t("matches.delete"),
+        destructive: true,
+      }))
+    )
+      return;
+    setDeletingId(matchId);
+    setError("");
+    try {
+      const { error: deleteError } = await supabase
+        .from("matches")
+        .delete()
+        .eq("id", matchId);
+      if (deleteError) throw new Error(deleteError.message);
+      setMatches((prev) => prev.filter((m) => m.matchId !== matchId));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t("matches.errDelete"));
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
+  const handleRemoveGuest = async () => {
+    if (!payerToRemove) return;
+    const { match, payer } = payerToRemove;
+    setRemoving(true);
+    setError("");
+    try {
+      const { error: rpcError } = await supabase.rpc("host_remove_guest", {
+        p_match_id: match.matchId,
+        p_guest_id: payer.id,
+      });
+      if (rpcError) throw new Error(rpcError.message);
+      setPayerToRemove(null);
+      if (userId) await load(userId);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t("match.errRemoveGuest"));
+    } finally {
+      setRemoving(false);
+    }
+  };
+
   const stats = (match: LedgerMatch) => {
     const total = match.payers.length;
     const paid = match.payers.filter((p) => p.status === "confirmed").length;
@@ -211,12 +311,7 @@ export default function LedgerPage() {
     return { label: t("match.payUnpaid"), cls: "bg-slate-800 text-slate-400" };
   };
 
-  const visible = matches.filter((match) => {
-    const s = stats(match);
-    if (filter === "pending") return !s.completed;
-    if (filter === "completed") return s.completed;
-    return true;
-  });
+  const visible = matches;
 
   return (
     <main className="relative min-h-screen overflow-hidden bg-slate-950 px-6 py-10 pb-28 text-slate-50">
@@ -234,23 +329,6 @@ export default function LedgerPage() {
             <p className="text-xs text-slate-400">{t("ledger.subtitle")}</p>
           </div>
         </header>
-
-        <nav className="flex gap-2 rounded-full bg-slate-900/70 p-1 text-sm">
-          {(["all", "pending", "completed"] as const).map((key) => (
-            <button
-              key={key}
-              type="button"
-              onClick={() => setFilter(key)}
-              className={`flex-1 rounded-full py-2 transition ${
-                filter === key
-                  ? "bg-lime-500 text-slate-950"
-                  : "text-slate-300 hover:text-slate-100"
-              }`}
-            >
-              {t(`ledger.${key}`)}
-            </button>
-          ))}
-        </nav>
 
         {error && <p className="text-sm text-rose-400">{error}</p>}
 
@@ -286,6 +364,21 @@ export default function LedgerPage() {
                         <p className="truncate text-xs text-slate-400">
                           {match.location}
                         </p>
+                      )}
+                      {match.matchTime && (
+                        <div className="mt-1 flex items-center gap-1.5 text-xs text-slate-300">
+                          <CalendarClock
+                            size={12}
+                            strokeWidth={1.75}
+                            className="shrink-0 text-lime-400"
+                          />
+                          <span className="truncate">
+                            {match.matchTime.slice(0, 5)}
+                            {match.matchEndTime
+                              ? ` - ${match.matchEndTime.slice(0, 5)}`
+                              : ""}
+                          </span>
+                        </div>
                       )}
                       <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-slate-300">
                         <span>
@@ -328,21 +421,39 @@ export default function LedgerPage() {
                     </div>
                   </button>
 
-                  {open && (
-                    <div className="mt-3 space-y-2 border-t border-white/10 pt-3">
-                      <div className="flex items-center justify-between gap-3 text-xs text-slate-400">
-                        <span>
-                          {t("ledger.perPerson")}: {formatVnd(match.feePerPerson)}
-                        </span>
-                        <Link
-                          href={`/dashboard/matches/${match.matchId}`}
-                          className="font-semibold text-lime-300 transition hover:text-lime-200"
-                        >
-                          {t("ledger.viewMatch")}
-                        </Link>
-                      </div>
+                  <div className="mt-3 flex items-center gap-2 border-t border-white/10 pt-3">
+                    <button
+                      type="button"
+                      onClick={() => void handleCopyLink(match.matchId)}
+                      className="inline-flex items-center gap-1.5 rounded-lg border border-slate-700 px-3 py-1.5 text-xs font-semibold text-slate-200 transition hover:border-lime-500/50 hover:text-lime-300 active:scale-95"
+                    >
+                      {copiedId === match.matchId ? (
+                        <Check size={12} strokeWidth={2.25} className="text-lime-400" />
+                      ) : (
+                        <Share2 size={12} strokeWidth={2} />
+                      )}
+                      {copiedId === match.matchId
+                        ? t("match.linkCopied")
+                        : t("match.shareLink")}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => void handleDelete(match.matchId)}
+                      disabled={deletingId === match.matchId}
+                      aria-label={t("matches.delete")}
+                      className="ml-auto rounded-lg p-1.5 text-rose-400 transition hover:bg-rose-500/10 hover:text-rose-300 disabled:opacity-50"
+                    >
+                      <Trash2 size={15} strokeWidth={2} />
+                    </button>
+                  </div>
 
-                      {match.payers.length === 0 ? (
+                  {open && (
+                    <div className="mt-3 space-y-4 border-t border-white/10 pt-3">
+                      <section className="space-y-2">
+                        <h3 className="text-xs font-semibold uppercase tracking-[0.2em] text-lime-300">
+                          {t("match.joinList", { count: match.payers.length })}
+                        </h3>
+                        {match.payers.length === 0 ? (
                         <p className="text-xs text-slate-500">
                           {t("ledger.emptyDesc")}
                         </p>
@@ -366,21 +477,34 @@ export default function LedgerPage() {
                                     </p>
                                   </div>
                                 </div>
-                                <div className="flex shrink-0 items-center gap-2">
-                                  <span
-                                    className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${pill.cls}`}
-                                  >
-                                    {pill.label}
-                                  </span>
-                                  {payer.status === "submitted" && (
+                                <div className="flex shrink-0 items-center gap-1.5">
+                                  {payer.status === "submitted" ? (
                                     <button
                                       type="button"
                                       disabled={busy === payer.key}
                                       onClick={() => void confirmPayer(match, payer)}
-                                      className="inline-flex items-center gap-1 rounded-lg bg-emerald-500 px-3 py-1.5 text-xs font-semibold text-slate-950 transition hover:scale-[1.03] active:scale-95 disabled:opacity-60"
+                                      className="inline-flex items-center gap-1 rounded-lg bg-emerald-500 px-2.5 py-1.5 text-xs font-semibold text-slate-950 transition hover:scale-[1.03] active:scale-95 disabled:opacity-60"
                                     >
                                       <Check size={12} strokeWidth={2.25} />
                                       {t("ledger.confirmPay")}
+                                    </button>
+                                  ) : (
+                                    <span
+                                      className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${pill.cls}`}
+                                    >
+                                      {pill.label}
+                                    </span>
+                                  )}
+                                  {payer.status !== "confirmed" && (
+                                    <button
+                                      type="button"
+                                      aria-label={t("match.removeGuestTitle")}
+                                      onClick={() =>
+                                        setPayerToRemove({ match, payer })
+                                      }
+                                      className="rounded-lg p-1.5 text-slate-400 transition hover:text-rose-400 active:scale-95"
+                                    >
+                                      <Trash2 size={15} strokeWidth={2} />
                                     </button>
                                   )}
                                 </div>
@@ -388,7 +512,15 @@ export default function LedgerPage() {
                             );
                           })}
                         </ul>
-                      )}
+                        )}
+                      </section>
+
+                      <FeeForm
+                        match={match}
+                        onSaved={() => {
+                          if (userId) void load(userId);
+                        }}
+                      />
                     </div>
                   )}
                 </li>
@@ -397,7 +529,235 @@ export default function LedgerPage() {
           </ul>
         )}
       </div>
+
+      {payerToRemove && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-950/80 p-4 backdrop-blur-md sm:items-center">
+          <div className="w-full max-w-md rounded-2xl border border-slate-800/90 bg-slate-900 p-6 shadow-2xl">
+            <h2 className="text-lg font-semibold">
+              {t("match.removeGuestTitle")}
+            </h2>
+            <p className="mt-2 text-sm text-slate-300">
+              {payerToRemove.payer.id === userId
+                ? t("match.removeSelfBody")
+                : t("match.removeGuestBody", {
+                    name: payerToRemove.payer.name,
+                  })}
+            </p>
+            <div className="mt-5 flex gap-2">
+              <button
+                type="button"
+                disabled={removing}
+                onClick={() => void handleRemoveGuest()}
+                className="flex-1 rounded-xl bg-rose-500 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-rose-600 active:scale-95 disabled:opacity-60"
+              >
+                {t("match.removeGuestBtn")}
+              </button>
+              <button
+                type="button"
+                onClick={() => setPayerToRemove(null)}
+                className="flex-1 rounded-xl border border-slate-700 px-4 py-2.5 text-sm font-semibold text-slate-300 transition hover:bg-slate-800 active:scale-95"
+              >
+                {t("common.cancel")}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <BottomNav />
     </main>
+  );
+}
+
+function toThousands(value: number): string {
+  return value ? String(value / 1000) : "";
+}
+
+function FeeForm({
+  match,
+  onSaved,
+}: {
+  match: LedgerMatch;
+  onSaved: () => void;
+}) {
+  const { t, formatVnd } = useI18n();
+  const [courtFee, setCourtFee] = useState(() => toThousands(match.courtFee));
+  const [tubePrice, setTubePrice] = useState("");
+  const [shuttleCount, setShuttleCount] = useState("");
+  const [waterFee, setWaterFee] = useState(() => toThousands(match.waterFee));
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState("");
+  const [formError, setFormError] = useState("");
+
+  const tubePriceNum = Number(tubePrice) || 0;
+  const shuttleCountNum = Number(shuttleCount) || 0;
+  const shuttleFeeCalculated =
+    tubePriceNum > 0 && shuttleCountNum > 0
+      ? Math.round((tubePriceNum * 1000 / 12) * shuttleCountNum)
+      : match.shuttleFee;
+  const courtFeeTotal = (Number(courtFee) || 0) * 1000;
+  const waterFeeTotal = (Number(waterFee) || 0) * 1000;
+  const total = courtFeeTotal + shuttleFeeCalculated + waterFeeTotal;
+  const attendeeCount = match.payers.length;
+  const perPerson = attendeeCount > 0 ? Math.round(total / attendeeCount) : 0;
+
+  const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setBusy(true);
+    setMessage("");
+    setFormError("");
+    try {
+      if (courtFeeTotal < 0 || shuttleFeeCalculated < 0 || waterFeeTotal < 0) {
+        throw new Error(t("match.errNegativeFee"));
+      }
+
+      const { data, error: rpcError } = await supabase.rpc("settle_match", {
+        target_match_id: match.matchId,
+        court: courtFeeTotal,
+        shuttle: shuttleFeeCalculated,
+        water: waterFeeTotal,
+      });
+      if (rpcError) throw new Error(rpcError.message);
+
+      const result = data as {
+        attendees?: number;
+        fee_per_person?: number;
+      } | null;
+      if (result) {
+        setMessage(
+          t("match.settledMsg", {
+            count: result.attendees ?? 0,
+            amount: formatVnd(result.fee_per_person ?? 0),
+          })
+        );
+      } else {
+        setMessage(t("match.settledMsgSimple"));
+      }
+      onSaved();
+    } catch (err) {
+      setFormError(err instanceof Error ? err.message : t("match.errSettle"));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <section className="space-y-3 rounded-xl border border-lime-500/20 bg-lime-500/5 p-3">
+      <div className="flex items-center gap-2">
+        <ReceiptText size={15} strokeWidth={1.75} className="text-lime-400" />
+        <h3 className="text-xs font-semibold uppercase tracking-[0.2em] text-lime-300">
+          {t("match.expenses")}
+        </h3>
+      </div>
+      <form onSubmit={handleSubmit} className="space-y-3">
+        <FeeInput
+          label={t("match.courtFeeLabel")}
+          value={courtFee}
+          onChange={setCourtFee}
+          placeholder="400"
+        />
+
+        <div className="grid grid-cols-2 gap-3">
+          <FeeInput
+            label={t("ledger.tubePrice")}
+            value={tubePrice}
+            onChange={setTubePrice}
+            placeholder="240"
+          />
+          <FeeInput
+            label={t("ledger.shuttleCount")}
+            value={shuttleCount}
+            onChange={setShuttleCount}
+            placeholder="6"
+            suffix={t("ledger.shuttleUnit")}
+            showPreview={false}
+          />
+        </div>
+        <p className="ml-1 text-[11px] text-slate-400">
+          = {t("match.shuttleFee")}: {formatVnd(shuttleFeeCalculated)}
+        </p>
+
+        <FeeInput
+          label={t("match.waterFee")}
+          value={waterFee}
+          onChange={setWaterFee}
+          placeholder="50"
+        />
+
+        <div className="space-y-2 rounded-xl border border-white/10 bg-slate-900/60 p-3.5">
+          <div className="flex items-center justify-between text-sm">
+            <span className="text-slate-400">{t("match.total")}</span>
+            <span className="font-semibold text-slate-100">
+              {formatVnd(total)}
+            </span>
+          </div>
+          <div className="flex items-center justify-between border-t border-white/10 pt-2">
+            <span className="text-xs font-medium uppercase tracking-wider text-lime-400">
+              {t("ledger.perPerson")} (
+              {t("ledger.peopleCount", { count: attendeeCount })})
+            </span>
+            <span className="text-xl font-bold text-lime-300">
+              {formatVnd(perPerson)}
+            </span>
+          </div>
+        </div>
+
+        {formError && <p className="text-xs text-rose-400">{formError}</p>}
+        {message && <p className="text-xs text-lime-300">{message}</p>}
+        <button
+          type="submit"
+          disabled={busy}
+          className="w-full rounded-xl bg-lime-500 py-2.5 text-sm font-semibold text-slate-950 transition hover:scale-[1.01] active:scale-[0.98] disabled:opacity-60 disabled:hover:scale-100"
+        >
+          {busy ? t("match.saving") : t("match.updateCosts")}
+        </button>
+      </form>
+    </section>
+  );
+}
+
+function FeeInput({
+  label,
+  value,
+  onChange,
+  placeholder,
+  suffix,
+  showPreview = true,
+}: {
+  label: string;
+  value: string;
+  onChange: (next: string) => void;
+  placeholder?: string;
+  suffix?: string;
+  showPreview?: boolean;
+}) {
+  const { t, formatVnd } = useI18n();
+  const thousands = Number(value) || 0;
+  return (
+    <div className="space-y-1 text-sm">
+      <label className="ml-1 text-[10px] font-semibold uppercase tracking-[0.2em] text-slate-400">
+        {label}
+      </label>
+      <div className="relative">
+        <input
+          type="number"
+          min={0}
+          step="1"
+          inputMode="numeric"
+          className="w-full rounded-xl border border-slate-800 bg-slate-950/60 px-4 py-2.5 pr-16 text-slate-100 placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-lime-500/70"
+          value={value}
+          onChange={(event) => onChange(event.target.value)}
+          placeholder={placeholder ?? "0"}
+        />
+        <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs font-semibold text-slate-500">
+          {suffix ?? t("match.feeThousands")}
+        </span>
+      </div>
+      {showPreview && (
+        <p className="ml-1 text-[11px] text-lime-300/80">
+          {thousands > 0 ? `= ${formatVnd(thousands * 1000)}` : " "}
+        </p>
+      )}
+    </div>
   );
 }

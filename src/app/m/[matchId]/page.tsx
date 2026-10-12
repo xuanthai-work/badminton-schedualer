@@ -8,8 +8,6 @@ import {
   CheckCircle2,
   Clock,
   Copy,
-  Download,
-  Loader2,
   MapPin,
   QrCode,
 } from "lucide-react";
@@ -80,7 +78,6 @@ export default function PublicMatchPage() {
 
   const [data, setData] = useState<PublicData | null>(null);
   const [identity, setIdentity] = useState<Identity | null>(null);
-  const [rsvpLocked, setRsvpLocked] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
@@ -98,11 +95,6 @@ export default function PublicMatchPage() {
     if (rpcError) throw new Error(rpcError.message);
     if (!result) throw new Error(t("publicMatch.notFound"));
     const parsed = result as PublicData;
-    setRsvpLocked(
-      Date.now() >
-        new Date(`${parsed.match.date}T${parsed.match.time}`).getTime() -
-          30 * 60_000
-    );
     setData(parsed);
   }, [matchId, t]);
 
@@ -358,11 +350,7 @@ export default function PublicMatchPage() {
                 <h2 className="text-center text-lg font-semibold">
                   {t("publicMatch.rsvpQuestion")}
                 </h2>
-                {rsvpLocked ? (
-                  <p className="mt-3 text-center text-sm text-amber-300">
-                    {t("publicMatch.rsvpLocked")}
-                  </p>
-                ) : myGuest?.status === "yes" && identity ? (
+                {myGuest?.status === "yes" && identity ? (
                   <div className="mt-4 space-y-3">
                     <p className="flex items-center justify-center gap-2 rounded-xl bg-emerald-500/15 px-3 py-3 text-sm font-semibold text-emerald-300">
                       <CheckCircle2 size={18} strokeWidth={2} />
@@ -533,7 +521,6 @@ function GuestPayment({
 }) {
   const { t, formatVnd } = useI18n();
   const [copied, setCopied] = useState<string | null>(null);
-  const [downloading, setDownloading] = useState(false);
 
   const copy = async (key: string, value: string) => {
     try {
@@ -555,52 +542,6 @@ function GuestPayment({
         amount
       )}&addInfo=${encodeURIComponent(memo)}&accountName=${encodeURIComponent(holder)}`
     : null;
-
-  const handleDownloadQr = async () => {
-    if (!qrSrc || downloading) return;
-    try {
-      setDownloading(true);
-      const res = await fetch(qrSrc);
-      if (!res.ok) throw new Error("Failed to fetch QR image");
-      const blob = await res.blob();
-
-      const fileName = `vietqr-${bankAccount ?? "code"}.png`;
-      const file = new File([blob], fileName, { type: "image/png" });
-
-      // iOS Safari: Web Share API Level 2 opens the native Share Sheet so the
-      // user can "Save Image" straight into Photos (instead of Files).
-      if (
-        typeof navigator !== "undefined" &&
-        typeof navigator.canShare === "function" &&
-        navigator.canShare({ files: [file] })
-      ) {
-        try {
-          await navigator.share({ files: [file], title: "Mã VietQR" });
-          return;
-        } catch (shareErr) {
-          // User dismissed the share sheet — do nothing more.
-          if (shareErr instanceof Error && shareErr.name === "AbortError") {
-            return;
-          }
-          // Any other error falls through to the desktop download path.
-        }
-      }
-
-      const blobUrl = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = blobUrl;
-      a.download = fileName;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(blobUrl);
-    } catch {
-      // Fallback cho mobile browser khi bị hạn chế tải blob
-      window.open(qrSrc, "_blank");
-    } finally {
-      setDownloading(false);
-    }
-  };
 
   return (
     <section className="glass-panel rounded-2xl p-5">
@@ -639,24 +580,6 @@ function GuestPayment({
                     unoptimized
                   />
                 </div>
-                <button
-                  type="button"
-                  onClick={handleDownloadQr}
-                  disabled={downloading}
-                  className="inline-flex items-center gap-1.5 rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-medium text-slate-200 transition hover:bg-white/10 hover:text-white disabled:opacity-50"
-                >
-                  {downloading ? (
-                    <>
-                      <Loader2 size={13} className="animate-spin text-lime-400" />
-                      <span>{t("publicMatch.downloadingQr")}</span>
-                    </>
-                  ) : (
-                    <>
-                      <Download size={13} className="text-lime-400" />
-                      <span>{t("publicMatch.downloadQr")}</span>
-                    </>
-                  )}
-                </button>
                 <p className="text-xs text-slate-400">
                   {t("publicMatch.scanHint")}
                 </p>

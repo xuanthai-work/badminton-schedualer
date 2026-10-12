@@ -32,8 +32,6 @@ type HostMatch = {
   attendees: number;
 };
 
-type Tab = "upcoming" | "history";
-
 export default function DashboardPage() {
   const router = useRouter();
   const { t, formatMatchHeading } = useI18n();
@@ -43,7 +41,6 @@ export default function DashboardPage() {
   const [displayName, setDisplayName] = useState<string>("");
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [matches, setMatches] = useState<HostMatch[]>([]);
-  const [tab, setTab] = useState<Tab>("upcoming");
   const [busyId, setBusyId] = useState<string | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -150,20 +147,17 @@ export default function DashboardPage() {
     };
   }, [userId, loadMatches]);
 
-  const { upcoming, history } = useMemo(() => {
-    const today = new Date().toISOString().slice(0, 10);
-    const up: HostMatch[] = [];
-    const past: HostMatch[] = [];
-    // Source list is newest-first; upcoming reads best oldest-first.
-    const ascending = [...matches].sort((a, b) =>
-      `${a.date}${a.time}`.localeCompare(`${b.date}${b.time}`)
-    );
-    for (const match of ascending) {
-      if (match.status === "open" && match.date >= today) up.push(match);
-      else past.unshift(match); // newest past first
-    }
-    return { upcoming: up, history: past };
-  }, [matches]);
+  // Only un-settled matches live on the home page. The source list is
+  // newest-first, but open matches read best oldest-first.
+  const openMatches = useMemo(
+    () =>
+      matches
+        .filter((match) => match.status === "open")
+        .sort((a, b) =>
+          `${a.date}${a.time}`.localeCompare(`${b.date}${b.time}`)
+        ),
+    [matches]
+  );
 
   const handleCopyLink = async (matchId: string) => {
     try {
@@ -204,7 +198,7 @@ export default function DashboardPage() {
     }
   };
 
-  const visible = tab === "upcoming" ? upcoming : history;
+  const visible = openMatches;
 
   return (
     <main className="relative min-h-screen overflow-hidden bg-slate-950 px-6 py-10 pb-[calc(7rem+env(safe-area-inset-bottom))] text-slate-50">
@@ -246,31 +240,6 @@ export default function DashboardPage() {
 
         {userId ? <CreateMatchPanel onCreated={() => void loadMatches(userId)} /> : null}
 
-        <nav className="flex gap-2 rounded-full bg-slate-900/70 p-1 text-sm">
-          <button
-            type="button"
-            onClick={() => setTab("upcoming")}
-            className={`flex-1 rounded-full py-2 transition ${
-              tab === "upcoming"
-                ? "bg-lime-500 text-slate-950"
-                : "text-slate-300 hover:text-slate-100"
-            }`}
-          >
-            {t("dashboard.upcoming")}
-          </button>
-          <button
-            type="button"
-            onClick={() => setTab("history")}
-            className={`flex-1 rounded-full py-2 transition ${
-              tab === "history"
-                ? "bg-lime-500 text-slate-950"
-                : "text-slate-300 hover:text-slate-100"
-            }`}
-          >
-            {t("dashboard.history")}
-          </button>
-        </nav>
-
         {error && <p className="text-sm text-rose-400">{error}</p>}
 
         <section className="space-y-3">
@@ -279,11 +248,7 @@ export default function DashboardPage() {
           ) : visible.length === 0 ? (
             <EmptyState
               icon={CalendarClock}
-              message={
-                tab === "upcoming"
-                  ? t("dashboard.emptyMatches")
-                  : t("dashboard.emptyHistory")
-              }
+              message={t("dashboard.emptyMatches")}
             />
           ) : (
             visible.map((match) => (
@@ -359,18 +324,12 @@ export default function DashboardPage() {
                       ? t("match.linkCopied")
                       : t("match.shareLink")}
                   </button>
-                  <Link
-                    href={`/dashboard/matches/${match.id}`}
-                    className="ml-auto rounded-lg bg-lime-500 px-3 py-1.5 text-xs font-semibold text-slate-950 transition hover:scale-[1.03] active:scale-95"
-                  >
-                    {t("ledger.viewMatch")}
-                  </Link>
                   <button
                     type="button"
                     onClick={() => void handleDelete(match.id)}
                     disabled={busyId === match.id}
                     aria-label={t("matches.delete")}
-                    className="rounded-lg p-1.5 text-rose-400 transition hover:bg-rose-500/10 hover:text-rose-300 disabled:opacity-50"
+                    className="ml-auto rounded-lg p-1.5 text-rose-400 transition hover:bg-rose-500/10 hover:text-rose-300 disabled:opacity-50"
                   >
                     <Trash2 size={15} strokeWidth={2} />
                   </button>
