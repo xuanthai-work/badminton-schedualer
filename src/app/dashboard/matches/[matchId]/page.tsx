@@ -10,6 +10,7 @@ import {
   ReceiptText,
   Share2,
   Trash2,
+  UserPlus,
 } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { useI18n } from "@/lib/i18n";
@@ -64,6 +65,9 @@ export default function MatchDetailPage() {
   const [linkCopied, setLinkCopied] = useState(false);
   const [guestToDelete, setGuestToDelete] = useState<Guest | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [showAddGuestModal, setShowAddGuestModal] = useState(false);
+  const [newGuestName, setNewGuestName] = useState("");
+  const [addingGuest, setAddingGuest] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -298,6 +302,38 @@ export default function MatchDetailPage() {
     }
   };
 
+  const handleAddGuest = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!matchId || !userId) return;
+    const name = newGuestName.trim();
+    if (!name) {
+      setError(t("match.errNameEmpty"));
+      return;
+    }
+    setAddingGuest(true);
+    setError("");
+    try {
+      const { error: rpcError } = await supabase.rpc("host_add_guest", {
+        p_match_id: matchId,
+        p_name: name,
+      });
+      if (rpcError) {
+        if (rpcError.message?.includes("match_full")) {
+          throw new Error(t("publicMatch.matchFullError"));
+        }
+        throw new Error(rpcError.message);
+      }
+      triggerHaptic("success");
+      setNewGuestName("");
+      setShowAddGuestModal(false);
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t("ledger.actionError"));
+    } finally {
+      setAddingGuest(false);
+    }
+  };
+
   const handleCopyLink = async () => {
     try {
       await navigator.clipboard.writeText(
@@ -420,6 +456,10 @@ export default function MatchDetailPage() {
               busyId={payBusy}
               onConfirm={handleConfirmGuest}
               onRequestDelete={(g) => setGuestToDelete(g)}
+              onOpenAddGuest={() => {
+                setNewGuestName("");
+                setShowAddGuestModal(true);
+              }}
               emptyLabel={t("match.nobody")}
             />
 
@@ -582,6 +622,45 @@ export default function MatchDetailPage() {
         </div>
       )}
 
+      {showAddGuestModal && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-950/80 p-4 backdrop-blur-md sm:items-center">
+          <div className="w-full max-w-md rounded-2xl border border-slate-800/90 bg-slate-900 p-6 shadow-2xl">
+            <h2 className="text-lg font-semibold">
+              {t("match.addGuestTitle")}
+            </h2>
+            <p className="mt-1 text-sm text-slate-400">
+              {t("match.addGuestHint")}
+            </p>
+            <form onSubmit={handleAddGuest} className="mt-4 space-y-4">
+              <input
+                autoFocus
+                value={newGuestName}
+                onChange={(event) => setNewGuestName(event.target.value)}
+                placeholder={t("match.addGuestPlaceholder")}
+                maxLength={60}
+                className="w-full rounded-xl border border-slate-800 bg-slate-950/60 px-4 py-3 text-slate-100 placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-lime-500/70"
+              />
+              <div className="flex gap-2">
+                <button
+                  type="submit"
+                  disabled={addingGuest}
+                  className="flex-1 rounded-xl bg-lime-500 px-4 py-2.5 text-sm font-semibold text-slate-950 transition hover:scale-[1.01] active:scale-95 disabled:opacity-60"
+                >
+                  {addingGuest ? t("match.saving") : t("common.confirm")}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowAddGuestModal(false)}
+                  className="flex-1 rounded-xl border border-slate-700 px-4 py-2.5 text-sm font-semibold text-slate-300 transition hover:bg-slate-800 active:scale-95"
+                >
+                  {t("common.cancel")}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
       <BottomNav />
     </main>
   );
@@ -597,6 +676,7 @@ function ParticipantList({
   busyId,
   onConfirm,
   onRequestDelete,
+  onOpenAddGuest,
   emptyLabel,
 }: {
   title: string;
@@ -608,6 +688,7 @@ function ParticipantList({
   busyId: string | null;
   onConfirm: (guestId: string, confirmed: boolean) => void;
   onRequestDelete: (guest: Guest) => void;
+  onOpenAddGuest: () => void;
   emptyLabel: string;
 }) {
   const { t, formatVnd } = useI18n();
@@ -626,9 +707,21 @@ function ParticipantList({
 
   return (
     <section className="glass-panel rounded-2xl p-4">
-      <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-lime-300">
-        {title}
-      </p>
+      <div className="flex items-center justify-between gap-2">
+        <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-lime-300">
+          {title}
+        </p>
+        {isHost && (
+          <button
+            type="button"
+            onClick={onOpenAddGuest}
+            className="inline-flex items-center gap-1 rounded-lg border border-slate-700 bg-slate-800/80 px-2.5 py-1 text-xs font-semibold text-lime-400 transition hover:border-lime-500/50 hover:bg-slate-800 active:scale-95"
+          >
+            <UserPlus size={13} strokeWidth={2} />
+            {t("match.addGuestBtn")}
+          </button>
+        )}
+      </div>
       {guests.length === 0 ? (
         <p className="mt-3 text-sm text-slate-500">{emptyLabel}</p>
       ) : (

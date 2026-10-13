@@ -225,6 +225,11 @@ const vi = {
       "Bạn có chắc chắn muốn rút tên mình khỏi danh sách tham gia không? Bạn vẫn là người quản lý buổi đánh nhưng sẽ không bị tính tiền chia.",
     removeGuestBtn: "Xác nhận xóa",
     errRemoveGuest: "Lỗi xóa người tham gia.",
+    addGuestBtn: "+ Thêm người",
+    addGuestTitle: "Thêm người tham gia",
+    addGuestHint: "Nhập tên bạn bè hoặc người chơi đi cùng",
+    addGuestPlaceholder: "Ví dụ: Tuấn Anh, Bạn Nam...",
+    errNameEmpty: "Vui lòng nhập tên người chơi",
   },
   publicMatch: {
     loading: "Đang tải trận đấu...",
@@ -583,6 +588,11 @@ const en: typeof vi = {
       "Are you sure you want to remove yourself from this match? You will still manage it but will not be included in the cost split.",
     removeGuestBtn: "Confirm remove",
     errRemoveGuest: "Failed to remove participant.",
+    addGuestBtn: "+ Add player",
+    addGuestTitle: "Add participant",
+    addGuestHint: "Enter name of friend or guest",
+    addGuestPlaceholder: "e.g. Tuan Anh, Nam's friend...",
+    errNameEmpty: "Please enter player name",
   },
   publicMatch: {
     loading: "Loading match...",
