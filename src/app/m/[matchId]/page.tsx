@@ -88,6 +88,8 @@ export default function PublicMatchPage() {
     null
   );
   const [nameInput, setNameInput] = useState("");
+  const [selectedGuestId, setSelectedGuestId] = useState<string | null>(null);
+  const [showListManual, setShowListManual] = useState(false);
 
   const load = useCallback(async () => {
     if (!matchId) return;
@@ -255,13 +257,18 @@ export default function PublicMatchPage() {
     ? data?.guests.find((g) => g.guestId === identity.id)
     : undefined;
 
-  const yesPeople = (data?.guests.filter((g) => g.status === "yes") ?? []).map(
-    (g) => ({
-      key: g.guestId,
-      name: g.name,
-      avatarUrl: null,
-    })
-  );
+  const yesGuests = data?.guests.filter((g) => g.status === "yes") ?? [];
+  // Which player's VietQR to show on a closed match: an explicitly chosen one,
+  // otherwise the identity remembered on this device.
+  const activeGuest = selectedGuestId
+    ? yesGuests.find((g) => g.guestId === selectedGuestId)
+    : myGuest;
+
+  const yesPeople = yesGuests.map((g) => ({
+    key: g.guestId,
+    name: g.name,
+    avatarUrl: null,
+  }));
   const isFull = yesPeople.length >= 20;
 
   return (
@@ -339,22 +346,29 @@ export default function PublicMatchPage() {
             </section>
 
             {match.status === "closed" ? (
-              myGuest?.status === "yes" ? (
+              activeGuest &&
+              activeGuest.status === "yes" &&
+              !showListManual ? (
                 <GuestPayment
                   amount={data.expense?.feePerPerson ?? 0}
                   payee={data.payee}
-                  status={myGuest.paymentStatus}
+                  status={activeGuest.paymentStatus}
                   matchId={matchId}
-                  guestId={identity?.id ?? myGuest.guestId}
+                  guestId={activeGuest.guestId}
                   busy={busy}
                   onSubmit={handleSubmitPayment}
+                  onBackToList={() => setShowListManual(true)}
                 />
               ) : (
-                <section className="glass-panel rounded-2xl p-5 text-center">
-                  <p className="text-sm text-slate-400">
-                    {t("publicMatch.matchEndedNotice")}
-                  </p>
-                </section>
+                <ClosedMatchGuestList
+                  guests={yesGuests}
+                  selectedId={activeGuest?.guestId ?? null}
+                  onSelect={(guest) => {
+                    setSelectedGuestId(guest.guestId);
+                    saveIdentity({ id: guest.guestId, name: guest.name });
+                    setShowListManual(false);
+                  }}
+                />
               )
             ) : (
               <section className="glass-panel rounded-2xl p-5">
@@ -520,6 +534,79 @@ function PeopleList({
   );
 }
 
+function ClosedMatchGuestList({
+  guests,
+  selectedId,
+  onSelect,
+}: {
+  guests: PublicGuest[];
+  selectedId: string | null;
+  onSelect: (guest: PublicGuest) => void;
+}) {
+  const { t } = useI18n();
+  return (
+    <section className="glass-panel rounded-2xl p-5">
+      <h2 className="text-base font-semibold text-slate-100">
+        {t("publicMatch.closedListTitle")}
+      </h2>
+      <p className="mt-1 text-xs text-slate-400">
+        {t("publicMatch.closedListSubtitle")}
+      </p>
+      {guests.length === 0 ? (
+        <p className="mt-3 text-sm text-slate-500">
+          {t("publicMatch.nobody")}
+        </p>
+      ) : (
+        <ul className="mt-4 space-y-2">
+          {guests.map((guest) => {
+            const paid = guest.paymentStatus === "confirmed";
+            return (
+              <li
+                key={guest.guestId}
+                className="flex items-center justify-between gap-3 rounded-xl bg-slate-900/50 px-3 py-2"
+              >
+                <div className="flex min-w-0 items-center gap-2.5">
+                  <InitialAvatar name={guest.name} size={32} />
+                  <span className="truncate text-sm text-slate-100">
+                    {guest.name}
+                  </span>
+                  {guest.guestId === selectedId && (
+                    <span className="rounded-full bg-lime-500/15 px-2 py-0.5 text-[10px] font-semibold text-lime-300">
+                      {t("publicMatch.you")}
+                    </span>
+                  )}
+                </div>
+                <div className="flex shrink-0 items-center gap-2">
+                  <span
+                    className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${
+                      paid
+                        ? "bg-emerald-500/20 text-emerald-300"
+                        : "bg-amber-500/20 text-amber-300"
+                    }`}
+                  >
+                    {paid
+                      ? t("publicMatch.confirmed")
+                      : t("match.payUnpaid")}
+                  </span>
+                  {!paid && (
+                    <button
+                      type="button"
+                      onClick={() => onSelect(guest)}
+                      className="rounded-lg bg-lime-500 px-3 py-1.5 text-xs font-semibold text-slate-950 transition hover:scale-[1.03] active:scale-95"
+                    >
+                      {t("publicMatch.imThisPlayer")}
+                    </button>
+                  )}
+                </div>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </section>
+  );
+}
+
 function GuestPayment({
   amount,
   payee,
@@ -528,6 +615,7 @@ function GuestPayment({
   guestId,
   busy,
   onSubmit,
+  onBackToList,
 }: {
   amount: number;
   payee: Payee | null;
@@ -536,6 +624,7 @@ function GuestPayment({
   guestId: string;
   busy: boolean;
   onSubmit: () => void;
+  onBackToList?: () => void;
 }) {
   const { t, formatVnd } = useI18n();
   const [copied, setCopied] = useState<string | null>(null);
@@ -553,7 +642,7 @@ function GuestPayment({
   const bank = bankByCode(payee?.bankId);
   const bankAccount = payee?.bankAccount ?? null;
   const holder = payee?.bankAccountName || payee?.name || "";
-  // Standardized, regex-extractable transfer code: "BS <match> <guest>".
+  // Standardized, regex-extractable transfer code: "BSCHEL <match> <guest>".
   // The webhook (/api/webhook/bank-payment) parses it to reconcile payments.
   const shortMatch = (matchId ?? "")
     .replace(/-/g, "")
@@ -663,6 +752,16 @@ function GuestPayment({
             )
           )}
         </>
+      )}
+
+      {onBackToList && (
+        <button
+          type="button"
+          onClick={onBackToList}
+          className="mt-4 w-full rounded-xl border border-slate-700 px-3 py-2 text-xs font-semibold text-slate-300 transition hover:border-slate-500 active:scale-95"
+        >
+          {t("publicMatch.switchPlayer")}
+        </button>
       )}
     </section>
   );
