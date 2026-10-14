@@ -90,6 +90,16 @@ class TransactionDbHelper(context: Context) :
     fun markSynced(id: Long, message: String?) =
         updateStatus(id, Transaction.STATUS_SYNCED, message)
 
+    /** Deletes transactions older than [days]. Returns the number of rows removed. */
+    fun cleanOldTransactions(days: Int = 7): Int {
+        val cutoff = System.currentTimeMillis() - days * 24L * 60L * 60L * 1000L
+        return writableDatabase.delete(
+            TABLE,
+            "$COL_CREATED_AT < ?",
+            arrayOf(cutoff.toString())
+        )
+    }
+
     fun updateStatus(id: Long, status: String, message: String?) {
         val values = ContentValues().apply {
             put(COL_STATUS, status)

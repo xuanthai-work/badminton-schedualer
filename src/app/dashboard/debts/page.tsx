@@ -251,7 +251,11 @@ function LedgerContent() {
     };
   }, [userId, load]);
 
-  const confirmPayer = async (match: LedgerMatch, payer: Payer) => {
+  const confirmPayer = async (
+    match: LedgerMatch,
+    payer: Payer,
+    targetConfirmed: boolean
+  ) => {
     triggerHaptic("light");
     setBusy(payer.key);
     setError("");
@@ -259,7 +263,7 @@ function LedgerContent() {
       const { error: rpcError } = await supabase.rpc("confirm_guest_payment", {
         p_match_id: match.matchId,
         p_guest_id: payer.id,
-        p_confirmed: true,
+        p_confirmed: targetConfirmed,
       });
       if (rpcError) throw new Error(rpcError.message);
       if (userId) await load(userId);
@@ -340,20 +344,6 @@ function LedgerContent() {
       .reduce((sum, p) => sum + p.amount, 0);
     const remaining = Math.max(0, match.totalAmount - collected);
     return { total, paid, collected, remaining, completed: total > 0 && paid === total };
-  };
-
-  const statusPill = (status: PayStatus) => {
-    if (status === "confirmed")
-      return {
-        label: t("match.payConfirmed"),
-        cls: "bg-emerald-500/20 text-emerald-300",
-      };
-    if (status === "submitted")
-      return {
-        label: t("match.paySubmitted"),
-        cls: "bg-amber-500/20 text-amber-300",
-      };
-    return { label: t("match.payUnpaid"), cls: "bg-slate-800 text-slate-400" };
   };
 
   const visible = matches;
@@ -508,7 +498,7 @@ function LedgerContent() {
                       ) : (
                         <ul className="space-y-2">
                           {match.payers.map((payer) => {
-                            const pill = statusPill(payer.status);
+                            const isSelf = payer.id === userId;
                             return (
                               <li
                                 key={payer.key}
@@ -526,11 +516,29 @@ function LedgerContent() {
                                   </div>
                                 </div>
                                 <div className="flex shrink-0 items-center gap-1.5">
-                                  {payer.status === "submitted" ? (
+                                  {isSelf ? (
+                                    <span className="rounded-full bg-emerald-500/20 px-2.5 py-1 text-[11px] font-semibold text-emerald-300">
+                                      {t("match.payConfirmed")}
+                                    </span>
+                                  ) : payer.status === "confirmed" ? (
                                     <button
                                       type="button"
                                       disabled={busy === payer.key}
-                                      onClick={() => void confirmPayer(match, payer)}
+                                      onClick={() =>
+                                        void confirmPayer(match, payer, false)
+                                      }
+                                      className="inline-flex items-center gap-1 rounded-lg bg-emerald-500/20 px-2.5 py-1.5 text-xs font-semibold text-emerald-300 transition hover:bg-emerald-500/30 active:scale-95 disabled:opacity-60"
+                                    >
+                                      <Check size={12} strokeWidth={2.25} />
+                                      {t("match.payConfirmed")}
+                                    </button>
+                                  ) : (
+                                    <button
+                                      type="button"
+                                      disabled={busy === payer.key}
+                                      onClick={() =>
+                                        void confirmPayer(match, payer, true)
+                                      }
                                       className="inline-flex items-center gap-1 rounded-lg bg-emerald-500 px-2.5 py-1.5 text-xs font-semibold text-slate-950 transition hover:scale-[1.03] active:scale-95 disabled:opacity-60"
                                     >
                                       {busy === payer.key ? (
@@ -543,14 +551,8 @@ function LedgerContent() {
                                       )}
                                       {t("ledger.confirmPay")}
                                     </button>
-                                  ) : (
-                                    <span
-                                      className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${pill.cls}`}
-                                    >
-                                      {pill.label}
-                                    </span>
                                   )}
-                                  {payer.status !== "confirmed" && (
+                                  {payer.status !== "confirmed" && !isSelf && (
                                     <button
                                       type="button"
                                       aria-label={t("match.removeGuestTitle")}

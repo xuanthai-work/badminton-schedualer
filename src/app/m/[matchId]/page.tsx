@@ -225,33 +225,6 @@ export default function PublicMatchPage() {
     }
   };
 
-  const handleSubmitPayment = async () => {
-    if (!identity || busy) return;
-    triggerHaptic("light");
-    setBusy(true);
-    setError("");
-    try {
-      const { error: rpcError } = await supabase.rpc("guest_submit_payment", {
-        p_match_id: matchId,
-        p_guest_id: identity.id,
-        p_secret: identity.secret ?? null,
-      });
-      if (rpcError) {
-        if (rpcError.message?.includes("unauthorized_guest")) {
-          throw new Error(t("publicMatch.errUnauthorizedGuest"));
-        }
-        throw new Error(rpcError.message);
-      }
-      await load();
-      triggerHaptic("success");
-    } catch (err) {
-      setError(err instanceof Error ? err.message : t("publicMatch.errLoad"));
-      triggerHaptic("warning");
-    } finally {
-      setBusy(false);
-    }
-  };
-
   const match = data?.match ?? null;
   const myGuest = identity
     ? data?.guests.find((g) => g.guestId === identity.id)
@@ -355,8 +328,6 @@ export default function PublicMatchPage() {
                   status={activeGuest.paymentStatus}
                   matchId={matchId}
                   guestId={activeGuest.guestId}
-                  busy={busy}
-                  onSubmit={handleSubmitPayment}
                   onBackToList={() => setShowListManual(true)}
                 />
               ) : (
@@ -613,8 +584,6 @@ function GuestPayment({
   status,
   matchId,
   guestId,
-  busy,
-  onSubmit,
   onBackToList,
 }: {
   amount: number;
@@ -622,8 +591,6 @@ function GuestPayment({
   status: PaymentStatus;
   matchId: string | undefined;
   guestId: string;
-  busy: boolean;
-  onSubmit: () => void;
   onBackToList?: () => void;
 }) {
   const { t, formatVnd } = useI18n();
@@ -732,24 +699,6 @@ function GuestPayment({
             <p className="mt-4 text-sm text-slate-400">
               {t("publicMatch.payNone")}
             </p>
-          )}
-
-          {status === "submitted" ? (
-            <p className="mt-4 rounded-xl bg-amber-500/15 px-3 py-3 text-center text-sm font-semibold text-amber-300">
-              {t("publicMatch.submitted")}
-            </p>
-          ) : (
-            hasBank && (
-              <button
-                type="button"
-                disabled={busy}
-                onClick={onSubmit}
-                className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl bg-lime-500 py-3 text-sm font-semibold text-slate-950 shadow-[0_0_20px_rgba(163,230,53,0.35)] transition hover:scale-[1.01] active:scale-95 disabled:opacity-60"
-              >
-                {busy && <Loader2 size={16} className="animate-spin" />}
-                {t("publicMatch.iPaid")}
-              </button>
-            )
           )}
         </>
       )}

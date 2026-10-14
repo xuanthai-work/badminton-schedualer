@@ -14,9 +14,10 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 
 /**
- * Listens to system notifications, keeps only Cake (xyz.be.cake) ones that
- * carry a BSche transfer code ("BSCHEL" / legacy "BS "), queues them and syncs
- * them to the webhook — retrying automatically whenever connectivity returns.
+ * Listens to system notifications and keeps any that carry a BSche transfer
+ * code ("BSCHEL" / legacy "BS "). Works across common Vietnamese banking apps
+ * (and universal fallback for any app), queues matches offline and syncs them to
+ * the webhook — retrying automatically whenever connectivity returns.
  */
 class BankNotificationListenerService : NotificationListenerService() {
 
@@ -49,7 +50,6 @@ class BankNotificationListenerService : NotificationListenerService() {
     override fun onNotificationPosted(sbn: StatusBarNotification?) {
         val notification = sbn?.notification ?: return
         val pkg = sbn.packageName ?: return
-        if (pkg != CAKE_PACKAGE && pkg != CAKE_LEGACY_PACKAGE && pkg != TEST_PACKAGE) return
 
         val extras = notification.extras
         val title = extras.getCharSequence(Notification.EXTRA_TITLE)?.toString().orEmpty()
@@ -59,12 +59,18 @@ class BankNotificationListenerService : NotificationListenerService() {
             .filter { it.isNotBlank() }
             .joinToString(" ")
 
-        // Only reconcile notifications that actually carry a BSche code.
-        if (!combined.contains(BSCHEL_MARKER, ignoreCase = true)) return
+        // Universal matcher: only reconcile notifications that actually carry a
+        // BSche transfer code, no matter which app posted them.
+        val hasMarker =
+            combined.contains(BSCHEL_MARKER, ignoreCase = true) ||
+                combined.contains(BS_MARKER, ignoreCase = true)
+        if (!hasMarker) return
 
         val amount = parseAmount(combined)
-        val bank = if (pkg == CAKE_PACKAGE || pkg == CAKE_LEGACY_PACKAGE) "CAKE" else "TEST"
+        val bank = bankLabelFor(pkg)
 
+        // Keep the local store tidy: drop anything older than a week.
+        db.cleanOldTransactions(7)
         db.insertTransaction(bank, combined.trim(), amount)
         notifyUi()
         processPending()
@@ -101,10 +107,33 @@ class BankNotificationListenerService : NotificationListenerService() {
         sendBroadcast(Intent(ACTION_TX_UPDATE).setPackage(packageName))
     }
 
+    private fun bankLabelFor(pkg: String): String = when (pkg) {
+        CAKE_PACKAGE, CAKE_LEGACY_PACKAGE -> "CAKE"
+        "com.VCB" -> "VCB"
+        "com.mbmobile" -> "MB"
+        "com.techcombank.mobilebanking" -> "TCB"
+        "com.tpb.mb.gprsandroid" -> "TPB"
+        "com.vnpay.vpbankonline", "com.vpbank.vpbank" -> "VPB"
+        "com.acb.acbpluss", "vn.acb.acbpluss" -> "ACB"
+        "com.bidv" -> "BIDV"
+        "com.vietinbank.ipay" -> "VTB"
+        "io.lifestyle.timo" -> "TIMO"
+        else -> "BANK"
+    }
+
+    /**
+     * Multi-tier amount extraction. Returns 0 (and still syncs) when nothing
+     * matches, so a missing amount never blocks reconciliation.
+     */
     private fun parseAmount(text: String): Long {
-        val match = AMOUNT_REGEX.find(text) ?: return 0L
-        val digits = match.groupValues[1].filter { it.isDigit() }
-        return digits.toLongOrNull() ?: 0L
+        for (regex in AMOUNT_REGEXES) {
+            val match = regex.find(text) ?: continue
+            val raw = match.groupValues.getOrNull(1).orEmpty()
+            val digits = raw.filter { it.isDigit() }
+            val value = digits.toLongOrNull() ?: continue
+            if (value > 0) return value
+        }
+        return 0L
     }
 
     companion object {
@@ -112,12 +141,26 @@ class BankNotificationListenerService : NotificationListenerService() {
         const val CAKE_LEGACY_PACKAGE = "vn.cake.banking"
         const val TEST_PACKAGE = "com.bsche.banksync"
         const val BSCHEL_MARKER = "BSCHEL"
+        const val BS_MARKER = "BS "
         const val ACTION_TX_UPDATE = "com.bsche.banksync.TX_UPDATE"
 
-        // Matches both "+10.000 đ" and Cake's "vừa tăng 10.000 đ" wording.
-        private val AMOUNT_REGEX = Regex(
-            """(?:\+|vừa tăng\s+)([0-9][0-9.,]*)\s*(?:VND|đ|₫)?""",
-            RegexOption.IGNORE_CASE
+        // Tier 1: balance-increase wordings ("+10.000", "vừa tăng 10.000 đ",
+        // "nhận được 75.000đ", "ghi có 100,000", "GD: +50.000").
+        // Tier 2: any thousand-grouped amount followed by a currency word.
+        // Tier 3: any 4-9 digit integer followed by a currency word.
+        private val AMOUNT_REGEXES = listOf(
+            Regex(
+                """(?:\+|\bnhận(?:\s+được)?\b|\bvừa\s+tăng\b|\btăng\b|\bcộng\b|\bghi\s*có\b|\bGD:\s*\+)\s*([0-9]{1,3}(?:[.,][0-9]{3})+|[0-9]{4,10})\s*(?:VND|VNĐ|đ|₫)?""",
+                RegexOption.IGNORE_CASE
+            ),
+            Regex(
+                """([0-9]{1,3}(?:[.,][0-9]{3})+)\s*(?:VND|VNĐ|đ|₫)""",
+                RegexOption.IGNORE_CASE
+            ),
+            Regex(
+                """\b([1-9][0-9]{3,8})\s*(?:VND|VNĐ|đ|₫)\b""",
+                RegexOption.IGNORE_CASE
+            ),
         )
     }
 }

@@ -14,7 +14,7 @@ const securityHeaders = [
       default-src 'self';
       script-src 'self' 'unsafe-eval' 'unsafe-inline' https://va.vercel-scripts.com;
       style-src 'self' 'unsafe-inline';
-      img-src 'self' data: blob: https://*.supabase.co https://img.vietqr.io https://*.tile.openstreetmap.org https://*.google.com https://*.googleusercontent.com https://*.googleapis.com https://*.gstatic.com;
+      img-src 'self' data: blob: https://*.supabase.co https://img.vietqr.io https://api.qrserver.com https://*.tile.openstreetmap.org https://*.google.com https://*.googleusercontent.com https://*.googleapis.com https://*.gstatic.com;
       connect-src 'self' https://*.supabase.co wss://*.supabase.co https://img.vietqr.io https://vitals.vercel-insights.com https://va.vercel-scripts.com;
       frame-src 'self' https://www.openstreetmap.org https://maps.google.com https://www.google.com;
       frame-ancestors 'none';

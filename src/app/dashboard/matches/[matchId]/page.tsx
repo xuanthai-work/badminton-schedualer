@@ -752,32 +752,36 @@ function ParticipantList({
                 <div className="flex shrink-0 items-center gap-1.5">
                   {status === "closed" && (
                     <>
-                      {isHost && !isSelf && paymentStatus === "submitted" ? (
-                        <button
-                          type="button"
-                          disabled={busy}
-                          onClick={() => onConfirm(g.guestId, true)}
-                          className="inline-flex items-center gap-1 rounded-lg bg-emerald-500 px-2.5 py-1.5 text-xs font-semibold text-slate-950 transition hover:scale-[1.03] active:scale-95 disabled:opacity-60"
-                        >
-                          <Check size={12} strokeWidth={2.25} />
-                          {t("match.payConfirm")}
-                        </button>
+                      {isHost && !isSelf ? (
+                        paymentStatus === "confirmed" ? (
+                          <button
+                            type="button"
+                            disabled={busy}
+                            onClick={() => onConfirm(g.guestId, false)}
+                            className="inline-flex items-center gap-1 rounded-lg bg-emerald-500/20 px-2.5 py-1.5 text-xs font-semibold text-emerald-300 transition hover:bg-emerald-500/30 active:scale-95 disabled:opacity-60"
+                          >
+                            <Check size={12} strokeWidth={2.25} />
+                            {t("match.payConfirmed")}
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            disabled={busy}
+                            onClick={() => onConfirm(g.guestId, true)}
+                            className="inline-flex items-center gap-1 rounded-lg bg-emerald-500 px-2.5 py-1.5 text-xs font-semibold text-slate-950 transition hover:scale-[1.03] active:scale-95 disabled:opacity-60"
+                          >
+                            <Check size={12} strokeWidth={2.25} />
+                            {t("match.payConfirm")}
+                          </button>
+                        )
                       ) : (
                         <span
                           className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${pill[paymentStatus].cls}`}
                         >
-                          {pill[paymentStatus].label}
+                          {paymentStatus === "confirmed"
+                            ? t("match.payConfirmed")
+                            : pill[paymentStatus].label}
                         </span>
-                      )}
-                      {isHost && !isSelf && paymentStatus === "confirmed" && (
-                        <button
-                          type="button"
-                          disabled={busy}
-                          onClick={() => onConfirm(g.guestId, false)}
-                          className="rounded-lg border border-slate-700 px-3 py-1.5 text-xs text-slate-300 transition hover:border-slate-500 active:scale-95 disabled:opacity-60"
-                        >
-                          {t("match.payUnconfirm")}
-                        </button>
                       )}
                     </>
                   )}

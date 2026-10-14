@@ -1,17 +1,25 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
+  Check,
   ChevronRight,
+  Copy,
+  Download,
   Globe,
   KeyRound,
   Landmark,
+  Link2,
+  Loader2,
   LogOut,
   MapPin,
   Save,
+  Smartphone,
   UserCog,
+  X,
 } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { useI18n } from "@/lib/i18n";
@@ -64,6 +72,15 @@ export default function ProfilePage() {
   const [pwBusy, setPwBusy] = useState(false);
   const [pwMsg, setPwMsg] = useState("");
   const [pwError, setPwError] = useState("");
+
+  const [syncOpen, setSyncOpen] = useState(false);
+  const [syncConfig, setSyncConfig] = useState<{
+    webhookUrl: string;
+    webhookSecret: string;
+  } | null>(null);
+  const [syncLoading, setSyncLoading] = useState(false);
+  const [syncError, setSyncError] = useState("");
+  const [syncCopied, setSyncCopied] = useState(false);
 
   useEffect(() => {
     const init = async () => {
@@ -228,6 +245,56 @@ export default function ProfilePage() {
       .eq("id", userId);
     if (updateError) throw new Error(updateError.message);
     setProfile((p) => (p ? { ...p, avatarUrl: url } : p));
+  };
+
+  const bindLink = syncConfig
+    ? `bsche://bind?url=${encodeURIComponent(
+        syncConfig.webhookUrl
+      )}&secret=${encodeURIComponent(
+        syncConfig.webhookSecret
+      )}&hostId=${encodeURIComponent(userId)}&hostName=${encodeURIComponent(
+        profile?.name ?? ""
+      )}`
+    : "";
+  const bindQrSrc = bindLink
+    ? `https://api.qrserver.com/v1/create-qr-code/?size=240x240&margin=8&data=${encodeURIComponent(
+        bindLink
+      )}`
+    : null;
+
+  const openSyncModal = async () => {
+    setSyncOpen(true);
+    setSyncError("");
+    if (syncConfig) return;
+    setSyncLoading(true);
+    try {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData.session?.access_token;
+      const res = await fetch("/api/bank-sync/config", {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      if (!res.ok) throw new Error(t("profile.syncError"));
+      const data = (await res.json()) as {
+        webhookUrl: string;
+        webhookSecret: string;
+      };
+      setSyncConfig(data);
+    } catch (err) {
+      setSyncError(err instanceof Error ? err.message : t("profile.syncError"));
+    } finally {
+      setSyncLoading(false);
+    }
+  };
+
+  const copyBindLink = async () => {
+    if (!bindLink) return;
+    try {
+      await navigator.clipboard.writeText(bindLink);
+      setSyncCopied(true);
+      window.setTimeout(() => setSyncCopied(false), 1500);
+    } catch {
+      /* clipboard unavailable — ignore */
+    }
   };
 
   return (
@@ -520,6 +587,40 @@ export default function ProfilePage() {
               </Link>
             </section>
 
+            <section className="glass-panel relative z-10 rounded-2xl p-5">
+              <div className="mb-4 flex items-center gap-2">
+                <Smartphone
+                  size={18}
+                  strokeWidth={1.75}
+                  className="text-lime-400"
+                />
+                <h2 className="text-base font-semibold">
+                  {t("profile.syncTitle")}
+                </h2>
+              </div>
+              <p className="mb-4 text-xs text-slate-400">
+                {t("profile.syncHint")}
+              </p>
+              <div className="flex flex-col gap-2 sm:flex-row">
+                <a
+                  href="/downloads/bsche-sync.apk"
+                  download
+                  className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl border border-slate-700 px-4 py-2.5 text-sm font-semibold text-slate-200 transition hover:border-lime-500/50 hover:text-lime-300 active:scale-[0.99]"
+                >
+                  <Download size={15} strokeWidth={2} />
+                  {t("profile.syncDownloadApk")}
+                </a>
+                <button
+                  type="button"
+                  onClick={() => void openSyncModal()}
+                  className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl bg-lime-500 px-4 py-2.5 text-sm font-semibold text-slate-950 transition hover:scale-[1.02] active:scale-95"
+                >
+                  <Link2 size={15} strokeWidth={2} />
+                  {t("profile.syncLinkApp")}
+                </button>
+              </div>
+            </section>
+
             <button
               type="button"
               onClick={handleSignOut}
@@ -531,6 +632,78 @@ export default function ProfilePage() {
           </>
         ) : null}
       </div>
+
+      {syncOpen && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-950/80 p-4 backdrop-blur-md sm:items-center">
+          <div className="w-full max-w-md rounded-2xl border border-slate-800/90 bg-slate-900 p-6 shadow-2xl">
+            <div className="flex items-start justify-between gap-3">
+              <h2 className="text-lg font-semibold">
+                {t("profile.syncModalTitle")}
+              </h2>
+              <button
+                type="button"
+                onClick={() => setSyncOpen(false)}
+                aria-label={t("common.close")}
+                className="rounded-lg p-1 text-slate-400 transition hover:text-slate-200"
+              >
+                <X size={18} strokeWidth={2} />
+              </button>
+            </div>
+            <p className="mt-1 text-sm text-slate-400">
+              {t("profile.syncModalHint")}
+            </p>
+
+            {syncLoading ? (
+              <p className="mt-6 flex items-center justify-center gap-2 text-sm text-slate-400">
+                <Loader2 size={16} className="animate-spin text-lime-400" />
+                {t("profile.syncLoading")}
+              </p>
+            ) : syncError ? (
+              <p className="mt-4 text-sm text-rose-400">{syncError}</p>
+            ) : bindQrSrc ? (
+              <>
+                <div className="mt-4 flex justify-center">
+                  <div className="overflow-hidden rounded-2xl border border-white/10 bg-white p-2">
+                    <Image
+                      src={bindQrSrc}
+                      alt="Bind QR"
+                      width={240}
+                      height={240}
+                      unoptimized
+                    />
+                  </div>
+                </div>
+                <a
+                  href={bindLink}
+                  className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl bg-lime-500 px-4 py-3 text-sm font-semibold text-slate-950 transition hover:scale-[1.01] active:scale-95"
+                >
+                  <Link2 size={16} strokeWidth={2} />
+                  {t("profile.syncOpenApp")}
+                </a>
+                <button
+                  type="button"
+                  onClick={() => void copyBindLink()}
+                  className="mt-2 flex w-full items-center justify-center gap-2 rounded-xl border border-slate-700 px-4 py-2.5 text-xs font-semibold text-slate-300 transition hover:border-slate-500 active:scale-95"
+                >
+                  {syncCopied ? (
+                    <Check size={14} strokeWidth={2.25} className="text-lime-400" />
+                  ) : (
+                    <Copy size={14} strokeWidth={2} />
+                  )}
+                  {syncCopied
+                    ? t("profile.syncCopied")
+                    : t("profile.syncCopyLink")}
+                </button>
+                <ol className="mt-4 space-y-1 text-xs text-slate-400">
+                  <li>{t("profile.syncStep1")}</li>
+                  <li>{t("profile.syncStep2")}</li>
+                  <li>{t("profile.syncStep3")}</li>
+                </ol>
+              </>
+            ) : null}
+          </div>
+        </div>
+      )}
 
       <BottomNav />
     </main>
