@@ -669,6 +669,7 @@ export default function ProfilePage() {
                       alt="Bind QR"
                       width={240}
                       height={240}
+                      className="h-auto w-auto"
                       unoptimized
                     />
                   </div>

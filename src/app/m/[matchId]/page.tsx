@@ -661,6 +661,7 @@ function GuestPayment({
                     alt="VietQR"
                     width={220}
                     height={220}
+                    className="h-auto w-auto"
                     unoptimized
                   />
                 </div>
