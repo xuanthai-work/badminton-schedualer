@@ -574,6 +574,7 @@ function LedgerContent() {
 
                       <FeeForm
                         match={match}
+                        userId={userId}
                         onSaved={() => {
                           if (userId) void load(userId);
                         }}
@@ -633,12 +634,16 @@ function toThousands(value: number): string {
 
 function FeeForm({
   match,
+  userId,
   onSaved,
 }: {
   match: LedgerMatch;
+  userId: string | null;
   onSaved: () => void;
 }) {
   const { t, formatVnd } = useI18n();
+  const confirm = useConfirm();
+  const [isEditing, setIsEditing] = useState(false);
   const [courtFee, setCourtFee] = useState(() => toThousands(match.courtFee));
   const [tubePrice, setTubePrice] = useState("");
   const [shuttleCount, setShuttleCount] = useState("");
@@ -658,6 +663,23 @@ function FeeForm({
   const total = courtFeeTotal + shuttleFeeCalculated + waterFeeTotal;
   const attendeeCount = match.payers.length;
   const perPerson = attendeeCount > 0 ? Math.round(total / attendeeCount) : 0;
+
+  const handleToggleEdit = async () => {
+    const paidCount = match.payers.filter(
+      (p) => p.id !== userId && p.status === "confirmed"
+    ).length;
+    if (paidCount > 0) {
+      const ok = await confirm({
+        title: t("match.warnEditFeeTitle"),
+        message: t("match.warnEditFeeMsg", { count: paidCount }),
+        confirmLabel: t("common.continue"),
+        cancelLabel: t("common.cancel"),
+        destructive: true,
+      });
+      if (!ok) return;
+    }
+    setIsEditing(true);
+  };
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -691,6 +713,7 @@ function FeeForm({
       } else {
         setMessage(t("match.settledMsgSimple"));
       }
+      setIsEditing(false);
       onSaved();
     } catch (err) {
       setFormError(err instanceof Error ? err.message : t("match.errSettle"));
@@ -699,13 +722,46 @@ function FeeForm({
     }
   };
 
+  if (!isEditing) {
+    return (
+      <div className="flex items-center justify-between gap-2 rounded-xl border border-white/10 bg-slate-900/40 px-3 py-2.5">
+        <div className="flex min-w-0 items-center gap-2 text-xs text-slate-400">
+          <ReceiptText size={14} className="shrink-0 text-lime-400" />
+          <span className="truncate">
+            {t("match.expenses")}:{" "}
+            <strong className="text-slate-200">
+              {formatVnd(match.totalAmount)}
+            </strong>{" "}
+            ({t("match.perPerson", { amount: formatVnd(match.feePerPerson) })})
+          </span>
+        </div>
+        <button
+          type="button"
+          onClick={() => void handleToggleEdit()}
+          className="shrink-0 rounded-lg border border-slate-700 px-2.5 py-1 text-xs font-semibold text-slate-300 transition hover:border-lime-500/50 hover:text-lime-300 active:scale-95"
+        >
+          {t("match.editCosts")}
+        </button>
+      </div>
+    );
+  }
+
   return (
     <section className="space-y-3 rounded-xl border border-lime-500/20 bg-lime-500/5 p-3">
-      <div className="flex items-center gap-2">
-        <ReceiptText size={15} strokeWidth={1.75} className="text-lime-400" />
-        <h3 className="text-xs font-semibold uppercase tracking-[0.2em] text-lime-300">
-          {t("match.expenses")}
-        </h3>
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2">
+          <ReceiptText size={15} strokeWidth={1.75} className="text-lime-400" />
+          <h3 className="text-xs font-semibold uppercase tracking-[0.2em] text-lime-300">
+            {t("match.expenses")}
+          </h3>
+        </div>
+        <button
+          type="button"
+          onClick={() => setIsEditing(false)}
+          className="rounded-lg border border-slate-700 px-2.5 py-1 text-xs font-semibold text-slate-300 transition hover:border-lime-500/50 hover:text-lime-300 active:scale-95"
+        >
+          {t("match.cancelEditCosts")}
+        </button>
       </div>
       <form onSubmit={handleSubmit} className="space-y-3">
         <FeeInput

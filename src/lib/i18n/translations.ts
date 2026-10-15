@@ -17,6 +17,7 @@ const vi = {
     cancel: "Hủy",
     close: "Đóng",
     confirm: "Xác nhận",
+    continue: "Tiếp tục",
   },
   auth: {
     brand: "BSche",
@@ -230,6 +231,11 @@ const vi = {
     addGuestHint: "Nhập tên bạn bè hoặc người chơi đi cùng",
     addGuestPlaceholder: "Ví dụ: Tuấn Anh, Bạn Nam...",
     errNameEmpty: "Vui lòng nhập tên người chơi",
+    editCosts: "Chỉnh sửa chi phí",
+    cancelEditCosts: "Hủy chỉnh sửa",
+    warnEditFeeTitle: "Cảnh báo thay đổi chi phí",
+    warnEditFeeMsg:
+      "Đã có {count} người thanh toán theo mức giá cũ. Nếu sửa chi phí, bạn cần tự đối soát phần chênh lệch với họ. Bạn có chắc muốn tiếp tục?",
   },
   publicMatch: {
     loading: "Đang tải trận đấu...",
@@ -396,6 +402,7 @@ const en: typeof vi = {
     cancel: "Cancel",
     close: "Close",
     confirm: "Confirm",
+    continue: "Continue",
   },
   auth: {
     brand: "BSche",
@@ -609,6 +616,11 @@ const en: typeof vi = {
     addGuestHint: "Enter name of friend or guest",
     addGuestPlaceholder: "e.g. Tuan Anh, Nam's friend...",
     errNameEmpty: "Please enter player name",
+    editCosts: "Edit costs",
+    cancelEditCosts: "Cancel edit",
+    warnEditFeeTitle: "Change costs warning",
+    warnEditFeeMsg:
+      "{count} player(s) have already paid at the previous rate. If you change costs, you need to reconcile the difference with them manually. Continue?",
   },
   publicMatch: {
     loading: "Loading match...",

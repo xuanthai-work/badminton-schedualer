@@ -19,6 +19,7 @@ import BottomNav from "@/components/BottomNav";
 import PullToRefresh from "@/components/PullToRefresh";
 import MapsPreview from "@/components/MapsPreview";
 import InitialAvatar from "@/components/InitialAvatar";
+import { useConfirm } from "@/components/ConfirmProvider";
 import EditMatchPanel from "./EditMatchPanel";
 
 type Guest = {
@@ -54,6 +55,7 @@ type PaymentStatus = "unpaid" | "submitted" | "confirmed";
 export default function MatchDetailPage() {
   const router = useRouter();
   const { t, formatVnd, formatMatchHeading } = useI18n();
+  const confirm = useConfirm();
   const params = useParams<{ matchId: string }>();
   const matchId = params?.matchId;
 
@@ -68,6 +70,7 @@ export default function MatchDetailPage() {
   const [showAddGuestModal, setShowAddGuestModal] = useState(false);
   const [newGuestName, setNewGuestName] = useState("");
   const [addingGuest, setAddingGuest] = useState(false);
+  const [isEditingFee, setIsEditingFee] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -334,6 +337,30 @@ export default function MatchDetailPage() {
     }
   };
 
+  const handleToggleEditFee = async () => {
+    if (isEditingFee) {
+      setIsEditingFee(false);
+      return;
+    }
+    const paidCount = guests.filter(
+      (g) =>
+        g.status === "yes" &&
+        g.paymentStatus === "confirmed" &&
+        g.guestId !== userId
+    ).length;
+    if (paidCount > 0) {
+      const ok = await confirm({
+        title: t("match.warnEditFeeTitle"),
+        message: t("match.warnEditFeeMsg", { count: paidCount }),
+        confirmLabel: t("common.continue"),
+        cancelLabel: t("common.cancel"),
+        destructive: true,
+      });
+      if (!ok) return;
+    }
+    setIsEditingFee(true);
+  };
+
   const handleCopyLink = async () => {
     try {
       await navigator.clipboard.writeText(
@@ -499,10 +526,23 @@ export default function MatchDetailPage() {
                     amount: formatVnd(expense.feePerPerson),
                   })}
                 </p>
+
+                {isHost && match.status === "closed" && (
+                  <button
+                    type="button"
+                    onClick={() => void handleToggleEditFee()}
+                    className="flex w-full items-center justify-center gap-1.5 rounded-xl border border-slate-700 bg-slate-900/60 py-2 text-xs font-semibold text-slate-300 transition hover:border-lime-500/50 hover:text-lime-300 active:scale-95"
+                  >
+                    <ReceiptText size={14} />
+                    {isEditingFee
+                      ? t("match.cancelEditCosts")
+                      : t("match.editCosts")}
+                  </button>
+                )}
               </section>
             )}
 
-            {isHost && (
+            {isHost && (match.status === "open" || isEditingFee) && (
               <section className="glass-panel rounded-2xl border-lime-500/20 bg-lime-500/5 p-5">
                 <div className="mb-4 flex items-center gap-2">
                   <ReceiptText
@@ -786,7 +826,8 @@ function ParticipantList({
                     </>
                   )}
                   {isHost &&
-                    (status !== "closed" || paymentStatus !== "confirmed") && (
+                    status === "closed" &&
+                    paymentStatus !== "confirmed" && (
                       <button
                         type="button"
                         aria-label={t("match.removeGuestTitle")}
