@@ -147,6 +147,19 @@ export default function PublicMatchPage() {
     };
   }, [matchId, load]);
 
+  // Re-sync when the tab becomes visible again (mobile browsers sleep sockets).
+  useEffect(() => {
+    const refresh = () => {
+      if (document.visibilityState === "visible") void load();
+    };
+    document.addEventListener("visibilitychange", refresh);
+    window.addEventListener("focus", refresh);
+    return () => {
+      document.removeEventListener("visibilitychange", refresh);
+      window.removeEventListener("focus", refresh);
+    };
+  }, [load]);
+
   const saveIdentity = (next: Identity) => {
     setIdentity(next);
     try {

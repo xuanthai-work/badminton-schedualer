@@ -251,6 +251,20 @@ function LedgerContent() {
     };
   }, [userId, load]);
 
+  // Re-sync when the tab becomes visible again (mobile browsers sleep sockets).
+  useEffect(() => {
+    if (!userId) return;
+    const refresh = () => {
+      if (document.visibilityState === "visible") void load(userId);
+    };
+    document.addEventListener("visibilitychange", refresh);
+    window.addEventListener("focus", refresh);
+    return () => {
+      document.removeEventListener("visibilitychange", refresh);
+      window.removeEventListener("focus", refresh);
+    };
+  }, [userId, load]);
+
   const confirmPayer = async (
     match: LedgerMatch,
     payer: Payer,

@@ -59,3 +59,5 @@ Thư mục lưu trữ tài liệu kỹ thuật và lịch sử các task đã ho
 | TASK-47 | Khắc Phục Cảnh Báo Next.js Image Aspect Ratio Trên Ảnh QR Code | 2026-10-15 | **PASS** | [fix-next-image-aspect-ratio-warning.md](file:///D:/work/Stuff/badminton-schedualer/docs/tasks/fix-next-image-aspect-ratio-warning.md) |
 | TASK-48 | Tinh Gọn Form Chi Phí Sau Khi Chốt & Cảnh Báo Khi Sửa Chi Phí Đã Có Người Thanh Toán | 2026-10-15 | **PASS** | [safe-expense-edit-and-collapse-on-closed.md](file:///D:/work/Stuff/badminton-schedualer/docs/tasks/safe-expense-edit-and-collapse-on-closed.md) |
 | TASK-49 | Bỏ Nút Xóa Người Dùng Khi Chưa Chốt Sổ Tại Trang Chi Tiết Trận Đấu | 2026-10-15 | **PASS** | [hide-delete-guest-before-settle.md](file:///D:/work/Stuff/badminton-schedualer/docs/tasks/hide-delete-guest-before-settle.md) |
+| TASK-50 | Gia Cố Foreground Service BSche Bank Sync Chống Kill Ngầm Trên MIUI, Hỗ Trợ Grouped Notifications & Tự Động Refetch Tab Web | 2026-10-19 | **PASS** | [foreground-service-bank-sync-and-web-auto-refetch.md](file:///D:/work/Stuff/badminton-schedualer/docs/tasks/foreground-service-bank-sync-and-web-auto-refetch.md) |
+

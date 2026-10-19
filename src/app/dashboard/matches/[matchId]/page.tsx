@@ -200,6 +200,19 @@ export default function MatchDetailPage() {
     };
   }, [userId, matchId, load]);
 
+  // Re-sync when the tab becomes visible again (mobile browsers sleep sockets).
+  useEffect(() => {
+    const refresh = () => {
+      if (document.visibilityState === "visible") void load();
+    };
+    document.addEventListener("visibilitychange", refresh);
+    window.addEventListener("focus", refresh);
+    return () => {
+      document.removeEventListener("visibilitychange", refresh);
+      window.removeEventListener("focus", refresh);
+    };
+  }, [load]);
+
   const isHost = Boolean(match && userId && match.createdBy === userId);
 
   const guestYes = guests.filter((g) => g.status === "yes");
