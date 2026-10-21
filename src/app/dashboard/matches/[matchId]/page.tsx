@@ -838,18 +838,16 @@ function ParticipantList({
                       )}
                     </>
                   )}
-                  {isHost &&
-                    status === "closed" &&
-                    paymentStatus !== "confirmed" && (
-                      <button
-                        type="button"
-                        aria-label={t("match.removeGuestTitle")}
-                        onClick={() => onRequestDelete(g)}
-                        className="rounded-lg p-1.5 text-slate-400 transition hover:text-rose-400 active:scale-95"
-                      >
-                        <Trash2 size={15} strokeWidth={2} />
-                      </button>
-                    )}
+                  {isHost && status === "open" && (
+                    <button
+                      type="button"
+                      aria-label={t("match.removeGuestTitle")}
+                      onClick={() => onRequestDelete(g)}
+                      className="rounded-lg p-1.5 text-slate-400 transition hover:text-rose-400 active:scale-95"
+                    >
+                      <Trash2 size={15} strokeWidth={2} />
+                    </button>
+                  )}
                 </div>
               </li>
             );
