@@ -16,6 +16,9 @@ type Venue = {
   mapsUrl: string | null;
 };
 
+// Synthetic option used when the match's venue is not saved in `venues` yet.
+const CURRENT_VENUE_ID = "__current_match_venue__";
+
 type EditableMatch = {
   id: string;
   title: string;
@@ -64,7 +67,8 @@ export default function EditMatchPanel({ match, onSaved }: Props) {
   const close = () => setOpen(false);
 
   // Load the host's saved venues when the modal opens and preselect the one
-  // matching the current location (kept flexible: manual entry still works).
+  // matching the current location. A location that is not in the list yet is
+  // offered as a synthetic option so the match never loses its venue.
   useEffect(() => {
     if (!open) return;
     let active = true;
@@ -81,15 +85,25 @@ export default function EditMatchPanel({ match, onSaved }: Props) {
         address: (row.address as string | null) ?? null,
         mapsUrl: (row.maps_url as string | null) ?? null,
       }));
+      const matched = list.find((v) => v.name === match.location);
+      const currentName = match.location.trim();
+      if (!matched && currentName) {
+        list.push({
+          id: CURRENT_VENUE_ID,
+          name: currentName,
+          address: null,
+          mapsUrl: match.locationUrl ?? null,
+        });
+      }
       setVenues(list);
-      setVenueId(list.find((v) => v.name === match.location)?.id ?? "");
+      setVenueId(matched?.id ?? (currentName ? CURRENT_VENUE_ID : ""));
       setVenuesLoading(false);
     };
     void run();
     return () => {
       active = false;
     };
-  }, [open, match.location]);
+  }, [open, match.location, match.locationUrl]);
 
   const handleVenueChange = (id: string) => {
     setVenueId(id);
@@ -104,7 +118,11 @@ export default function EditMatchPanel({ match, onSaved }: Props) {
     event.preventDefault();
     setError("");
 
-    if (!title.trim() || !date || !time || !endTime || !location.trim()) {
+    if (!title.trim() || !date || !time || !endTime) {
+      setError(t("matches.errRequired"));
+      return;
+    }
+    if (!venueId || !location.trim()) {
       setError(t("matches.errRequired"));
       return;
     }
@@ -212,9 +230,7 @@ export default function EditMatchPanel({ match, onSaved }: Props) {
               </div>
               <div className="space-y-1 text-sm">
                 <div className="flex items-center justify-between gap-2">
-                  <label className="text-slate-300">
-                    {t("venues.selectVenue")}
-                  </label>
+                  <label className="text-slate-300">{t("matches.location")}</label>
                   <Link
                     href="/dashboard/venues"
                     className="text-[11px] font-semibold text-lime-300 transition hover:text-lime-200"
@@ -225,9 +241,15 @@ export default function EditMatchPanel({ match, onSaved }: Props) {
                 {venuesLoading ? (
                   <div className="h-12 animate-pulse rounded-xl bg-slate-800/40" />
                 ) : venues.length === 0 ? (
-                  <p className="rounded-xl border border-dashed border-slate-700 px-3 py-2 text-xs text-slate-400">
-                    {t("venues.noVenuesYet")}
-                  </p>
+                  <div className="flex items-center justify-between gap-3 rounded-xl border border-dashed border-slate-700 px-3 py-3 text-xs text-slate-400">
+                    <span>{t("venues.noVenuesYet")}</span>
+                    <Link
+                      href="/dashboard/venues"
+                      className="shrink-0 rounded-lg bg-lime-500 px-3 py-1.5 text-xs font-semibold text-slate-950 transition hover:scale-[1.03] active:scale-95"
+                    >
+                      {t("venues.addVenue")}
+                    </Link>
+                  </div>
                 ) : (
                   <SelectField
                     value={venueId}
@@ -239,18 +261,6 @@ export default function EditMatchPanel({ match, onSaved }: Props) {
                     }))}
                   />
                 )}
-              </div>
-              <div className="space-y-1 text-sm">
-                <label className="text-slate-300">
-                  {t("matches.location")}
-                </label>
-                <input
-                  className="w-full rounded-xl border border-slate-800 bg-slate-950/60 px-3 py-2 text-slate-100 focus:outline-none focus:ring-2 focus:ring-lime-500/70"
-                  placeholder={t("matches.locationPlaceholder")}
-                  value={location}
-                  onChange={(event) => setLocation(event.target.value)}
-                  required
-                />
               </div>
               <div className="space-y-1 text-sm">
                 <label className="text-slate-300">

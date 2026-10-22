@@ -61,4 +61,5 @@ Thư mục lưu trữ tài liệu kỹ thuật và lịch sử các task đã ho
 | TASK-49 | Bỏ Nút Xóa Người Dùng Khi Chưa Chốt Sổ Tại Trang Chi Tiết Trận Đấu | 2026-10-15 | **PASS** | [hide-delete-guest-before-settle.md](file:///D:/work/Stuff/badminton-schedualer/docs/tasks/hide-delete-guest-before-settle.md) |
 | TASK-50 | Gia Cố Foreground Service BSche Bank Sync Chống Kill Ngầm Trên MIUI, Hỗ Trợ Grouped Notifications & Tự Động Refetch Tab Web | 2026-10-19 | **PASS** | [foreground-service-bank-sync-and-web-auto-refetch.md](file:///D:/work/Stuff/badminton-schedualer/docs/tasks/foreground-service-bank-sync-and-web-auto-refetch.md) |
 | TASK-51 | Chuyển Quyền Xóa Người Chơi Sang Trận Đấu Mở (Kèm Popup Xác Nhận) & Ẩn Xóa Khi Đã Chốt Sổ | 2026-10-21 | **PASS** | [host-remove-guest-on-open-with-confirm.md](file:///D:/work/Stuff/badminton-schedualer/docs/tasks/host-remove-guest-on-open-with-confirm.md) |
+| TASK-52 | Bỏ Ô Điền Text Sân Trong Modal Chỉnh Sửa Trận Đấu (EditMatchPanel) | 2026-10-22 | **PASS** | [remove-manual-location-input-in-edit-match.md](file:///D:/work/Stuff/badminton-schedualer/docs/tasks/remove-manual-location-input-in-edit-match.md) |
 
