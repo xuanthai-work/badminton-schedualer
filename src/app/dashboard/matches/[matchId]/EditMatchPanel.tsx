@@ -42,10 +42,9 @@ export default function EditMatchPanel({ match, onSaved }: Props) {
   const [date, setDate] = useState("");
   const [time, setTime] = useState("");
   const [endTime, setEndTime] = useState("");
-  const [location, setLocation] = useState("");
-  const [locationUrl, setLocationUrl] = useState("");
   const [courtNo, setCourtNo] = useState("");
   const [venueId, setVenueId] = useState("");
+  const [initialVenueId, setInitialVenueId] = useState("");
   const [venues, setVenues] = useState<Venue[]>([]);
   const [venuesLoading, setVenuesLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -57,8 +56,6 @@ export default function EditMatchPanel({ match, onSaved }: Props) {
     setDate(match.date);
     setTime(match.time.slice(0, 5));
     setEndTime(match.endTime ? match.endTime.slice(0, 5) : "");
-    setLocation(match.location);
-    setLocationUrl(match.locationUrl ?? "");
     setCourtNo(match.courtNo != null ? String(match.courtNo) : "");
     setError("");
     setOpen(true);
@@ -96,7 +93,9 @@ export default function EditMatchPanel({ match, onSaved }: Props) {
         });
       }
       setVenues(list);
-      setVenueId(matched?.id ?? (currentName ? CURRENT_VENUE_ID : ""));
+      const resolvedId = matched?.id ?? (currentName ? CURRENT_VENUE_ID : "");
+      setVenueId(resolvedId);
+      setInitialVenueId(resolvedId);
       setVenuesLoading(false);
     };
     void run();
@@ -107,11 +106,6 @@ export default function EditMatchPanel({ match, onSaved }: Props) {
 
   const handleVenueChange = (id: string) => {
     setVenueId(id);
-    const venue = venues.find((v) => v.id === id);
-    if (venue) {
-      setLocation(venue.name);
-      setLocationUrl(venue.mapsUrl ?? "");
-    }
   };
 
   const handleSave = async (event: React.FormEvent<HTMLFormElement>) => {
@@ -122,19 +116,21 @@ export default function EditMatchPanel({ match, onSaved }: Props) {
       setError(t("matches.errRequired"));
       return;
     }
-    if (!venueId || !location.trim()) {
-      setError(t("matches.errRequired"));
+    const chosenVenue = venues.find((v) => v.id === venueId);
+    if (!chosenVenue) {
+      setError(t("venues.selectVenue"));
       return;
     }
     if (endTime <= time) {
       setError(t("matches.errEndTime"));
       return;
     }
-    const trimmedUrl = locationUrl.trim();
-    if (trimmedUrl && !/^https?:\/\//i.test(trimmedUrl)) {
-      setError(t("matches.errMapsUrl"));
-      return;
-    }
+    // The maps link always comes from the venue. Keeping the match's existing
+    // link when the venue did not change preserves legacy matches.
+    const locationUrl =
+      venueId === initialVenueId
+        ? match.locationUrl ?? chosenVenue.mapsUrl ?? null
+        : chosenVenue.mapsUrl ?? null;
 
     setSubmitting(true);
     try {
@@ -145,8 +141,8 @@ export default function EditMatchPanel({ match, onSaved }: Props) {
           match_date: date,
           match_time: time,
           match_end_time: endTime,
-          location: location.trim(),
-          location_url: trimmedUrl || null,
+          location: chosenVenue.name,
+          location_url: locationUrl,
           court_no: courtNo ? Number(courtNo) : null,
         })
         .eq("id", match.id);
@@ -279,22 +275,6 @@ export default function EditMatchPanel({ match, onSaved }: Props) {
                   placeholder="3"
                   value={courtNo}
                   onChange={(event) => setCourtNo(event.target.value)}
-                />
-              </div>
-              <div className="space-y-1 text-sm">
-                <label className="text-slate-300">
-                  {t("matches.mapsLink")}{" "}
-                  <span className="text-xs text-slate-500">
-                    {t("matches.optional")}
-                  </span>
-                </label>
-                <input
-                  type="url"
-                  inputMode="url"
-                  className="w-full rounded-xl border border-slate-800 bg-slate-950/60 px-3 py-2 text-slate-100 placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-lime-500/70"
-                  placeholder="https://maps.app.goo.gl/..."
-                  value={locationUrl}
-                  onChange={(event) => setLocationUrl(event.target.value)}
                 />
               </div>
 

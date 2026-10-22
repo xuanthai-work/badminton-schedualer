@@ -86,7 +86,6 @@ const vi = {
     timeStart: "Giờ bắt đầu",
     timeEnd: "Giờ kết thúc",
     location: "Sân / Địa điểm",
-    mapsLink: "Link Google Maps",
     optional: "(tùy chọn)",
     courtNo: "Sân số",
     courtShort: "Sân {n}",
@@ -94,7 +93,6 @@ const vi = {
     errLoad: "Lỗi tải lịch.",
     errRequired: "Vui lòng nhập đủ tên, ngày, giờ và địa điểm.",
     errEndTime: "Giờ kết thúc phải sau giờ bắt đầu.",
-    errMapsUrl: "Link Google Maps phải bắt đầu bằng http:// hoặc https://.",
     errCreate: "Tạo buổi đánh thất bại.",
     delete: "Xóa buổi đánh",
     confirmDelete:
@@ -470,7 +468,6 @@ const en: typeof vi = {
     timeStart: "Start time",
     timeEnd: "End time",
     location: "Court / Location",
-    mapsLink: "Google Maps link",
     optional: "(optional)",
     courtNo: "Court number",
     courtShort: "Court {n}",
@@ -478,7 +475,6 @@ const en: typeof vi = {
     errLoad: "Failed to load matches.",
     errRequired: "Please enter name, date, time and location.",
     errEndTime: "End time must be after the start time.",
-    errMapsUrl: "Google Maps link must start with http:// or https://.",
     errCreate: "Failed to create match.",
     delete: "Delete match",
     confirmDelete:
