@@ -30,6 +30,7 @@ type HostMatch = {
   endTime: string | null;
   location: string;
   status: "open" | "closed";
+  rsvpLocked: boolean;
   attendees: number;
 };
 
@@ -64,7 +65,7 @@ export default function DashboardPage() {
     const { data, error: queryError } = await supabase
       .from("matches")
       .select(
-        "id, title, match_date, match_time, match_end_time, location, status, match_guests ( status )"
+        "id, title, match_date, match_time, match_end_time, location, status, rsvp_locked, match_guests ( status )"
       )
       .eq("created_by", uid)
       .order("match_date", { ascending: false })
@@ -86,6 +87,7 @@ export default function DashboardPage() {
           endTime: (row.match_end_time as string | null) ?? null,
           location: (row.location as string) ?? "",
           status: row.status === "closed" ? "closed" : "open",
+          rsvpLocked: Boolean(row.rsvp_locked),
           attendees: guests.filter((g) => g.status === "yes").length,
         };
       })
@@ -301,14 +303,18 @@ export default function DashboardPage() {
                     </div>
                     <span
                       className={`shrink-0 rounded-full border px-2.5 py-0.5 text-[9px] font-semibold uppercase tracking-[0.16em] ${
-                        match.status === "open"
-                          ? "border-emerald-500/30 bg-emerald-500/20 text-emerald-300"
-                          : "border-white/10 bg-slate-800 text-slate-400"
+                        match.status === "closed"
+                          ? "border-white/10 bg-slate-800 text-slate-400"
+                          : match.rsvpLocked
+                            ? "border-rose-500/30 bg-rose-500/20 text-rose-300"
+                            : "border-emerald-500/30 bg-emerald-500/20 text-emerald-300"
                       }`}
                     >
-                      {match.status === "open"
-                        ? t("matches.statusOpen")
-                        : t("matches.statusClosed")}
+                      {match.status === "closed"
+                        ? t("matches.statusClosed")
+                        : match.rsvpLocked
+                          ? t("matches.statusLocked")
+                          : t("matches.statusOpen")}
                     </span>
                   </div>
                 </Link>

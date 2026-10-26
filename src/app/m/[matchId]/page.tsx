@@ -292,14 +292,18 @@ export default function PublicMatchPage() {
                 </h1>
                 <span
                   className={`rounded-full border px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.18em] ${
-                    match.status === "open"
-                      ? "border-emerald-500/30 bg-emerald-500/20 text-emerald-300"
-                      : "border-white/10 bg-slate-800 text-slate-400"
+                    match.status === "closed"
+                      ? "border-white/10 bg-slate-800 text-slate-400"
+                      : match.rsvpLocked
+                        ? "border-rose-500/30 bg-rose-500/20 text-rose-300"
+                        : "border-emerald-500/30 bg-emerald-500/20 text-emerald-300"
                   }`}
                 >
-                  {match.status === "open"
-                    ? t("publicMatch.statusOpen")
-                    : t("publicMatch.statusClosed")}
+                  {match.status === "closed"
+                    ? t("publicMatch.statusClosed")
+                    : match.rsvpLocked
+                      ? t("publicMatch.statusLocked")
+                      : t("publicMatch.statusOpen")}
                 </span>
               </div>
             </header>

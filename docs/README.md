@@ -69,4 +69,5 @@ Thư mục lưu trữ tài liệu kỹ thuật và lịch sử các task đã ho
 | TASK-57 | Mặc Định Tùy Chọn Chưa Chọn Sân Khi Tạo/Sửa Lịch Và Loại Bỏ Trường Sân Số | 2026-10-26 | **PASS** | [optional-venue-and-remove-court-number.md](file:///D:/work/Stuff/badminton-schedualer/docs/tasks/optional-venue-and-remove-court-number.md) |
 | TASK-58 | Đổi Modal Tạo Lịch, Thêm Sân Và Sửa Lịch Sang Dạng Căn Giữa Màn Hình (Centered Modal) | 2026-10-26 | **PASS** | [center-modals-ui.md](file:///D:/work/Stuff/badminton-schedualer/docs/tasks/center-modals-ui.md) |
 | TASK-59 | Tối Ưu Kích Thước Modal (Chống Scrollbar Khi Mở Picker) Và Bỏ Tên Buổi Đánh Ở Modal Sửa Lịch | 2026-10-26 | **PASS** | [optimize-modal-height-and-remove-match-name.md](file:///D:/work/Stuff/badminton-schedualer/docs/tasks/optimize-modal-height-and-remove-match-name.md) |
+| TASK-60 | Rút Gọn Nút Trạng Thái "Đã Khóa" Và Sửa Lỗi Hiển Thị Badge Khóa Tại Trang Chủ | 2026-10-26 | **PASS** | [shorten-locked-status-and-fix-dashboard-badge.md](file:///D:/work/Stuff/badminton-schedualer/docs/tasks/shorten-locked-status-and-fix-dashboard-badge.md) |
 
