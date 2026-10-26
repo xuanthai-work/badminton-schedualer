@@ -27,7 +27,6 @@ type EditableMatch = {
   endTime: string | null;
   location: string;
   locationUrl: string | null;
-  courtNo: number | null;
 };
 
 type Props = {
@@ -42,7 +41,6 @@ export default function EditMatchPanel({ match, onSaved }: Props) {
   const [date, setDate] = useState("");
   const [time, setTime] = useState("");
   const [endTime, setEndTime] = useState("");
-  const [courtNo, setCourtNo] = useState("");
   const [venueId, setVenueId] = useState("");
   const [initialVenueId, setInitialVenueId] = useState("");
   const [venues, setVenues] = useState<Venue[]>([]);
@@ -56,7 +54,6 @@ export default function EditMatchPanel({ match, onSaved }: Props) {
     setDate(match.date);
     setTime(match.time.slice(0, 5));
     setEndTime(match.endTime ? match.endTime.slice(0, 5) : "");
-    setCourtNo(match.courtNo != null ? String(match.courtNo) : "");
     setError("");
     setOpen(true);
   };
@@ -82,9 +79,10 @@ export default function EditMatchPanel({ match, onSaved }: Props) {
         address: (row.address as string | null) ?? null,
         mapsUrl: (row.maps_url as string | null) ?? null,
       }));
+      const isUnselected = match.location.trim() === t("venues.unselected");
       const matched = list.find((v) => v.name === match.location);
       const currentName = match.location.trim();
-      if (!matched && currentName) {
+      if (!matched && currentName && !isUnselected) {
         list.push({
           id: CURRENT_VENUE_ID,
           name: currentName,
@@ -93,7 +91,8 @@ export default function EditMatchPanel({ match, onSaved }: Props) {
         });
       }
       setVenues(list);
-      const resolvedId = matched?.id ?? (currentName ? CURRENT_VENUE_ID : "");
+      const resolvedId =
+        matched?.id ?? (currentName && !isUnselected ? CURRENT_VENUE_ID : "");
       setVenueId(resolvedId);
       setInitialVenueId(resolvedId);
       setVenuesLoading(false);
@@ -102,7 +101,7 @@ export default function EditMatchPanel({ match, onSaved }: Props) {
     return () => {
       active = false;
     };
-  }, [open, match.location, match.locationUrl]);
+  }, [open, match.location, match.locationUrl, t]);
 
   const handleVenueChange = (id: string) => {
     setVenueId(id);
@@ -116,8 +115,8 @@ export default function EditMatchPanel({ match, onSaved }: Props) {
       setError(t("matches.errRequired"));
       return;
     }
-    const chosenVenue = venues.find((v) => v.id === venueId);
-    if (!chosenVenue) {
+    const chosenVenue = venueId ? venues.find((v) => v.id === venueId) : null;
+    if (venueId && !chosenVenue) {
       setError(t("venues.selectVenue"));
       return;
     }
@@ -128,9 +127,11 @@ export default function EditMatchPanel({ match, onSaved }: Props) {
     // The maps link always comes from the venue. Keeping the match's existing
     // link when the venue did not change preserves legacy matches.
     const locationUrl =
-      venueId === initialVenueId
-        ? match.locationUrl ?? chosenVenue.mapsUrl ?? null
-        : chosenVenue.mapsUrl ?? null;
+      venueId !== "" && chosenVenue
+        ? venueId === initialVenueId
+          ? match.locationUrl ?? chosenVenue.mapsUrl ?? null
+          : chosenVenue.mapsUrl ?? null
+        : null;
 
     setSubmitting(true);
     try {
@@ -141,9 +142,9 @@ export default function EditMatchPanel({ match, onSaved }: Props) {
           match_date: date,
           match_time: time,
           match_end_time: endTime,
-          location: chosenVenue.name,
+          location: chosenVenue ? chosenVenue.name : t("venues.unselected"),
           location_url: locationUrl,
-          court_no: courtNo ? Number(courtNo) : null,
+          court_no: null,
         })
         .eq("id", match.id);
 
@@ -174,7 +175,7 @@ export default function EditMatchPanel({ match, onSaved }: Props) {
 
       {open && (
         <div
-          className="fixed inset-0 z-50 flex items-end justify-center bg-slate-950/80 backdrop-blur-md p-4 sm:items-center"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-md p-4"
           onClick={(event) => {
             if (event.currentTarget === event.target) {
               close();
@@ -234,51 +235,22 @@ export default function EditMatchPanel({ match, onSaved }: Props) {
                     {t("venues.manageVenues")}
                   </Link>
                 </div>
-                {venuesLoading ? (
-                  <div className="h-12 animate-pulse rounded-xl bg-slate-800/40" />
-                ) : venues.length === 0 ? (
-                  <div className="flex items-center justify-between gap-3 rounded-xl border border-dashed border-slate-700 px-3 py-3 text-xs text-slate-400">
-                    <span>{t("venues.noVenuesYet")}</span>
-                    <Link
-                      href="/dashboard/venues"
-                      className="shrink-0 rounded-lg bg-lime-500 px-3 py-1.5 text-xs font-semibold text-slate-950 transition hover:scale-[1.03] active:scale-95"
-                    >
-                      {t("venues.addVenue")}
-                    </Link>
-                  </div>
-                ) : (
-                  <SelectField
-                    value={venueId}
-                    onChange={handleVenueChange}
-                    placeholder={t("venues.selectVenue")}
-                    options={venues.map((v) => ({
-                      value: v.id,
-                      label: v.name,
-                    }))}
-                  />
-                )}
-              </div>
-              <div className="space-y-1 text-sm">
-                <label className="text-slate-300">
-                  {t("matches.courtNo")}{" "}
-                  <span className="text-xs text-slate-500">
-                    {t("matches.optional")}
-                  </span>
-                </label>
-                <input
-                  type="number"
-                  min={1}
-                  max={99}
-                  step={1}
-                  inputMode="numeric"
-                  className="w-full rounded-xl border border-slate-800 bg-slate-950/60 px-3 py-2 text-slate-100 placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-lime-500/70"
-                  placeholder="3"
-                  value={courtNo}
-                  onChange={(event) => setCourtNo(event.target.value)}
-                />
-              </div>
+                  {venuesLoading ? (
+                    <div className="h-12 animate-pulse rounded-xl bg-slate-800/40" />
+                  ) : (
+                    <SelectField
+                      value={venueId}
+                      onChange={handleVenueChange}
+                      placeholder={t("venues.selectVenue")}
+                      options={[
+                        { value: "", label: t("venues.unselected") },
+                        ...venues.map((v) => ({ value: v.id, label: v.name })),
+                      ]}
+                    />
+                  )}
+                </div>
 
-              {error && <p className="text-xs text-rose-400">{error}</p>}
+                {error && <p className="text-xs text-rose-400">{error}</p>}
 
               <div className="flex justify-end gap-2">
                 <button

@@ -39,7 +39,6 @@ type LedgerMatch = {
   location: string;
   courtFee: number;
   shuttleFee: number;
-  waterFee: number;
   totalAmount: number;
   feePerPerson: number;
   payers: Payer[];
@@ -97,7 +96,7 @@ function LedgerContent() {
     const { data: matchRows, error: matchError } = await supabase
       .from("matches")
       .select(
-        "id, match_date, match_time, match_end_time, location, expenses ( court_fee, shuttle_fee, water_fee, total_amount, fee_per_person )"
+        "id, match_date, match_time, match_end_time, location, expenses ( court_fee, shuttle_fee, total_amount, fee_per_person )"
       )
       .eq("created_by", uid)
       .eq("status", "closed");
@@ -109,14 +108,12 @@ function LedgerContent() {
           | {
               court_fee: number;
               shuttle_fee: number;
-              water_fee: number;
               total_amount: number;
               fee_per_person: number;
             }
           | {
               court_fee: number;
               shuttle_fee: number;
-              water_fee: number;
               total_amount: number;
               fee_per_person: number;
             }[]
@@ -131,7 +128,6 @@ function LedgerContent() {
         location: (row.location as string) ?? "",
         courtFee: Number(expense.court_fee),
         shuttleFee: Number(expense.shuttle_fee),
-        waterFee: Number(expense.water_fee),
         totalAmount: Number(expense.total_amount),
         feePerPerson: Number(expense.fee_per_person),
         payers: [],
@@ -142,7 +138,7 @@ function LedgerContent() {
     const { data: payeeRows } = await supabase
       .from("expenses")
       .select(
-        "match_id, court_fee, shuttle_fee, water_fee, total_amount, fee_per_person, matches ( id, match_date, match_time, match_end_time, location, status )"
+        "match_id, court_fee, shuttle_fee, total_amount, fee_per_person, matches ( id, match_date, match_time, match_end_time, location, status )"
       )
       .eq("payee_id", uid);
 
@@ -176,7 +172,6 @@ function LedgerContent() {
         location: match.location ?? "",
         courtFee: Number(row.court_fee),
         shuttleFee: Number(row.shuttle_fee),
-        waterFee: Number(row.water_fee),
         totalAmount: Number(row.total_amount),
         feePerPerson: Number(row.fee_per_person),
         payers: [],
@@ -661,7 +656,6 @@ function FeeForm({
   const [courtFee, setCourtFee] = useState(() => toThousands(match.courtFee));
   const [tubePrice, setTubePrice] = useState("");
   const [shuttleCount, setShuttleCount] = useState("");
-  const [waterFee, setWaterFee] = useState(() => toThousands(match.waterFee));
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
   const [formError, setFormError] = useState("");
@@ -673,8 +667,7 @@ function FeeForm({
       ? Math.round((tubePriceNum * 1000 / 12) * shuttleCountNum)
       : match.shuttleFee;
   const courtFeeTotal = (Number(courtFee) || 0) * 1000;
-  const waterFeeTotal = (Number(waterFee) || 0) * 1000;
-  const total = courtFeeTotal + shuttleFeeCalculated + waterFeeTotal;
+  const total = courtFeeTotal + shuttleFeeCalculated;
   const attendeeCount = match.payers.length;
   const perPerson = attendeeCount > 0 ? Math.round(total / attendeeCount) : 0;
 
@@ -701,7 +694,7 @@ function FeeForm({
     setMessage("");
     setFormError("");
     try {
-      if (courtFeeTotal < 0 || shuttleFeeCalculated < 0 || waterFeeTotal < 0) {
+      if (courtFeeTotal < 0 || shuttleFeeCalculated < 0) {
         throw new Error(t("match.errNegativeFee"));
       }
 
@@ -709,7 +702,6 @@ function FeeForm({
         target_match_id: match.matchId,
         court: courtFeeTotal,
         shuttle: shuttleFeeCalculated,
-        water: waterFeeTotal,
       });
       if (rpcError) throw new Error(rpcError.message);
 
@@ -742,11 +734,10 @@ function FeeForm({
         <div className="flex min-w-0 items-center gap-2 text-xs text-slate-400">
           <ReceiptText size={14} className="shrink-0 text-lime-400" />
           <span className="truncate">
-            {t("match.expenses")}:{" "}
-            <strong className="text-slate-200">
-              {formatVnd(match.totalAmount)}
-            </strong>{" "}
-            ({t("match.perPerson", { amount: formatVnd(match.feePerPerson) })})
+            {t("ledger.perPerson")}:{" "}
+            <strong className="font-semibold text-lime-300">
+              {formatVnd(match.feePerPerson)}
+            </strong>
           </span>
         </div>
         <button
@@ -804,13 +795,6 @@ function FeeForm({
         <p className="ml-1 text-[11px] text-slate-400">
           = {t("match.shuttleFee")}: {formatVnd(shuttleFeeCalculated)}
         </p>
-
-        <FeeInput
-          label={t("match.waterFee")}
-          value={waterFee}
-          onChange={setWaterFee}
-          placeholder="50"
-        />
 
         <div className="space-y-2 rounded-xl border border-white/10 bg-slate-900/60 p-3.5">
           <div className="flex items-center justify-between text-sm">

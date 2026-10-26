@@ -6,10 +6,12 @@ import {
   Check,
   ChevronLeft,
   Clock,
+  Lock,
   MapPin,
   ReceiptText,
   Share2,
   Trash2,
+  UnlockKeyhole,
   UserPlus,
 } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
@@ -39,13 +41,13 @@ type Match = {
   locationUrl: string | null;
   courtNo: number | null;
   status: "open" | "closed";
+  rsvpLocked: boolean;
   createdBy: string | null;
 };
 
 type Expense = {
   courtFee: number;
   shuttleFee: number;
-  waterFee: number;
   totalAmount: number;
   feePerPerson: number;
 };
@@ -78,7 +80,6 @@ export default function MatchDetailPage() {
   const [tubePrice, setTubePrice] = useState("");
   const [shuttleCount, setShuttleCount] = useState("");
   const [shuttleFee, setShuttleFee] = useState("");
-  const [waterFee, setWaterFee] = useState("");
   const [settleBusy, setSettleBusy] = useState(false);
   const [settleMsg, setSettleMsg] = useState("");
 
@@ -90,7 +91,7 @@ export default function MatchDetailPage() {
       const { data: matchRow, error: matchError } = await supabase
         .from("matches")
         .select(
-          "id, title, match_date, match_time, match_end_time, location, location_url, court_no, status, created_by"
+          "id, title, match_date, match_time, match_end_time, location, location_url, court_no, status, rsvp_locked, created_by"
         )
         .eq("id", matchId)
         .maybeSingle();
@@ -108,6 +109,7 @@ export default function MatchDetailPage() {
         locationUrl: matchRow.location_url ?? null,
         courtNo: matchRow.court_no ?? null,
         status: matchRow.status === "closed" ? "closed" : "open",
+        rsvpLocked: Boolean(matchRow.rsvp_locked),
         createdBy: matchRow.created_by ?? null,
       });
 
@@ -128,7 +130,7 @@ export default function MatchDetailPage() {
 
       const { data: expenseRow, error: expenseError } = await supabase
         .from("expenses")
-        .select("court_fee, shuttle_fee, water_fee, total_amount, fee_per_person")
+        .select("court_fee, shuttle_fee, total_amount, fee_per_person")
         .eq("match_id", matchId)
         .maybeSingle();
       if (expenseError) throw expenseError;
@@ -137,7 +139,6 @@ export default function MatchDetailPage() {
         setExpense({
           courtFee: Number(expenseRow.court_fee),
           shuttleFee: Number(expenseRow.shuttle_fee),
-          waterFee: Number(expenseRow.water_fee),
           totalAmount: Number(expenseRow.total_amount),
           feePerPerson: Number(expenseRow.fee_per_person),
         });
@@ -147,7 +148,6 @@ export default function MatchDetailPage() {
         };
         setCourtFee(toThousands(expenseRow.court_fee));
         setShuttleFee(toThousands(expenseRow.shuttle_fee));
-        setWaterFee(toThousands(expenseRow.water_fee));
       } else {
         setExpense(null);
       }
@@ -227,8 +227,7 @@ export default function MatchDetailPage() {
       ? Math.round(((tubePriceNum * 1000) / 12) * shuttleCountNum)
       : (Number(shuttleFee) || 0) * 1000;
   const courtFeeTotal = (Number(courtFee) || 0) * 1000;
-  const waterFeeTotal = (Number(waterFee) || 0) * 1000;
-  const totalCost = courtFeeTotal + shuttleFeeCalculated + waterFeeTotal;
+  const totalCost = courtFeeTotal + shuttleFeeCalculated;
   const feePerPersonPreview =
     attendeeCount > 0 ? Math.round(totalCost / attendeeCount) : 0;
 
@@ -242,8 +241,7 @@ export default function MatchDetailPage() {
     try {
       const court = courtFeeTotal;
       const shuttle = shuttleFeeCalculated;
-      const water = waterFeeTotal;
-      if (court < 0 || shuttle < 0 || water < 0) {
+      if (court < 0 || shuttle < 0) {
         throw new Error(t("match.errNegativeFee"));
       }
 
@@ -251,7 +249,6 @@ export default function MatchDetailPage() {
         target_match_id: matchId,
         court,
         shuttle,
-        water,
       });
       if (rpcError) throw new Error(rpcError.message);
 
@@ -386,6 +383,23 @@ export default function MatchDetailPage() {
     }
   };
 
+  const handleToggleRsvpLock = async () => {
+    if (!matchId || !match) return;
+    const nextLocked = !match.rsvpLocked;
+    setError("");
+    try {
+      const { error: updateError } = await supabase
+        .from("matches")
+        .update({ rsvp_locked: nextLocked })
+        .eq("id", matchId);
+      if (updateError) throw new Error(updateError.message);
+      triggerHaptic("success");
+      setMatch((prev) => (prev ? { ...prev, rsvpLocked: nextLocked } : prev));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t("match.errUpdate"));
+    }
+  };
+
   return (
     <main className="relative min-h-screen overflow-hidden bg-slate-950 px-6 py-10 pb-28 text-slate-50">
       <div
@@ -411,6 +425,49 @@ export default function MatchDetailPage() {
                 {formatMatchHeading(match.date)}
               </h1>
               <div className="flex items-center gap-2">
+                {match.status === "open" ? (
+                  isHost ? (
+                    <button
+                      type="button"
+                      onClick={() => void handleToggleRsvpLock()}
+                      className={`inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-xs font-semibold transition active:scale-95 ${
+                        match.rsvpLocked
+                          ? "border-rose-500/40 bg-rose-500/15 text-rose-300 hover:bg-rose-500/25"
+                          : "border-emerald-500/40 bg-emerald-500/15 text-emerald-300 hover:bg-emerald-500/25"
+                      }`}
+                    >
+                      {match.rsvpLocked ? (
+                        <Lock size={12} strokeWidth={2} />
+                      ) : (
+                        <UnlockKeyhole size={12} strokeWidth={2} />
+                      )}
+                      {match.rsvpLocked
+                        ? t("match.statusLocked")
+                        : t("match.statusOpen")}
+                    </button>
+                  ) : (
+                    <span
+                      className={`inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-xs font-semibold ${
+                        match.rsvpLocked
+                          ? "border-rose-500/40 bg-rose-500/15 text-rose-300"
+                          : "border-emerald-500/40 bg-emerald-500/15 text-emerald-300"
+                      }`}
+                    >
+                      {match.rsvpLocked ? (
+                        <Lock size={12} strokeWidth={2} />
+                      ) : (
+                        <UnlockKeyhole size={12} strokeWidth={2} />
+                      )}
+                      {match.rsvpLocked
+                        ? t("match.statusLocked")
+                        : t("match.statusOpen")}
+                    </span>
+                  )
+                ) : (
+                  <span className="rounded-full border border-white/10 bg-slate-800 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-400">
+                    {t("match.statusClosed")}
+                  </span>
+                )}
                 {isHost && (
                   <button
                     type="button"
@@ -433,17 +490,6 @@ export default function MatchDetailPage() {
                     }}
                   />
                 )}
-                <span
-                  className={`rounded-full border px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] ${
-                    match.status === "open"
-                      ? "border-emerald-500/30 bg-emerald-500/20 text-emerald-300"
-                      : "border-white/10 bg-slate-800 text-slate-400"
-                  }`}
-                >
-                  {match.status === "open"
-                    ? t("match.statusOpen")
-                    : t("match.statusClosed")}
-                </span>
               </div>
             </div>
           )}
@@ -471,11 +517,6 @@ export default function MatchDetailPage() {
                     className="shrink-0 text-lime-400"
                   />
                   <span className="min-w-0 truncate">{match.location}</span>
-                  {match.courtNo != null && (
-                    <span className="shrink-0 rounded-full bg-lime-500/15 px-2 py-0.5 text-xs font-semibold text-lime-300">
-                      {t("matches.courtShort", { n: match.courtNo })}
-                    </span>
-                  )}
                 </p>
               </div>
 
@@ -523,8 +564,6 @@ export default function MatchDetailPage() {
                     <dd className="text-right">
                       {formatVnd(expense.shuttleFee)}
                     </dd>
-                    <dt>{t("match.waterFee")}</dt>
-                    <dd className="text-right">{formatVnd(expense.waterFee)}</dd>
                     <dt className="mt-1 border-t border-white/10 pt-2 font-semibold text-slate-200">
                       {t("match.total")}
                     </dt>
@@ -596,12 +635,6 @@ export default function MatchDetailPage() {
                     = {t("match.shuttleFee")}:{" "}
                     {formatVnd(shuttleFeeCalculated)}
                   </p>
-                  <FeeInput
-                    label={t("match.waterFee")}
-                    value={waterFee}
-                    onChange={setWaterFee}
-                    placeholder="50"
-                  />
                   <div className="space-y-2 rounded-xl border border-white/10 bg-slate-900/60 p-3.5">
                     <div className="flex items-center justify-between text-sm">
                       <span className="text-slate-400">{t("match.total")}</span>

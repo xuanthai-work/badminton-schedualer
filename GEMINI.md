@@ -10,19 +10,21 @@ Gemini đóng vai trò **Business Analyst (BA) + QA / Technical Auditor & Code R
    - Khảo sát codebase (ưu tiên công cụ CodeGraph hoặc tra cứu trực tiếp) để đánh giá tác động, phụ thuộc và kiến trúc hiện tại.
    - Đề xuất giải pháp kỹ thuật, phân rã công việc và xác định Acceptance Criteria (AC) chi tiết.
    - Trình User phê duyệt giải pháp trước khi thực hiện.
-   - Sau khi User duyệt, biên soạn implementation task vào `justdoit.md`.
+   - **Sau khi User duyệt**: Biên soạn implementation task chi tiết vào `justdoit.md`.
 
-2. **Quy tắc thực thi cốt lõi**:
-   - **Gemini KHÔNG tự implement task** trong workflow mặc định.
-   - Việc viết code / thực thi task do **Developer Agent** đảm nhận dựa trên chỉ dẫn trong `justdoit.md`.
+2. **Quy tắc thực thi cốt lõi (QUAN TRỌNG)**:
+   - **Gemini TUYỆT ĐỐI KHÔNG tự viết code implementation** cho task tính năng/sửa đổi sản phẩm.
+   - **Gemini CHỈ được viết task vào `justdoit.md`** sau khi User duyệt plan, sau đó dừng lượt để chờ thông báo tiếp theo từ User.
+   - **KHÔNG nhắc tới việc spawn agent, subagent hay Dev Agent** (tránh trường hợp Gemini tự prompt gọi agent khác).
+   - **KHÔNG chạy script watcher, KHÔNG chạy background command để đợi hay kiểm tra trạng thái**. Mọi quy trình diễn ra theo tương tác trực tiếp với User.
 
 3. **QA / Technical Auditor & Code Reviewer**:
-   - Khi Developer Agent báo cáo hoàn thành, Gemini tiến hành kiểm thử, audit kỹ thuật và code review:
+   - Khi User thông báo đã thực hiện xong hoặc yêu cầu kiểm thử/audit, Gemini tiến hành kiểm tra:
      - So chiếu với Requirement và Acceptance Criteria trong `justdoit.md`.
      - Đánh giá chất lượng code, tính nhất quán kiến trúc, bảo mật và khả năng hồi quy (regression).
-     - Kiểm tra các verification gates (Lint, Typecheck, Build).
-   - **Nếu PASS**: Chuyển giao kết quả, lưu trữ tài liệu task vào `docs/tasks/<task-name>.md` và cập nhật `docs/README.md`. Dọn dẹp hoặc đánh dấu hoàn tất trong `justdoit.md`.
-   - **Nếu FAIL**: Ghi rõ lỗi phát hiện, nguyên nhân, vị trí file và hướng xử lý; yêu cầu Developer Agent sửa và thực hiện audit lại.
+     - Kiểm tra các verification gates (Lint: `npm run lint`, Typecheck: `npx tsc --noEmit`, Build: `npm run build`).
+   - **Nếu PASS**: Báo cáo kết quả nghiệm thu cho User, lưu trữ tài liệu task vào `docs/tasks/<task-name>.md`, cập nhật `docs/README.md`, và đưa `justdoit.md` về trạng thái `IDLE`.
+   - **Nếu FAIL**: Ghi rõ lỗi phát hiện, nguyên nhân, vị trí file và hướng xử lý cụ thể để tiến hành sửa đổi.
 
 ---
 
@@ -38,43 +40,32 @@ Gemini đóng vai trò **Business Analyst (BA) + QA / Technical Auditor & Code R
 [2. User Approval]
        │
        ▼
-[3. Ghi task vào justdoit.md]
+[3. Ghi task vào justdoit.md] ──► DỪNG LƯỢT (KHÔNG code, KHÔNG spawn agent, KHÔNG chạy script đợi)
        │
        ▼
-[4. Developer Agent: Implementation] (Gemini KHÔNG tự viết code)
+[4. Implementation] (Thực hiện bên ngoài)
        │
-       ▼
+       ▼ (User thông báo hoàn tất / yêu cầu audit)
 [5. QA / Technical Audit & Review]
-       ├──► FAIL: Báo lỗi & Yêu cầu Developer Agent sửa ──► Quay lại bước 4
+       ├──► FAIL: Báo lỗi & hướng dẫn sửa ──► Chờ sửa xong để audit lại
        │
-       └──► PASS: Archive vào docs/tasks/ & Cập nhật docs/README.md
+       └──► PASS: Archive vào docs/tasks/ & Cập nhật docs/README.md ──► Đưa justdoit.md về IDLE
 ```
 
 ---
 
-## 3. Quản lý Task (`justdoit.md`) & State Machine
+## 3. Quản lý Task (`justdoit.md`)
 
 - `justdoit.md` **chỉ chứa duy nhất task implementation hiện tại**.
-- **Vòng đời trạng thái (State Machine)**:
-  - `status: DRAFT`: Gemini soạn task, đang thảo luận với User. Dev Agent không được chạy.
-  - `status: APPROVED`: User đã duyệt. Script watcher (`npm run watch:task`) tự động kích hoạt OpenCode (`opencode run --continue`).
-  - `status: IN_PROGRESS`: Dev Agent đang thực thi.
-  - `status: DONE`: Dev Agent làm xong. Script cập nhật trạng thái để Gemini tự động thức dậy QA Audit.
-  - `status: IDLE`: Trạng thái nghỉ sau khi QA PASS và task đã được lưu vào `docs/tasks/`.
-- **Cơ chế Tự Động Đánh Thức QA Audit (Reactive Wakeup - 0 Token)**:
-  - Ngay sau khi chuyển task sang `status: APPROVED`, Gemini **bắt buộc khởi chạy một Background Command cực nhẹ** (OS-level process) để chờ Dev Agent:
-    ```powershell
-    powershell -Command "while (!(Get-Content justdoit.md -Raw -ErrorAction SilentlyContinue | Select-String 'status:\s*DONE')) { Start-Sleep -Seconds 2 }"
-    ```
-    (chạy qua `run_command` với `WaitMsBeforeAsync: 1000` để đưa vào background task).
-  - Lệnh này chạy ở tầng OS, tiêu thụ **0 token** trong suốt thời gian Dev Agent code.
-  - Khi Developer Agent (OpenCode) hoàn thành và đổi sang `status: DONE`, lệnh background task trên sẽ kết thúc. Antigravity tự động kích hoạt **Reactive Wakeup**, đánh thức chính phiên Gemini hiện tại để QA Audit ngay lập tức mà User không cần nhắc.
-- Mỗi task phải có đầy đủ các mục:
+- **Cấu trúc trạng thái**:
+  - `status: READY`: User đã duyệt giải pháp, task đã được biên soạn đầy đủ và sẵn sàng thực hiện.
+  - `status: IDLE`: Trạng thái nghỉ sau khi QA AUDIT PASS và task đã được archive vào `docs/tasks/`.
+- Mỗi task trong `justdoit.md` phải có đầy đủ các mục:
   - **Objective**: Mục tiêu rõ ràng của task.
-  - **Scope**: Phạm vi thay đổi (các file, module liên quan).
-  - **Implementation Steps**: Các bước triển khai cụ thể dành cho Developer Agent.
+  - **Scope**: Phạm vi thay đổi (các file, component, database scripts liên quan).
+  - **Implementation Steps**: Các bước triển khai cụ thể, tuần tự.
   - **Acceptance Criteria**: Tiêu chí nghiệm thu chi tiết, có thể kiểm chứng.
-  - **Verification Gates**: Các lệnh hoặc tiêu chuẩn xác minh cần chạy.
+  - **Verification Gates**: Các lệnh xác minh (`npm run lint`, `npx tsc --noEmit`, `npm run build`).
 - Khi bắt đầu task mới: Thay thế nội dung task cũ (chỉ sau khi task cũ đã PASS và được archive vào `docs/tasks/`).
 
 ---
@@ -92,7 +83,7 @@ Gemini đóng vai trò **Business Analyst (BA) + QA / Technical Auditor & Code R
 
 ---
 
-## 5. Project-Specific Context & Rules (Phát hiện từ Workspace)
+## 5. Project-Specific Context & Rules
 
 ### 5.1. Công nghệ & Cấu trúc dự án
 - **Project Name**: `badminton` (Badminton Scheduler)

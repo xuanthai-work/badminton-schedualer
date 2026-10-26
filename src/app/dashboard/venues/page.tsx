@@ -282,7 +282,7 @@ export default function VenuesPage() {
 
       {open && (
         <div
-          className="fixed inset-0 z-50 flex items-end justify-center bg-slate-950/80 p-4 backdrop-blur-md sm:items-center"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 p-4 backdrop-blur-md"
           onClick={(event) => {
             if (event.currentTarget === event.target) {
               close();

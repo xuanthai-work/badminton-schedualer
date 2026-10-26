@@ -9,6 +9,7 @@ import {
   Clock,
   Copy,
   Loader2,
+  Lock,
   MapPin,
   QrCode,
 } from "lucide-react";
@@ -32,6 +33,7 @@ type PublicMatch = {
   locationUrl: string | null;
   courtNo: number | null;
   status: "open" | "closed";
+  rsvpLocked: boolean;
 };
 
 type PublicGuest = {
@@ -51,7 +53,6 @@ type Payee = {
 type Expense = {
   courtFee: number;
   shuttleFee: number;
-  waterFee: number;
   totalAmount: number;
   feePerPerson: number;
 };
@@ -188,6 +189,9 @@ export default function PublicMatchPage() {
         if (rpcError.message?.includes("match_full")) {
           throw new Error(t("publicMatch.matchFullError"));
         }
+        if (rpcError.message?.includes("registration_locked")) {
+          throw new Error(t("publicMatch.errRegistrationLocked"));
+        }
         if (rpcError.message?.includes("unauthorized_guest")) {
           throw new Error(t("publicMatch.errUnauthorizedGuest"));
         }
@@ -316,11 +320,6 @@ export default function PublicMatchPage() {
                     className="shrink-0 text-lime-400"
                   />
                   <span className="min-w-0 truncate">{match.location}</span>
-                  {match.courtNo != null && (
-                    <span className="shrink-0 rounded-full bg-lime-500/15 px-2 py-0.5 text-xs font-semibold text-lime-300">
-                      {t("matches.courtShort", { n: match.courtNo })}
-                    </span>
-                  )}
                 </p>
               </div>
 
@@ -387,6 +386,13 @@ export default function PublicMatchPage() {
                         {t("publicMatch.cancelRsvp")}
                       </button>
                     </div>
+                  </div>
+                ) : match.rsvpLocked && !identity?.secret ? (
+                  <div className="mt-4 flex flex-col items-center gap-2 rounded-xl border border-amber-500/30 bg-amber-500/10 px-3 py-4 text-center">
+                    <Lock size={20} strokeWidth={2} className="text-amber-300" />
+                    <p className="text-sm font-semibold text-amber-200">
+                      {t("publicMatch.registrationLocked")}
+                    </p>
                   </div>
                 ) : isFull ? (
                   <button

@@ -131,6 +131,7 @@ create table if not exists public.matches (
   location_url text check (location_url is null or location_url ~* '^https?://'),
   court_no smallint check (court_no is null or court_no between 1 and 99),
   status text not null default 'open' check (status in ('open', 'closed')),
+  rsvp_locked boolean not null default false,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
@@ -206,7 +207,6 @@ create table if not exists public.expenses (
   payee_id uuid references public.users(id) on delete set null,
   court_fee numeric(12, 2) not null default 0,
   shuttle_fee numeric(12, 2) not null default 0,
-  water_fee numeric(12, 2) not null default 0,
   total_amount numeric(12, 2) not null default 0,
   fee_per_person numeric(12, 2) not null default 0,
   created_at timestamptz not null default now(),
@@ -271,6 +271,7 @@ set search_path = public
 as $$
 declare
   match_status text;
+  is_locked boolean;
   clean_guest text := nullif(trim(p_guest_id), '');
   clean_name text := nullif(trim(p_name), '');
   current_yes_count int;
@@ -285,8 +286,8 @@ begin
     raise exception 'invalid_status';
   end if;
 
-  select m.status, (m.created_by = auth.uid())
-    into match_status, is_match_host
+  select m.status, coalesce(m.rsvp_locked, false), (m.created_by = auth.uid())
+    into match_status, is_locked, is_match_host
   from public.matches m where m.id = p_match_id;
 
   if match_status is null then
@@ -301,6 +302,10 @@ begin
   select g.guest_secret into existing_secret
   from public.match_guests g
   where g.match_id = p_match_id and g.guest_id = clean_guest;
+
+  if is_locked is true and existing_secret is null and is_match_host is not true then
+    raise exception 'registration_locked';
+  end if;
 
   if existing_secret is not null then
     if (auth.uid() is not null and clean_guest = auth.uid()::text)
@@ -541,8 +546,7 @@ grant execute on function public.host_add_guest(uuid, text) to authenticated;
 create or replace function public.settle_match(
   target_match_id uuid,
   court numeric,
-  shuttle numeric,
-  water numeric
+  shuttle numeric
 )
 returns jsonb
 language plpgsql
@@ -578,19 +582,18 @@ begin
   from public.match_guests g
   where g.match_id = target_match_id and g.status = 'yes';
 
-  total := coalesce(court, 0) + coalesce(shuttle, 0) + coalesce(water, 0);
+  total := coalesce(court, 0) + coalesce(shuttle, 0);
   per_person := case when attendees > 0 then round(total / attendees, 2) else 0 end;
 
   insert into public.expenses (
-    match_id, court_fee, shuttle_fee, water_fee, total_amount, fee_per_person, payee_id, updated_at
+    match_id, court_fee, shuttle_fee, total_amount, fee_per_person, payee_id, updated_at
   ) values (
-    target_match_id, coalesce(court, 0), coalesce(shuttle, 0), coalesce(water, 0),
+    target_match_id, coalesce(court, 0), coalesce(shuttle, 0),
     total, per_person, match_payee, now()
   )
   on conflict (match_id) do update set
     court_fee = excluded.court_fee,
     shuttle_fee = excluded.shuttle_fee,
-    water_fee = excluded.water_fee,
     total_amount = excluded.total_amount,
     fee_per_person = excluded.fee_per_person,
     payee_id = coalesce(public.expenses.payee_id, excluded.payee_id),
@@ -607,7 +610,7 @@ begin
 end;
 $$;
 
-grant execute on function public.settle_match(uuid, numeric, numeric, numeric) to authenticated;
+grant execute on function public.settle_match(uuid, numeric, numeric) to authenticated;
 
 -- 13. Recompute the per-person split from the current guests.
 create or replace function public.recompute_split(target_match_id uuid)
@@ -652,7 +655,7 @@ declare
   base jsonb;
 begin
   select id, title, match_date, match_time, match_end_time, location,
-         location_url, court_no, status, created_by
+         location_url, court_no, status, rsvp_locked, created_by
     into m
   from public.matches
   where id = p_match_id;
@@ -671,7 +674,8 @@ begin
       'location', m.location,
       'locationUrl', m.location_url,
       'courtNo', m.court_no,
-      'status', m.status
+      'status', m.status,
+      'rsvpLocked', coalesce(m.rsvp_locked, false)
     ),
     'guests', coalesce((
       select jsonb_agg(jsonb_build_object(
@@ -691,7 +695,6 @@ begin
         select jsonb_build_object(
           'courtFee', e.court_fee,
           'shuttleFee', e.shuttle_fee,
-          'waterFee', e.water_fee,
           'totalAmount', e.total_amount,
           'feePerPerson', e.fee_per_person
         )

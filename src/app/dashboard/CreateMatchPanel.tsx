@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { MapPin, Plus } from "lucide-react";
+import { Plus } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { useI18n } from "@/lib/i18n";
 import DateField from "@/components/DateField";
@@ -29,7 +29,6 @@ export default function CreateMatchPanel({ onCreated }: Props) {
   const [date, setDate] = useState("");
   const [time, setTime] = useState("");
   const [endTime, setEndTime] = useState("");
-  const [courtNo, setCourtNo] = useState("");
   const [venueId, setVenueId] = useState("");
   const [venues, setVenues] = useState<Venue[]>([]);
   const [venuesLoading, setVenuesLoading] = useState(false);
@@ -40,7 +39,6 @@ export default function CreateMatchPanel({ onCreated }: Props) {
     setDate("");
     setTime("");
     setEndTime("");
-    setCourtNo("");
     setVenueId("");
     setError("");
   };
@@ -81,7 +79,7 @@ export default function CreateMatchPanel({ onCreated }: Props) {
     event.preventDefault();
     setError("");
 
-    if (!date || !time || !endTime || !venueId) {
+    if (!date || !time || !endTime) {
       setError(t("matches.errRequired"));
       return;
     }
@@ -90,11 +88,13 @@ export default function CreateMatchPanel({ onCreated }: Props) {
       return;
     }
 
-    const venue = venues.find((v) => v.id === venueId);
-    if (!venue) {
+    const selectedVenue = venueId ? venues.find((v) => v.id === venueId) : null;
+    if (venueId && !selectedVenue) {
       setError(t("venues.selectVenue"));
       return;
     }
+    const location = selectedVenue ? selectedVenue.name : t("venues.unselected");
+    const locationUrl = selectedVenue ? selectedVenue.mapsUrl ?? null : null;
 
     setSubmitting(true);
     try {
@@ -118,9 +118,9 @@ export default function CreateMatchPanel({ onCreated }: Props) {
           match_date: date,
           match_time: time,
           match_end_time: endTime,
-          location: venue.name,
-          location_url: venue.mapsUrl ?? null,
-          court_no: courtNo ? Number(courtNo) : null,
+          location,
+          location_url: locationUrl,
+          court_no: null,
           created_by: uid,
         })
         .select("id")
@@ -177,7 +177,7 @@ export default function CreateMatchPanel({ onCreated }: Props) {
       {open &&
         createPortal(
           <div
-            className="fixed inset-0 z-50 flex items-end justify-center bg-slate-950/80 backdrop-blur-md p-4 sm:items-center"
+            className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-md p-4"
             onClick={(event) => {
               if (event.currentTarget === event.target) {
                 close();
@@ -244,47 +244,17 @@ export default function CreateMatchPanel({ onCreated }: Props) {
                   </div>
                   {venuesLoading ? (
                     <div className="h-12 animate-pulse rounded-xl bg-slate-800/40" />
-                  ) : venues.length === 0 ? (
-                    <div className="flex items-center justify-between gap-3 rounded-xl border border-dashed border-slate-700 px-3 py-3 text-xs text-slate-400">
-                      <span>{t("venues.noVenuesYet")}</span>
-                      <Link
-                        href="/dashboard/venues"
-                        className="shrink-0 rounded-lg bg-lime-500 px-3 py-1.5 text-xs font-semibold text-slate-950 transition hover:scale-[1.03] active:scale-95"
-                      >
-                        {t("venues.addVenue")}
-                      </Link>
-                    </div>
                   ) : (
                     <SelectField
                       value={venueId}
                       onChange={setVenueId}
                       placeholder={t("venues.selectVenue")}
-                      options={venues.map((v) => ({
-                        value: v.id,
-                        label: v.name,
-                      }))}
+                      options={[
+                        { value: "", label: t("venues.unselected") },
+                        ...venues.map((v) => ({ value: v.id, label: v.name })),
+                      ]}
                     />
                   )}
-                </div>
-
-                <div className="space-y-1 text-sm">
-                  <label className="text-slate-300">
-                    {t("matches.courtNo")}{" "}
-                    <span className="text-xs text-slate-500">
-                      {t("matches.optional")}
-                    </span>
-                  </label>
-                  <input
-                    type="number"
-                    min={1}
-                    max={99}
-                    step={1}
-                    inputMode="numeric"
-                    className="w-full rounded-xl border border-slate-800 bg-slate-950/60 px-3 py-2 text-slate-100 placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-lime-500/70"
-                    placeholder="3"
-                    value={courtNo}
-                    onChange={(event) => setCourtNo(event.target.value)}
-                  />
                 </div>
 
                 {error && <p className="text-xs text-rose-400">{error}</p>}
@@ -299,18 +269,11 @@ export default function CreateMatchPanel({ onCreated }: Props) {
                   </button>
                   <button
                     className="inline-flex items-center gap-1.5 rounded-xl bg-lime-500 px-4 py-2 text-sm font-semibold text-slate-950 disabled:opacity-60"
-                    disabled={submitting || venues.length === 0}
+                    disabled={submitting}
                   >
                     {submitting ? t("matches.creating") : t("matches.create")}
                   </button>
                 </div>
-
-                {venues.length === 0 && !venuesLoading && (
-                  <p className="flex items-center gap-1.5 text-[11px] text-slate-500">
-                    <MapPin size={12} strokeWidth={1.75} />
-                    {t("venues.needVenueHint")}
-                  </p>
-                )}
               </form>
             </div>
           </div>,
