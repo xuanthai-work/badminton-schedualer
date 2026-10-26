@@ -1,35 +1,44 @@
 # BSche - Badminton Match Scheduling & Cost Splitting
 
-> **BSche** (Cầu lông đi mà ^^) là ứng dụng web quản lý lịch cầu lông hiện đại, hỗ trợ tạo kèo, điểm danh tức thì (realtime) không cần tài khoản, và tự động chia chi phí kèm mã VietQR chuyển khoản nhanh cho cả nhóm.
+> **BSche** (Cầu lông đi mà ^^) là ứng dụng web & PWA quản lý lịch đánh cầu lông hiện đại, hỗ trợ tạo kèo khảo sát số lượng người, điểm danh tức thì không cần tài khoản, tự động chia chi phí kèm mã VietQR, sổ thu tiền thông minh và đồng bộ giao dịch ngân hàng tự động 24/7 (BSche Bank Sync).
 
 ---
 
 ## 🚀 Tính Năng Nổi Bật (Key Features)
 
-- **🏸 Magic Public Match Link (`/m/[matchId]`)**:
-  - Chia sẻ link trận đấu công khai. Người tham gia có thể điểm danh tham gia (Có / Không) ngay lập tức mà không cần tạo tài khoản hay đăng nhập.
-  - Hỗ trợ lưu định danh khách bền vững qua `localStorage` trên trình duyệt.
+### 🏸 1. Magic Public Match Link (`/m/[matchId]`)
+- **Điểm danh tức thì (Zero Friction)**: Người tham gia chỉ cần mở link là có thể bấm "Tham gia" hoặc "Hủy" ngay trên trình duyệt mà không cần đăng ký tài khoản hay tải ứng dụng.
+- **Bảo mật định danh**: Lưu danh tính cục bộ an toàn qua `localStorage` và mã bí mật (`guest_secret`) chống mạo danh hoặc sửa đè thông tin người khác.
+- **Giới hạn số lượng**: Tự động chặn khi đạt mốc tối đa 20 người/buổi đánh để tránh quá tải sân.
 
-- **💳 Tự Động Chia Chi Phí & Thanh Toán VietQR**:
-  - Nhập tiền sân, tiền cầu, tiền nước ➔ hệ thống tự động tính chi phí bình quân cho mỗi người tham gia.
-  - Sinh mã **VietQR động** chuẩn Napas 24/7 với số tài khoản của chủ kèo (hoặc người ứng tiền), kèm số tiền chính xác và nội dung chuyển khoản rõ ràng.
-  - Hỗ trợ nút tải ảnh mã QR trực tiếp về thư viện ảnh điện thoại để chuyển khoản nhanh trong ứng dụng ngân hàng.
+### 🔒 2. Khóa Link Đăng Ký Thông Minh (Registration Lock)
+- **Nút trạng thái linh hoạt**: Host có thể bấm **"Khóa đăng ký"** (màu Đỏ) hoặc **"Đang mở"** (màu Xanh) bất cứ lúc nào trên header chi tiết trận đấu.
+- **Chặn người mới nhưng bảo lưu quyền người cũ**: Khi khóa link, người mới không thể tham gia, nhưng các thành viên đã đăng ký trước đó vẫn có thể đổi tên hoặc hủy đăng ký bình thường nếu có việc bận đột xuất.
+- **Tùy chọn độc lập**: Dù đang khóa hay mở đăng ký, Host vẫn có thể bấm chốt chi phí & chia tiền sau trận bình thường.
 
-- **🌐 Rich Link Preview Card (Facebook Messenger, Zalo, Telegram)**:
-  - Tích hợp chuẩn **Open Graph (1200 x 630 px)** và Twitter Card `summary_large_image`.
-  - Hiển thị đầy đủ logo BSche, tên sân, thứ ngày, khung giờ thi đấu và lời mời điểm danh trực quan ngay khi dán link vào khung chat.
+### 📍 3. Lên Lịch Linh Hoạt & Kho Sân Dùng Chung (Flexible Venues)
+- **Tạo lịch không cần sân trước**: Mặc định hỗ trợ tùy chọn *"Chưa chọn sân"*, giúp Host dễ dàng tạo lịch để gom đủ số lượng thành viên trước rồi mới liên hệ đặt sân thực tế.
+- **Kho sân dùng chung & Bản đồ**: Lưu trữ danh sách sân thường chơi, tự động điền link Google Maps và hiển thị bản đồ trực tiếp trên trang trận đấu.
+- **Tự động đặt tên buổi đánh**: Tự động sinh tên kèo theo thứ ngày (ví dụ: *"Thứ Tư, 28/10/2026"*), giao diện modal căn giữa màn hình rộng rãi, không bị che khuất.
 
-- **⚡ Cập Nhật Realtime**:
-  - Danh sách người tham gia và trạng thái thanh toán được đồng bộ tức thì giữa tất cả người xem thông qua Supabase Realtime Channels.
+### 💳 4. Tự Động Chia Chi Phí & Thanh Toán VietQR
+- **Công thức tính tinh gọn**: Chỉ gồm **Tiền sân + Tiền cầu** (tự động nhân theo đơn giá ống và số quả sử dụng).
+- **Sinh mã VietQR Napas 24/7**: Tự động tạo mã QR chuyển khoản chính xác tới từng đồng, đúng số tài khoản của Host/người ứng tiền kèm cú pháp chuyển khoản chuẩn: `BSCHEL <Mã trận> <Mã người chơi>`.
 
-- **📍 Quản Lý Sân Dùng Chung & Bản Đồ (Shared Venues & Maps)**:
-  - Tự động gợi ý sân cầu lông phổ biến đã lưu trong hệ thống.
-  - Tích hợp bản đồ Google Maps xem nhanh vị trí sân thi đấu trực tiếp trên trang trận đấu.
+### 📖 5. Sổ Thu Tiền & Quản Lý Công Nợ (Ledger)
+- **Theo dõi tiến độ thu tiền trực quan**: Thống kê tổng tiền, số tiền đã thu, số tiền còn thiếu và tỷ lệ người đã đóng tiền.
+- **Hiển thị số tiền mỗi người**: Nhìn thấy ngay số tiền chính xác mỗi người phải nộp (ví dụ: *Mỗi người: 134.250 đ*).
+- **Xác nhận thanh toán 2 chiều**: Host có thể bấm toggle xác nhận đã đóng tiền hoặc hủy xác nhận linh hoạt.
 
-- **🛡️ An Toàn & Bảo Mật (Security Hardened)**:
-  - Gia cố bảo mật toàn diện: Phân quyền qua Supabase Row Level Security (RLS) và hàm RPC `SECURITY DEFINER`.
-  - Cơ chế mã khóa bảo mật (`secret`) cho từng người tham gia để chống mạo danh.
-  - Giới hạn tối đa 20 người/trận đấu để chống quá tải (Anti-OOM & Spam).
+### 🤖 6. BSche Bank Sync (Android App) - Tự Động Gạch Nợ Realtime
+- **Ứng dụng Android Native độc lập** ([`android-sync-app`](android-sync-app/)): Chạy ngầm an toàn qua Notification Listener Service, tự động bắt biến động số dư từ các app ngân hàng (Cake, Vietcombank, Techcombank, MB Bank, v.v.).
+- **Tự động gạch nợ qua Webhook**: Khớp cú pháp `BSCHEL`, tự động đổi trạng thái người chơi sang *Đã thanh toán* trên web theo thời gian thực mà Host không cần kiểm tra sao kê thủ công.
+- **Offline Queue**: Tự động lưu hàng đợi và gửi lại khi có mạng nếu mất kết nối internet.
+
+### 📱 7. Trải Nghiệm PWA Mượt Như Native App
+- Hỗ trợ cài đặt trực tiếp lên màn hình chính điện thoại (iOS / Android).
+- Tích hợp **Kéo xuống để làm mới (Pull-To-Refresh)** mượt mà.
+- Thiết kế Dark-Theme hiện đại, màu sắc chủ đạo Neon Lime cá tính, hỗ trợ phản hồi xúc giác (Haptic Feedback) khi thao tác.
 
 ---
 
@@ -37,12 +46,13 @@
 
 | Thành phần | Công nghệ |
 | :--- | :--- |
-| **Framework** | [Next.js 16](https://nextjs.org/) (App Router), React 19 |
-| **Language** | TypeScript 5 |
-| **Styling** | Tailwind CSS v4, Lucide React Icons |
-| **Backend / DB** | [Supabase](https://supabase.com/) (PostgreSQL, RLS, RPC Stored Procedures, Realtime) |
-| **Thanh toán & Tiện ích** | VietQR API, `date-fns` |
-| **Hosting & CDN** | Vercel |
+| **Frontend Web** | [Next.js 16](https://nextjs.org/) (App Router, Turbopack), [React 19](https://react.dev/) |
+| **Ngôn ngữ** | TypeScript 5 |
+| **Giao diện & Styling** | Tailwind CSS v4, Lucide React Icons, PWA Web Manifest |
+| **Backend & Database** | [Supabase](https://supabase.com/) (PostgreSQL, Row Level Security, RPC Stored Procedures, Realtime Channels) |
+| **Android Sync App** | Kotlin, Android SDK 34, NotificationListenerService, SQLite, OkHttp |
+| **Thanh toán & Tiện ích** | VietQR API, `date-fns`, Web Share API |
+| **Hosting & Deployment** | Vercel |
 
 ---
 
@@ -50,20 +60,27 @@
 
 ```text
 badminton-schedualer/
-├── docs/                       # Tài liệu kỹ thuật & Nhật ký task hoàn thành
-│   ├── README.md               # Danh mục tổng hợp toàn bộ các task đã nghiệm thu
-│   └── tasks/                  # Chi tiết từng task triển khai (TASK-01 -> TASK-20)
-├── public/                     # Static assets (og-image.png, icons, manifests)
+├── android-sync-app/           # Ứng dụng Android Native BSche Bank Sync
+│   └── app/src/main/           # Kotlin source code, Notification Service & UI
+├── docs/                       # Tài liệu kỹ thuật & Nhật ký nhiệm vụ
+│   ├── README.md               # Danh mục tổng hợp tất cả các task đã hoàn thành
+│   └── tasks/                  # Chi tiết từng task (TASK-01 -> TASK-59)
+├── public/                     # Static assets (icon, splash, og-image)
 ├── src/
 │   ├── app/                    # Next.js App Router
-│   │   ├── layout.tsx          # Root layout & global metadata (Open Graph)
-│   │   ├── page.tsx            # Trang chủ quản lý danh sách trận
-│   │   ├── m/[matchId]/        # Magic Public Match Link (layout & page)
-│   │   ├── venues/             # Quản lý kho sân cầu lông
-│   │   └── profile/            # Cài đặt tài khoản & cấu hình ngân hàng nhận tiền
-│   ├── components/             # Reusable UI components
-│   └── lib/                    # Tiện ích: Supabase client, i18n, VietQR helper
-├── supabase/                   # SQL migration scripts & schema database
+│   │   ├── api/
+│   │   │   └── webhook/bank-payment/   # Webhook xử lý gạch nợ tự động từ app Android
+│   │   ├── dashboard/          # Trang quản lý dành cho Host
+│   │   │   ├── debts/          # Sổ thu tiền & quản lý chi phí
+│   │   │   ├── matches/[id]/   # Trang chi tiết trận đấu & điều khiển kèo
+│   │   │   ├── profile/        # Quản lý tài khoản & cài đặt ngân hàng nhận tiền
+│   │   │   └── venues/         # Kho sân cầu lông dùng chung
+│   │   ├── m/[matchId]/        # Magic Public Link điểm danh & thanh toán VietQR
+│   │   ├── layout.tsx          # Root Layout & Open Graph Metadata
+│   │   └── page.tsx            # Trang đăng nhập / Trang chủ
+│   ├── components/             # Reusable UI Components (Modal, DateField, TimeField, Avatars...)
+│   └── lib/                    # Tiện ích chung (Supabase Client, i18n, Haptics, VietQR...)
+├── supabase/                   # Schema Database & các SQL Migration script
 └── justdoit.md                 # Quản lý task hiện tại của workflow
 ```
 
@@ -82,37 +99,49 @@ Tạo file `.env.local` hoặc `.env` với các biến cần thiết:
 NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
 SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
-NEXT_PUBLIC_APP_URL=https://bscheduler.xyz
+BANK_WEBHOOK_SECRET=your-webhook-secret-key
+NEXT_PUBLIC_APP_URL=https://your-domain.com
 ```
 
-### 3. Chạy môi trường phát triển (Dev Server)
+### 3. Khởi tạo Database Supabase
+Chạy toàn bộ script tại [`supabase/reset-database.sql`](supabase/reset-database.sql) trong **Supabase SQL Editor** để khởi tạo đầy đủ tables, index, RLS policies và stored procedures.
+
+### 4. Chạy môi trường phát triển (Dev Server)
 ```bash
 npm run dev
 ```
 Truy cập [http://localhost:3000](http://localhost:3000) trên trình duyệt.
 
-### 4. Kiểm tra chất lượng (Verification Gates)
+### 5. Kiểm tra chất lượng (Verification Gates)
 ```bash
+# Kiểm tra cú pháp và quy chuẩn code
+npm run lint
+
 # Kiểm tra kiểu dữ liệu TypeScript
 npx tsc --noEmit
 
-# Kiểm tra cú pháp và quy chuẩn code
-npm run lint
+# Kiểm tra build production
+npm run build
 ```
-*(Lưu ý: Không tự ý chạy `npm run build` trên local để bảo toàn dev cache).*
 
 ---
 
 ## 📚 Tài Liệu Kỹ Thuật & Lịch Sử Task (Task History)
 
-Toàn bộ quá trình phát triển, kiến trúc kỹ thuật và kết quả QA Audit được ghi nhận chi tiết tại:
+Toàn bộ quá trình phân tích nghiệp vụ, kiến trúc hệ thống và kết quả nghiệm thu QA được lưu trữ chi tiết tại:
 👉 [**docs/README.md**](docs/README.md)
 
-### Danh sách các task gần đây:
-- **[TASK-21](docs/tasks/ios-safari-qr-web-share.md)**: Tối ưu nút tải VietQR trên iOS Safari bằng Web Share API (lưu trực tiếp vào Photos).
-- **[TASK-20](docs/tasks/standardize-og-preview-card.md)**: Chuẩn hóa Open Graph Preview Card với Logo BSche (1200x630) & bổ sung `og:url`.
-- **[TASK-19](docs/tasks/add-og-image-preview.md)**: Tích hợp ảnh OG Preview cho link Messenger.
-- **[TASK-17](docs/tasks/dynamic-match-og-metadata.md)**: Dynamic Open Graph Metadata cho trang Magic Match Link.
-- **[TASK-16](docs/tasks/add-download-qr-button.md)**: Bổ sung nút tải ảnh VietQR trên trang Magic Match Link.
-- **[TASK-14](docs/tasks/security-hardening-2.md)**: Gia cố bảo mật toàn diện (IDOR, XSS, Anti-OOM, Storage RLS).
+### Một số mốc nhiệm vụ tiêu biểu:
+- **[TASK-59](docs/tasks/optimize-modal-height-and-remove-match-name.md)**: Tối ưu kích thước modal (chống scrollbar khi mở picker) và bỏ tên buổi đánh ở modal sửa lịch.
+- **[TASK-58](docs/tasks/center-modals-ui.md)**: Đổi modal tạo lịch, thêm sân và sửa lịch sang dạng căn giữa màn hình (centered modal).
+- **[TASK-57](docs/tasks/optional-venue-and-remove-court-number.md)**: Mặc định tùy chọn chưa chọn sân khi tạo/sửa lịch và loại bỏ trường sân số.
+- **[TASK-56](docs/tasks/optimize-ledger-per-person-display.md)**: Tối ưu dòng chi phí dưới cùng trong Sổ thu tiền (chỉ hiển thị tiền mỗi người đóng).
+- **[TASK-55](docs/tasks/smart-status-button-in-match-detail.md)**: Gộp nút khóa đăng ký và badge trạng thái thành Nút Trạng Thái Thông Minh (Xanh / Đỏ).
+- **[TASK-54](docs/tasks/remove-water-fee-and-add-registration-lock.md)**: Xóa bỏ hoàn toàn tiền nước (DB & UI) và bổ sung tính năng khóa nhận người mới.
+- **[TASK-42](docs/tasks/universal-bank-sync-onboarding-bind.md)** & **[TASK-36](docs/tasks/build-android-bank-sync-app.md)**: Xây dựng ứng dụng Android Native BSche Bank Sync & Offline Queue.
 - **[TASK-01](docs/tasks/magic-public-match-link.md)**: Xây dựng Magic Public Link cho trận đấu (Zero-Friction RSVP & VietQR).
+
+---
+
+## 📄 License
+Phát triển bởi xuanthai-work. Bản quyền thuộc về dự án **BSche**.
