@@ -184,7 +184,7 @@ export default function CreateMatchPanel({ onCreated }: Props) {
               }
             }}
           >
-            <div className="bg-slate-900 border border-slate-800/90 max-h-[85dvh] w-full max-w-lg overflow-y-auto rounded-2xl p-6 shadow-2xl">
+            <div className="bg-slate-900 border border-slate-800/90 flex flex-col min-h-[480px] sm:min-h-[500px] max-h-[90dvh] w-full max-w-lg overflow-y-auto rounded-2xl p-6 shadow-2xl">
               <div className="mb-4 flex items-center justify-between">
                 <h2 className="text-lg font-semibold">
                   {t("matches.createTitle")}
@@ -198,7 +198,7 @@ export default function CreateMatchPanel({ onCreated }: Props) {
                 </button>
               </div>
 
-              <form onSubmit={handleCreate} className="space-y-4">
+              <form onSubmit={handleCreate} className="flex flex-1 flex-col space-y-4">
                 <div className="space-y-1 text-sm">
                   <label className="text-slate-300">{t("matches.date")}</label>
                   <DateField value={date} onChange={setDate} required />
@@ -259,7 +259,7 @@ export default function CreateMatchPanel({ onCreated }: Props) {
 
                 {error && <p className="text-xs text-rose-400">{error}</p>}
 
-                <div className="flex justify-end gap-2">
+                <div className="mt-auto flex justify-end gap-2 pt-4">
                   <button
                     type="button"
                     className="rounded-xl border border-slate-700 px-4 py-2 text-sm text-slate-200"
