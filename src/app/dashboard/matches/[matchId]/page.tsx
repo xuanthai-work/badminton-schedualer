@@ -1,11 +1,13 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
+import Image from "next/image";
 import {
   Check,
   ChevronLeft,
   Clock,
+  ImagePlus,
   Lock,
   MapPin,
   ReceiptText,
@@ -13,6 +15,7 @@ import {
   Trash2,
   UnlockKeyhole,
   UserPlus,
+  X,
 } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { useI18n } from "@/lib/i18n";
@@ -39,7 +42,7 @@ type Match = {
   endTime: string | null;
   location: string;
   locationUrl: string | null;
-  courtNo: number | null;
+  courtBillUrl: string | null;
   status: "open" | "closed";
   rsvpLocked: boolean;
   createdBy: string | null;
@@ -53,6 +56,20 @@ type Expense = {
 };
 
 type PaymentStatus = "unpaid" | "submitted" | "confirmed";
+
+const BILL_BUCKET = "court-bills";
+const BILL_MAX_BYTES = 5 * 1024 * 1024; // 5MB
+// Only raster images — SVG is rejected (stored-XSS vector).
+const BILL_MIME = ["image/jpeg", "image/png", "image/webp"];
+const BILL_EXTS = [".jpg", ".jpeg", ".png", ".webp"];
+
+/** Pulls the storage path out of a public `/object/public/<bucket>/` URL. */
+function extractBillPath(url: string): string | null {
+  const marker = `/object/public/${BILL_BUCKET}/`;
+  const idx = url.indexOf(marker);
+  if (idx === -1) return null;
+  return url.slice(idx + marker.length) || null;
+}
 
 export default function MatchDetailPage() {
   const router = useRouter();
@@ -83,6 +100,10 @@ export default function MatchDetailPage() {
   const [settleBusy, setSettleBusy] = useState(false);
   const [settleMsg, setSettleMsg] = useState("");
 
+  const billFileRef = useRef<HTMLInputElement>(null);
+  const [billBusy, setBillBusy] = useState(false);
+  const [showBillLightbox, setShowBillLightbox] = useState(false);
+
   const load = useCallback(
     async () => {
       if (!matchId) return;
@@ -91,7 +112,7 @@ export default function MatchDetailPage() {
       const { data: matchRow, error: matchError } = await supabase
         .from("matches")
         .select(
-          "id, title, match_date, match_time, match_end_time, location, location_url, court_no, status, rsvp_locked, created_by"
+          "id, title, match_date, match_time, match_end_time, location, location_url, court_bill_url, status, rsvp_locked, created_by"
         )
         .eq("id", matchId)
         .maybeSingle();
@@ -107,7 +128,7 @@ export default function MatchDetailPage() {
         endTime: matchRow.match_end_time ?? null,
         location: matchRow.location,
         locationUrl: matchRow.location_url ?? null,
-        courtNo: matchRow.court_no ?? null,
+        courtBillUrl: matchRow.court_bill_url ?? null,
         status: matchRow.status === "closed" ? "closed" : "open",
         rsvpLocked: Boolean(matchRow.rsvp_locked),
         createdBy: matchRow.created_by ?? null,
@@ -323,6 +344,16 @@ export default function MatchDetailPage() {
       setError(t("match.errNameEmpty"));
       return;
     }
+    if (
+      guests.some(
+        (g) =>
+          g.status === "yes" &&
+          g.name.trim().toLowerCase() === name.toLowerCase()
+      )
+    ) {
+      setError(t("match.errDuplicateName"));
+      return;
+    }
     setAddingGuest(true);
     setError("");
     try {
@@ -333,6 +364,9 @@ export default function MatchDetailPage() {
       if (rpcError) {
         if (rpcError.message?.includes("match_full")) {
           throw new Error(t("publicMatch.matchFullError"));
+        }
+        if (rpcError.message?.includes("duplicate_name")) {
+          throw new Error(t("match.errDuplicateName"));
         }
         throw new Error(rpcError.message);
       }
@@ -397,6 +431,102 @@ export default function MatchDetailPage() {
       setMatch((prev) => (prev ? { ...prev, rsvpLocked: nextLocked } : prev));
     } catch (err) {
       setError(err instanceof Error ? err.message : t("match.errUpdate"));
+    }
+  };
+
+  const triggerPickBill = () => {
+    if (billBusy) return;
+    billFileRef.current?.click();
+  };
+
+  // Best-effort cleanup of the replaced/removed bill object in Storage. The DB
+  // row is the source of truth, so a failed cleanup is silently ignored.
+  const removeBillObject = (url: string | null | undefined) => {
+    if (!url) return;
+    const path = extractBillPath(url);
+    if (path) void supabase.storage.from(BILL_BUCKET).remove([path]);
+  };
+
+  const handleBillFile = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.target.value = ""; // reset so the same file can be picked again
+    if (!file || !matchId || !userId) return;
+
+    if (!BILL_MIME.includes(file.type)) {
+      setError(t("upload.errOnlyImages"));
+      return;
+    }
+    const ext = "." + (file.name.split(".").pop() || "").toLowerCase();
+    if (!BILL_EXTS.includes(ext)) {
+      setError(t("upload.errOnlyImages"));
+      return;
+    }
+    if (file.size > BILL_MAX_BYTES) {
+      setError(t("upload.errTooLarge"));
+      return;
+    }
+
+    setBillBusy(true);
+    setError("");
+    try {
+      const path = `${userId}/court-bill-${matchId}-${Date.now()}.${ext.slice(1)}`;
+      const { error: uploadError } = await supabase.storage
+        .from(BILL_BUCKET)
+        .upload(path, file, {
+          contentType: file.type,
+          upsert: false,
+          cacheControl: "3600",
+        });
+      if (uploadError) throw new Error(uploadError.message);
+
+      const { data } = supabase.storage.from(BILL_BUCKET).getPublicUrl(path);
+      if (!data.publicUrl) throw new Error(t("upload.errNoUrl"));
+      const url = data.publicUrl;
+
+      const { error: updateError } = await supabase
+        .from("matches")
+        .update({ court_bill_url: url })
+        .eq("id", matchId);
+      if (updateError) throw new Error(updateError.message);
+
+      removeBillObject(match?.courtBillUrl);
+      setMatch((prev) => (prev ? { ...prev, courtBillUrl: url } : prev));
+      triggerHaptic("success");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t("upload.errUpload"));
+    } finally {
+      setBillBusy(false);
+    }
+  };
+
+  const handleDeleteBill = async () => {
+    if (!matchId || !match?.courtBillUrl) return;
+    const ok = await confirm({
+      title: t("match.deleteCourtBill"),
+      message: t("match.deleteCourtBillConfirm"),
+      confirmLabel: t("common.confirm"),
+      cancelLabel: t("common.cancel"),
+      destructive: true,
+    });
+    if (!ok) return;
+
+    setBillBusy(true);
+    setError("");
+    try {
+      const { error: updateError } = await supabase
+        .from("matches")
+        .update({ court_bill_url: null })
+        .eq("id", matchId);
+      if (updateError) throw new Error(updateError.message);
+
+      removeBillObject(match.courtBillUrl);
+      setShowBillLightbox(false);
+      setMatch((prev) => (prev ? { ...prev, courtBillUrl: null } : prev));
+      triggerHaptic("success");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t("upload.errRemove"));
+    } finally {
+      setBillBusy(false);
     }
   };
 
@@ -543,6 +673,66 @@ export default function MatchDetailPage() {
               }}
               emptyLabel={t("match.nobody")}
             />
+
+            {match.status === "open" &&
+              (match.courtBillUrl ? (
+                <section className="glass-panel rounded-2xl p-5">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-lime-300">
+                    {t("match.courtBill")}
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => setShowBillLightbox(true)}
+                    aria-label={t("match.viewBill")}
+                    className="group relative mt-3 block h-44 w-full overflow-hidden rounded-xl border border-slate-800 transition hover:border-lime-500/40"
+                  >
+                    <Image
+                      src={match.courtBillUrl}
+                      alt={t("match.courtBill")}
+                      fill
+                      unoptimized
+                      sizes="(max-width: 768px) 100vw, 768px"
+                      style={{ objectFit: "cover" }}
+                    />
+                    <span className="absolute bottom-2 right-2 inline-flex items-center gap-1 rounded-lg bg-slate-950/70 px-2 py-1 text-[11px] font-semibold text-slate-100 backdrop-blur-sm group-hover:text-lime-300">
+                      <ImagePlus size={12} strokeWidth={1.75} />
+                      {t("match.viewBill")}
+                    </span>
+                  </button>
+                  {isHost && (
+                    <div className="mt-3 flex gap-2">
+                      <button
+                        type="button"
+                        disabled={billBusy}
+                        onClick={triggerPickBill}
+                        className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-xl border border-slate-700 bg-slate-900/60 py-2 text-xs font-semibold text-slate-300 transition hover:border-lime-500/50 hover:text-lime-300 active:scale-95 disabled:opacity-60"
+                      >
+                        <ImagePlus size={13} strokeWidth={2} />
+                        {t("match.changeCourtBill")}
+                      </button>
+                      <button
+                        type="button"
+                        disabled={billBusy}
+                        onClick={() => void handleDeleteBill()}
+                        className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-xl border border-rose-700/40 bg-rose-500/10 py-2 text-xs font-semibold text-rose-300 transition hover:bg-rose-500/15 active:scale-95 disabled:opacity-60"
+                      >
+                        <Trash2 size={13} strokeWidth={2} />
+                        {t("match.deleteCourtBill")}
+                      </button>
+                    </div>
+                  )}
+                </section>
+              ) : isHost ? (
+                <button
+                  type="button"
+                  disabled={billBusy}
+                  onClick={triggerPickBill}
+                  className="flex w-full items-center justify-center gap-2 rounded-2xl border border-dashed border-slate-700 bg-slate-900/40 py-4 text-sm font-semibold text-slate-400 transition hover:border-lime-500/40 hover:text-lime-300 active:scale-[0.99] disabled:opacity-60"
+                >
+                  <ImagePlus size={16} strokeWidth={1.75} />
+                  {billBusy ? t("upload.uploading") : t("match.uploadCourtBill")}
+                </button>
+              ) : null)}
 
             {expense && (
               <section className="glass-panel space-y-4 rounded-2xl p-5">
@@ -743,6 +933,44 @@ export default function MatchDetailPage() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      <input
+        ref={billFileRef}
+        type="file"
+        accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp"
+        className="hidden"
+        onChange={(event) => void handleBillFile(event)}
+      />
+
+      {showBillLightbox && match?.courtBillUrl && match.status === "open" && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/90 p-4 backdrop-blur-md"
+          onClick={() => setShowBillLightbox(false)}
+        >
+          <button
+            type="button"
+            aria-label={t("common.close")}
+            onClick={() => setShowBillLightbox(false)}
+            className="absolute right-4 top-4 rounded-full bg-slate-900/80 p-2.5 text-slate-200 transition hover:bg-slate-800 active:scale-95"
+          >
+            <X size={18} strokeWidth={2} />
+          </button>
+          {/* stopPropagation so tapping the image itself doesn't close */}
+          <div
+            className="max-h-full overflow-hidden rounded-2xl border border-slate-800 bg-slate-950"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <Image
+              src={match.courtBillUrl}
+              alt={t("match.courtBill")}
+              width={1536}
+              height={2048}
+              unoptimized
+              className="h-auto max-h-[85vh] w-auto max-w-[92vw] object-contain"
+            />
           </div>
         </div>
       )}

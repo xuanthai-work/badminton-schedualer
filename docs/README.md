@@ -70,4 +70,7 @@ Thư mục lưu trữ tài liệu kỹ thuật và lịch sử các task đã ho
 | TASK-58 | Đổi Modal Tạo Lịch, Thêm Sân Và Sửa Lịch Sang Dạng Căn Giữa Màn Hình (Centered Modal) | 2026-10-26 | **PASS** | [center-modals-ui.md](file:///D:/work/Stuff/badminton-schedualer/docs/tasks/center-modals-ui.md) |
 | TASK-59 | Tối Ưu Kích Thước Modal (Chống Scrollbar Khi Mở Picker) Và Bỏ Tên Buổi Đánh Ở Modal Sửa Lịch | 2026-10-26 | **PASS** | [optimize-modal-height-and-remove-match-name.md](file:///D:/work/Stuff/badminton-schedualer/docs/tasks/optimize-modal-height-and-remove-match-name.md) |
 | TASK-60 | Rút Gọn Nút Trạng Thái "Đã Khóa" Và Sửa Lỗi Hiển Thị Badge Khóa Tại Trang Chủ | 2026-10-26 | **PASS** | [shorten-locked-status-and-fix-dashboard-badge.md](file:///D:/work/Stuff/badminton-schedualer/docs/tasks/shorten-locked-status-and-fix-dashboard-badge.md) |
+| TASK-61 | Dọn Dẹp Triệt Để Tàn Dư "Sân Số" (Drop court_no Khỏi Database & Codebase) | 2026-10-29 | **PASS** | [remove-court-no.md](file:///D:/work/Stuff/badminton-schedualer/docs/tasks/remove-court-no.md) |
+| TASK-62 | Tích Hợp Upload Và Xem Phóng To Bill Đặt Sân Trong Chi Tiết Trận Đấu | 2026-10-29 | **PASS** | [add-court-booking-bill-upload.md](file:///D:/work/Stuff/badminton-schedualer/docs/tasks/add-court-booking-bill-upload.md) |
+| TASK-63 | Chặn Trùng Tên Người Chơi Trong Cùng Buổi Đánh (Unique Player Names Per Match) | 2026-10-29 | **PASS** | [enforce-unique-guest-name.md](file:///D:/work/Stuff/badminton-schedualer/docs/tasks/enforce-unique-guest-name.md) |
 

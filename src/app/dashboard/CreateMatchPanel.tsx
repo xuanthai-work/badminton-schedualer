@@ -120,7 +120,6 @@ export default function CreateMatchPanel({ onCreated }: Props) {
           match_end_time: endTime,
           location,
           location_url: locationUrl,
-          court_no: null,
           created_by: uid,
         })
         .select("id")

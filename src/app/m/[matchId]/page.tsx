@@ -8,10 +8,12 @@ import {
   CheckCircle2,
   Clock,
   Copy,
+  ImagePlus,
   Loader2,
   Lock,
   MapPin,
   QrCode,
+  X,
 } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { useI18n } from "@/lib/i18n";
@@ -31,7 +33,7 @@ type PublicMatch = {
   endTime: string | null;
   location: string;
   locationUrl: string | null;
-  courtNo: number | null;
+  courtBillUrl: string | null;
   status: "open" | "closed";
   rsvpLocked: boolean;
 };
@@ -91,6 +93,7 @@ export default function PublicMatchPage() {
   const [nameInput, setNameInput] = useState("");
   const [selectedGuestId, setSelectedGuestId] = useState<string | null>(null);
   const [showListManual, setShowListManual] = useState(false);
+  const [showBillLightbox, setShowBillLightbox] = useState(false);
 
   const load = useCallback(async () => {
     if (!matchId) return;
@@ -192,6 +195,9 @@ export default function PublicMatchPage() {
         if (rpcError.message?.includes("registration_locked")) {
           throw new Error(t("publicMatch.errRegistrationLocked"));
         }
+        if (rpcError.message?.includes("duplicate_name")) {
+          throw new Error(t("publicMatch.errDuplicateName"));
+        }
         if (rpcError.message?.includes("unauthorized_guest")) {
           throw new Error(t("publicMatch.errUnauthorizedGuest"));
         }
@@ -230,6 +236,20 @@ export default function PublicMatchPage() {
       return;
     }
     const id = identity?.id ?? newGuestId();
+    // Client-side duplicate check for joins/renames; the RPC re-checks
+    // server-side (case-insensitive after trimming).
+    if (dialogStatus === "yes" || dialogStatus === "rename") {
+      const isDuplicate = data?.guests.some(
+        (g) =>
+          g.status === "yes" &&
+          g.guestId !== id &&
+          g.name.trim().toLowerCase() === name.toLowerCase()
+      );
+      if (isDuplicate) {
+        setError(t("publicMatch.errDuplicateName"));
+        return;
+      }
+    }
     saveIdentity({ id, name });
     setDialogStatus(null);
     if (dialogStatus === "yes" || dialogStatus === "no") {
@@ -425,15 +445,44 @@ export default function PublicMatchPage() {
             )}
 
             {match.status === "open" && (
-              <section>
-                <PeopleList
-                  title={t("publicMatch.joinList", { count: yesPeople.length })}
-                  list={yesPeople}
-                  tone="lime"
-                  emptyLabel={t("publicMatch.nobody")}
-                  selfId={identity?.id ?? null}
-                />
-              </section>
+              <>
+                <section>
+                  <PeopleList
+                    title={t("publicMatch.joinList", { count: yesPeople.length })}
+                    list={yesPeople}
+                    tone="lime"
+                    emptyLabel={t("publicMatch.nobody")}
+                    selfId={identity?.id ?? null}
+                  />
+                </section>
+
+                {match.courtBillUrl && (
+                  <section className="glass-panel rounded-2xl p-5">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-lime-300">
+                      {t("match.courtBill")}
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => setShowBillLightbox(true)}
+                      aria-label={t("match.viewBill")}
+                      className="group relative mt-3 block h-44 w-full overflow-hidden rounded-xl border border-slate-800 transition hover:border-lime-500/40"
+                    >
+                      <Image
+                        src={match.courtBillUrl}
+                        alt={t("match.courtBill")}
+                        fill
+                        unoptimized
+                        sizes="(max-width: 768px) 100vw, 640px"
+                        style={{ objectFit: "cover" }}
+                      />
+                      <span className="absolute bottom-2 right-2 inline-flex items-center gap-1 rounded-lg bg-slate-950/70 px-2 py-1 text-[11px] font-semibold text-slate-100 backdrop-blur-sm group-hover:text-lime-300">
+                        <ImagePlus size={12} strokeWidth={1.75} />
+                        {t("match.viewBill")}
+                      </span>
+                    </button>
+                  </section>
+                )}
+              </>
             )}
           </>
         ) : null}
@@ -473,6 +522,35 @@ export default function PublicMatchPage() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+      {showBillLightbox && match?.courtBillUrl && match.status === "open" && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/90 p-4 backdrop-blur-md"
+          onClick={() => setShowBillLightbox(false)}
+        >
+          <button
+            type="button"
+            aria-label={t("common.close")}
+            onClick={() => setShowBillLightbox(false)}
+            className="absolute right-4 top-4 rounded-full bg-slate-900/80 p-2.5 text-slate-200 transition hover:bg-slate-800 active:scale-95"
+          >
+            <X size={18} strokeWidth={2} />
+          </button>
+          {/* stopPropagation so tapping the image itself doesn't close */}
+          <div
+            className="max-h-full overflow-hidden rounded-2xl border border-slate-800 bg-slate-950"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <Image
+              src={match.courtBillUrl}
+              alt={t("match.courtBill")}
+              width={1536}
+              height={2048}
+              unoptimized
+              className="h-auto max-h-[85vh] w-auto max-w-[92vw] object-contain"
+            />
           </div>
         </div>
       )}

@@ -129,7 +129,7 @@ create table if not exists public.matches (
   match_end_time time,
   location text not null check (length(location) <= 200),
   location_url text check (location_url is null or location_url ~* '^https?://'),
-  court_no smallint check (court_no is null or court_no between 1 and 99),
+  court_bill_url text check (court_bill_url is null or length(court_bill_url) <= 1000),
   status text not null default 'open' check (status in ('open', 'closed')),
   rsvp_locked boolean not null default false,
   created_at timestamptz not null default now(),
@@ -319,8 +319,8 @@ begin
     effective_secret := coalesce(nullif(trim(p_secret), ''), gen_random_uuid()::text);
   end if;
 
-  -- Hard cap: at most 20 attendees (status = 'yes').
   if p_status = 'yes' then
+    -- Hard cap: at most 20 attendees (status = 'yes').
     select count(*) into current_yes_count
     from public.match_guests
     where match_id = p_match_id
@@ -329,6 +329,19 @@ begin
 
     if current_yes_count >= 20 then
       raise exception 'match_full';
+    end if;
+
+    -- Duplicate names are confusing for cost splits and payment tracking.
+    -- Only active attendees count; the guest's own row is excluded so they
+    -- can re-submit / rename to their current name.
+    if exists (
+      select 1 from public.match_guests
+      where match_id = p_match_id
+        and status = 'yes'
+        and guest_id <> clean_guest
+        and lower(trim(name)) = lower(clean_name)
+    ) then
+      raise exception 'duplicate_name';
     end if;
   end if;
 
@@ -527,6 +540,15 @@ begin
     raise exception 'match_full';
   end if;
 
+  if exists (
+    select 1 from public.match_guests
+    where match_id = p_match_id
+      and status = 'yes'
+      and lower(trim(name)) = lower(clean_name)
+  ) then
+    raise exception 'duplicate_name';
+  end if;
+
   new_guest_id := 'g_' || substr(md5(random()::text || clock_timestamp()::text), 1, 12);
 
   insert into public.match_guests (match_id, guest_id, name, status, payment_status, updated_at)
@@ -655,7 +677,7 @@ declare
   base jsonb;
 begin
   select id, title, match_date, match_time, match_end_time, location,
-         location_url, court_no, status, rsvp_locked, created_by
+         location_url, court_bill_url, status, rsvp_locked, created_by
     into m
   from public.matches
   where id = p_match_id;
@@ -673,7 +695,7 @@ begin
       'endTime', m.match_end_time,
       'location', m.location,
       'locationUrl', m.location_url,
-      'courtNo', m.court_no,
+      'courtBillUrl', m.court_bill_url,
       'status', m.status,
       'rsvpLocked', coalesce(m.rsvp_locked, false)
     ),
@@ -754,3 +776,55 @@ on conflict (id) do update set
   public = true,
   file_size_limit = 2097152,
   allowed_mime_types = array['image/jpeg', 'image/png', 'image/webp'];
+
+-- 16b. Court-booking bills bucket (TASK-62): same hardening as avatars.
+insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+values (
+  'court-bills', 'court-bills', true, 5242880, array['image/jpeg', 'image/png', 'image/webp']
+)
+on conflict (id) do update set
+  public = true,
+  file_size_limit = 5242880,
+  allowed_mime_types = array['image/jpeg', 'image/png', 'image/webp'];
+
+drop policy if exists "CourtBills public read" on storage.objects;
+drop policy if exists "CourtBills owner insert" on storage.objects;
+drop policy if exists "CourtBills owner update" on storage.objects;
+drop policy if exists "CourtBills owner delete" on storage.objects;
+
+create policy "CourtBills public read"
+  on storage.objects
+  for select
+  to public
+  using (bucket_id = 'court-bills');
+
+create policy "CourtBills owner insert"
+  on storage.objects
+  for insert
+  to authenticated
+  with check (
+    bucket_id = 'court-bills'
+    and auth.uid()::text = (storage.foldername(name))[1]
+  );
+
+create policy "CourtBills owner update"
+  on storage.objects
+  for update
+  to authenticated
+  using (
+    bucket_id = 'court-bills'
+    and auth.uid()::text = (storage.foldername(name))[1]
+  )
+  with check (
+    bucket_id = 'court-bills'
+    and auth.uid()::text = (storage.foldername(name))[1]
+  );
+
+create policy "CourtBills owner delete"
+  on storage.objects
+  for delete
+  to authenticated
+  using (
+    bucket_id = 'court-bills'
+    and auth.uid()::text = (storage.foldername(name))[1]
+  );

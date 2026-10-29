@@ -228,11 +228,19 @@ const vi = {
     addGuestHint: "Nhập tên bạn bè hoặc người chơi đi cùng",
     addGuestPlaceholder: "Ví dụ: Tuấn Anh, Bạn Nam...",
     errNameEmpty: "Vui lòng nhập tên người chơi",
+    errDuplicateName:
+      "Tên này đã có trong danh sách tham gia. Vui lòng đặt tên khác.",
     editCosts: "Chỉnh sửa chi phí",
     cancelEditCosts: "Hủy chỉnh sửa",
     warnEditFeeTitle: "Cảnh báo thay đổi chi phí",
     warnEditFeeMsg:
       "Đã có {count} người thanh toán theo mức giá cũ. Nếu sửa chi phí, bạn cần tự đối soát phần chênh lệch với họ. Bạn có chắc muốn tiếp tục?",
+    courtBill: "Bill đặt sân",
+    uploadCourtBill: "Tải bill đặt sân",
+    changeCourtBill: "Đổi ảnh bill",
+    deleteCourtBill: "Xóa bill",
+    deleteCourtBillConfirm: "Xóa ảnh bill đặt sân này?",
+    viewBill: "Xem bill",
   },
   publicMatch: {
     loading: "Đang tải trận đấu...",
@@ -272,6 +280,8 @@ const vi = {
     errLoad: "Không thể tải dữ liệu.",
     errRsvp: "Lỗi điểm danh. Vui lòng thử lại.",
     errName: "Vui lòng nhập tên.",
+    errDuplicateName:
+      "Tên này đã có người sử dụng trong buổi đánh. Vui lòng chọn tên khác.",
     paymentTitle: "Thanh toán của bạn",
     amountDue: "Số tiền cần trả",
     scanHint: "Quét mã QR để chuyển khoản",
@@ -614,11 +624,19 @@ const en: typeof vi = {
     addGuestHint: "Enter name of friend or guest",
     addGuestPlaceholder: "e.g. Tuan Anh, Nam's friend...",
     errNameEmpty: "Please enter player name",
+    errDuplicateName:
+      "This name is already in the attendee list. Please use another name.",
     editCosts: "Edit costs",
     cancelEditCosts: "Cancel edit",
     warnEditFeeTitle: "Change costs warning",
     warnEditFeeMsg:
       "{count} player(s) have already paid at the previous rate. If you change costs, you need to reconcile the difference with them manually. Continue?",
+    courtBill: "Court booking bill",
+    uploadCourtBill: "Upload booking bill",
+    changeCourtBill: "Change bill",
+    deleteCourtBill: "Delete bill",
+    deleteCourtBillConfirm: "Delete this court booking bill?",
+    viewBill: "View bill",
   },
   publicMatch: {
     loading: "Loading match...",
@@ -658,6 +676,8 @@ const en: typeof vi = {
     errLoad: "Could not load data.",
     errRsvp: "Failed to RSVP. Please try again.",
     errName: "Please enter your name.",
+    errDuplicateName:
+      "This name is already taken in this match. Please choose another name.",
     paymentTitle: "Your payment",
     amountDue: "Amount due",
     scanHint: "Scan the QR to transfer",

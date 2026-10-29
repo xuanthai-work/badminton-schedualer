@@ -149,7 +149,6 @@ export default function EditMatchPanel({ match, onSaved }: Props) {
           match_end_time: endTime,
           location: chosenVenue ? chosenVenue.name : t("venues.unselected"),
           location_url: locationUrl,
-          court_no: null,
         })
         .eq("id", match.id);
 
