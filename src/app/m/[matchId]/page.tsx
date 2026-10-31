@@ -8,12 +8,10 @@ import {
   CheckCircle2,
   Clock,
   Copy,
-  ImagePlus,
   Loader2,
   Lock,
   MapPin,
   QrCode,
-  X,
 } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { useI18n } from "@/lib/i18n";
@@ -281,11 +279,26 @@ export default function PublicMatchPage() {
   }));
   const isFull = yesPeople.length >= 20;
 
+  // Lock background scroll and allow Escape to dismiss while the bill is open.
+  useEffect(() => {
+    if (!showBillLightbox) return;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setShowBillLightbox(false);
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener("keydown", onKeyDown);
+    };
+  }, [showBillLightbox]);
+
   return (
     <main className="relative min-h-screen overflow-hidden bg-slate-950 px-5 py-10 pb-16 text-slate-50">
       <div
         aria-hidden
-        className="pointer-events-none fixed -top-32 right-[-80px] h-80 w-80 rounded-full bg-lime-500/10 blur-3xl"
+        className="pointer-events-none absolute -top-40 right-[-120px] h-80 w-80 rounded-full bg-lime-500/[0.07] blur-3xl"
       />
 
       <PullToRefresh onRefresh={load}>
@@ -465,7 +478,7 @@ export default function PublicMatchPage() {
                       type="button"
                       onClick={() => setShowBillLightbox(true)}
                       aria-label={t("match.viewBill")}
-                      className="group relative mt-3 block h-44 w-full overflow-hidden rounded-xl border border-slate-800 transition hover:border-lime-500/40"
+                      className="group relative mt-3 flex h-44 w-full items-center justify-center overflow-hidden rounded-xl border border-slate-800 bg-slate-950/80 transition hover:border-lime-500/40"
                     >
                       <Image
                         src={match.courtBillUrl}
@@ -473,12 +486,8 @@ export default function PublicMatchPage() {
                         fill
                         unoptimized
                         sizes="(max-width: 768px) 100vw, 640px"
-                        style={{ objectFit: "cover" }}
+                        style={{ objectFit: "contain" }}
                       />
-                      <span className="absolute bottom-2 right-2 inline-flex items-center gap-1 rounded-lg bg-slate-950/70 px-2 py-1 text-[11px] font-semibold text-slate-100 backdrop-blur-sm group-hover:text-lime-300">
-                        <ImagePlus size={12} strokeWidth={1.75} />
-                        {t("match.viewBill")}
-                      </span>
                     </button>
                   </section>
                 )}
@@ -527,20 +536,12 @@ export default function PublicMatchPage() {
       )}
       {showBillLightbox && match?.courtBillUrl && match.status === "open" && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/90 p-4 backdrop-blur-md"
+          className="fixed inset-0 z-50 flex flex-col overscroll-contain bg-slate-950/90 pt-[max(1rem,env(safe-area-inset-top))] backdrop-blur-md"
           onClick={() => setShowBillLightbox(false)}
         >
-          <button
-            type="button"
-            aria-label={t("common.close")}
-            onClick={() => setShowBillLightbox(false)}
-            className="absolute right-4 top-4 rounded-full bg-slate-900/80 p-2.5 text-slate-200 transition hover:bg-slate-800 active:scale-95"
-          >
-            <X size={18} strokeWidth={2} />
-          </button>
-          {/* stopPropagation so tapping the image itself doesn't close */}
+          {/* Tapping the bill itself must not close the lightbox. */}
           <div
-            className="max-h-full overflow-hidden rounded-2xl border border-slate-800 bg-slate-950"
+            className="flex min-h-0 flex-1 items-center justify-center px-4"
             onClick={(event) => event.stopPropagation()}
           >
             <Image
@@ -549,8 +550,22 @@ export default function PublicMatchPage() {
               width={1536}
               height={2048}
               unoptimized
-              className="h-auto max-h-[85vh] w-auto max-w-[92vw] object-contain"
+              className="h-auto max-h-full w-auto max-w-full rounded-xl object-contain"
             />
+          </div>
+
+          {/* Thumb-reach close action for one-handed use. */}
+          <div
+            className="w-full px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-3"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <button
+              type="button"
+              onClick={() => setShowBillLightbox(false)}
+              className="mx-auto block w-full max-w-sm rounded-xl border border-white/10 bg-slate-900/80 py-3 text-sm font-semibold text-slate-100 backdrop-blur-md transition hover:bg-slate-800 active:scale-[0.98]"
+            >
+              {t("common.close")}
+            </button>
           </div>
         </div>
       )}

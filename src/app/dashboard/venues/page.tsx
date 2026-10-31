@@ -182,7 +182,7 @@ export default function VenuesPage() {
     <main className="relative min-h-screen overflow-hidden bg-slate-950 px-6 py-10 pb-28 text-slate-50">
       <div
         aria-hidden
-        className="pointer-events-none fixed -top-32 right-[-80px] h-80 w-80 rounded-full bg-lime-500/10 blur-3xl"
+        className="pointer-events-none absolute -top-40 right-[-120px] h-80 w-80 rounded-full bg-lime-500/[0.07] blur-3xl"
       />
 
       <div className="relative mx-auto flex w-full max-w-2xl flex-col gap-6">

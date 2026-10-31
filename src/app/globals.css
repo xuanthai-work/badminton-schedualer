@@ -63,6 +63,23 @@
     body {
       padding-top: env(safe-area-inset-top);
     }
+
+    /* Status-bar guard: the bar is translucent, so scrolled content would
+       otherwise slide under the clock / Dynamic Island. A fixed strip in the
+       inset area keeps that band opaque (and blurred) at every scroll offset. */
+    body::before {
+      content: "";
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: env(safe-area-inset-top);
+      background: rgba(2, 6, 23, 0.9);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      z-index: 60;
+      pointer-events: none;
+    }
   }
 }
 

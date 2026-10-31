@@ -73,4 +73,5 @@ Thư mục lưu trữ tài liệu kỹ thuật và lịch sử các task đã ho
 | TASK-61 | Dọn Dẹp Triệt Để Tàn Dư "Sân Số" (Drop court_no Khỏi Database & Codebase) | 2026-10-29 | **PASS** | [remove-court-no.md](file:///D:/work/Stuff/badminton-schedualer/docs/tasks/remove-court-no.md) |
 | TASK-62 | Tích Hợp Upload Và Xem Phóng To Bill Đặt Sân Trong Chi Tiết Trận Đấu | 2026-10-29 | **PASS** | [add-court-booking-bill-upload.md](file:///D:/work/Stuff/badminton-schedualer/docs/tasks/add-court-booking-bill-upload.md) |
 | TASK-63 | Chặn Trùng Tên Người Chơi Trong Cùng Buổi Đánh (Unique Player Names Per Match) | 2026-10-29 | **PASS** | [enforce-unique-guest-name.md](file:///D:/work/Stuff/badminton-schedualer/docs/tasks/enforce-unique-guest-name.md) |
+| TASK-64 | Tối Ưu Hiển Thị Bill Đặt Sân, Sửa Lỗi Thoát Lightbox, Tinh Gọn BottomNav & Fix Che Chữ Status Bar PWA (iOS / iPhone) | 2026-10-31 | **PASS** | [optimize-court-bill-and-pwa-mobile-ux.md](file:///D:/work/Stuff/badminton-schedualer/docs/tasks/optimize-court-bill-and-pwa-mobile-ux.md) |
 
